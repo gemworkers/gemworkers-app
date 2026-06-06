@@ -16,8 +16,20 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final quantityController = TextEditingController();
   final locationController = TextEditingController();
   final statusController = TextEditingController();
+
   final purchasePriceController = TextEditingController();
+  final wholesalePriceController = TextEditingController();
   final sellingPriceController = TextEditingController();
+  final retailPriceController = TextEditingController();
+
+  final productTypeController = TextEditingController();
+  final originCountryController = TextEditingController();
+  final originRegionController = TextEditingController();
+
+  final shapeController = TextEditingController();
+  final colorController = TextEditingController();
+
+  final notesController = TextEditingController();
 
   bool isSaving = false;
 
@@ -31,14 +43,24 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         'stone_type': stoneTypeController.text,
         'sku': skuController.text,
         'category': categoryController.text,
-        'weight': double.tryParse(weightController.text) ?? 0,
+        'weight': weightController.text,
         'quantity': int.tryParse(quantityController.text) ?? 0,
         'location': locationController.text,
         'status': statusController.text,
-        'purchase_price':
-            double.tryParse(purchasePriceController.text) ?? 0,
-        'selling_price':
-            double.tryParse(sellingPriceController.text) ?? 0,
+
+        'purchase_price': purchasePriceController.text,
+        'wholesale_price': wholesalePriceController.text,
+        'selling_price': sellingPriceController.text,
+        'retail_price': retailPriceController.text,
+
+        'product_type': productTypeController.text,
+        'origin_country': originCountryController.text,
+        'origin_region': originRegionController.text,
+
+        'shape': shapeController.text,
+        'color': colorController.text,
+
+        'notes': notesController.text,
       });
 
       if (mounted) {
@@ -46,7 +68,9 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(
+          content: Text('Error: $e'),
+        ),
       );
     }
 
@@ -84,12 +108,26 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             buildField('Stone Type', stoneTypeController),
             buildField('SKU', skuController),
             buildField('Category', categoryController),
+            buildField('Product Type', productTypeController),
+
             buildField('Weight', weightController),
             buildField('Quantity', quantityController),
+
             buildField('Location', locationController),
             buildField('Status', statusController),
+
+            buildField('Origin Country', originCountryController),
+            buildField('Origin Region', originRegionController),
+
+            buildField('Shape', shapeController),
+            buildField('Color', colorController),
+
             buildField('Purchase Price', purchasePriceController),
+            buildField('Wholesale Price', wholesalePriceController),
             buildField('Selling Price', sellingPriceController),
+            buildField('Retail Price', retailPriceController),
+
+            buildField('Notes', notesController),
 
             const SizedBox(height: 20),
 
