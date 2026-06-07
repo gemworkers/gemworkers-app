@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_inventory_page.dart';
+import 'edit_inventory_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -190,6 +191,29 @@ if (result == true) {
                               Text(
                                 'Selling Price: €${item['selling_price']}',
                               ),
+                              const SizedBox(height: 10),
+
+Align(
+  alignment: Alignment.centerRight,
+  child: ElevatedButton.icon(
+    icon: const Icon(Icons.edit),
+    label: const Text('Edit'),
+    onPressed: () async {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EditInventoryPage(
+            item: item,
+          ),
+        ),
+      );
+
+      if (result == true) {
+        loadItems();
+      }
+    },
+  ),
+),
                           ],
                         ),
                       ),
