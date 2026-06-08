@@ -1,0 +1,497 @@
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+import '../../models/inventory_item.dart';
+import '../../repositories/inventory_repository.dart';
+import 'edit_inventory_page.dart';
+
+class InventoryDetailPage extends StatefulWidget {
+  final InventoryItem item;
+
+  const InventoryDetailPage({super.key, required this.item});
+
+  @override
+  State<InventoryDetailPage> createState() => _InventoryDetailPageState();
+}
+
+class _InventoryDetailPageState extends State<InventoryDetailPage> {
+  final _repository = InventoryRepository();
+  final _picker = ImagePicker();
+
+  late InventoryItem _item;
+  bool _uploadingImage = false;
+  bool _deleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _item = widget.item;
+  }
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
+
+  Future<void> _openEdit() async {
+    final updated = await Navigator.push<InventoryItem>(
+      context,
+      MaterialPageRoute(builder: (_) => EditInventoryPage(item: _item)),
+    );
+    if (updated != null && mounted) {
+      setState(() => _item = updated);
+    }
+  }
+
+  // ── Delete item ───────────────────────────────────────────────────────────
+
+  Future<void> _confirmDeleteItem() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Item'),
+        content: Text('Delete "${_item.title}"? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await _repository.deleteItem(_item.id!);
+      if (mounted) Navigator.pop(context, 'deleted');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e')),
+        );
+        setState(() => _deleting = false);
+      }
+    }
+  }
+
+  // ── QR code ───────────────────────────────────────────────────────────────
+
+  void _showQRCode() {
+    final data = _item.sku.isNotEmpty ? _item.sku : (_item.id ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('QR Code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            QrImageView(
+              data: data,
+              version: QrVersions.auto,
+              size: 220,
+              eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square),
+              dataModuleStyle:
+                  const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _item.sku.isNotEmpty ? _item.sku : 'No SKU',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            if (_item.title.isNotEmpty)
+              Text(
+                _item.title,
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Photo upload ──────────────────────────────────────────────────────────
+
+  Future<void> _pickAndUpload() async {
+    if (_item.id == null) return;
+
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (file == null || !mounted) return;
+
+    setState(() => _uploadingImage = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final url = await _repository.uploadImage(_item.id!, bytes, file.name);
+      final updatedUrls = [..._item.imageUrls, url];
+      await _repository.updateItemImages(_item.id!, updatedUrls);
+      if (mounted) setState(() => _item = _item.copyWith(imageUrls: updatedUrls));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
+    }
+  }
+
+  // ── Photo deletion ────────────────────────────────────────────────────────
+
+  Future<void> _confirmDeletePhoto(int index) async {
+    final url = _item.imageUrls[index];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Photo'),
+        content: const Text('Remove this photo from the item?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _repository.deleteImageByUrl(_item.id!, url, _item.imageUrls);
+      final updatedUrls = [..._item.imageUrls]..removeAt(index);
+      if (mounted) setState(() => _item = _item.copyWith(imageUrls: updatedUrls));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Remove failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ── Gallery ───────────────────────────────────────────────────────────────
+
+  void _openGallery(int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ImageGalleryPage(
+          imageUrls: _item.imageUrls,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
+  // ── Build helpers ─────────────────────────────────────────────────────────
+
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            child: Text(value.isEmpty ? '—' : value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.primary,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Photos',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _uploadingImage ? null : _pickAndUpload,
+              icon: _uploadingImage
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: Text(_uploadingImage ? 'Uploading…' : 'Add Photo'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_item.imageUrls.isEmpty)
+          Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: Text('No photos yet', style: TextStyle(color: Colors.grey)),
+            ),
+          )
+        else
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _item.imageUrls.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (_, index) => GestureDetector(
+                onTap: () => _openGallery(index),
+                onLongPress: () => _confirmDeletePhoto(index),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _item.imageUrls[index],
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 120,
+                          height: 120,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Colors.black45,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.touch_app,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 4),
+          child: Text(
+            'Tap to view · Long press to remove',
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: Colors.grey),
+          ),
+        ),
+        const Divider(height: 24),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_item.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_outlined),
+            onPressed: _showQRCode,
+            tooltip: 'QR Code',
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: _openEdit,
+            tooltip: 'Edit',
+          ),
+          IconButton(
+            icon: _deleting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline),
+            onPressed: _deleting ? null : _confirmDeleteItem,
+            tooltip: 'Delete',
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildPhotoSection(),
+
+          _sectionLabel('Identification'),
+          _row('SKU', _item.sku),
+          _row('Title', _item.title),
+
+          _sectionLabel('Gem Details'),
+          _row('Gem Type', _item.gemType),
+          _row('Variety', _item.variety),
+          _row('Shape', _item.shape),
+          _row('Cut Type', _item.cutType),
+
+          _sectionLabel('Origin'),
+          _row('Country', _item.originCountry),
+          _row('Region', _item.originRegion),
+
+          _sectionLabel('Weight & Quantity'),
+          _row('Weight', '${_item.weightValue} ${_item.weightUnit}'),
+          _row('Quantity', _item.quantity.toString()),
+
+          _sectionLabel('Pricing'),
+          _row('Cost Price', '€${_item.costPrice.toStringAsFixed(2)}'),
+          _row('Sale Price', '€${_item.salePrice.toStringAsFixed(2)}'),
+
+          _sectionLabel('Supplier'),
+          _row(
+            'Supplier',
+            _item.supplierName.isNotEmpty ? _item.supplierName : '—',
+          ),
+
+          _sectionLabel('Other'),
+          _row('Status', _item.status),
+          _row('Barcode', _item.barcode),
+
+          if (_item.notes.isNotEmpty) ...[
+            _sectionLabel('Notes'),
+            Text(_item.notes),
+          ],
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Full-screen image gallery ─────────────────────────────────────────────────
+
+class _ImageGalleryPage extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const _ImageGalleryPage({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_ImageGalleryPage> createState() => _ImageGalleryPageState();
+}
+
+class _ImageGalleryPageState extends State<_ImageGalleryPage> {
+  late final PageController _controller;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text('${_current + 1} / ${widget.imageUrls.length}'),
+      ),
+      body: PageView.builder(
+        controller: _controller,
+        itemCount: widget.imageUrls.length,
+        onPageChanged: (i) => setState(() => _current = i),
+        itemBuilder: (_, index) => InteractiveViewer(
+          child: Center(
+            child: Image.network(
+              widget.imageUrls[index],
+              fit: BoxFit.contain,
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+              errorBuilder: (_, _, _) => const Center(
+                child: Icon(Icons.broken_image, color: Colors.white, size: 80),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
