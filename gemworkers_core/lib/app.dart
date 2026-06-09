@@ -3,8 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/services/auth_service.dart';
 import 'pages/auth/login_page.dart';
+import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
+import 'pages/orders/orders_page.dart';
 import 'pages/suppliers/suppliers_page.dart';
 
 class GemWorkersApp extends StatelessWidget {
@@ -46,6 +48,8 @@ class _MainLayoutState extends State<MainLayout> {
   static const _pages = [
     DashboardPage(),
     InventoryPage(),
+    OrdersPage(),
+    CustomersPage(),
     SuppliersPage(),
   ];
 
@@ -59,6 +63,16 @@ class _MainLayoutState extends State<MainLayout> {
       icon: Icon(Icons.inventory_2_outlined),
       selectedIcon: Icon(Icons.inventory_2),
       label: Text('Inventory'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long),
+      label: Text('Orders'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.person_outline),
+      selectedIcon: Icon(Icons.person),
+      label: Text('Customers'),
     ),
     NavigationRailDestination(
       icon: Icon(Icons.people_outline),

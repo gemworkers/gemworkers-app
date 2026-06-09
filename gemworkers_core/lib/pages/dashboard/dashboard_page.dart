@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../models/inventory_item.dart';
+import '../../repositories/customer_repository.dart';
 import '../../repositories/inventory_repository.dart';
-import '../../repositories/supplier_repository.dart';
+import '../../repositories/order_repository.dart';
 import '../inventory/inventory_detail_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -14,10 +15,13 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final _inventoryRepo = InventoryRepository();
-  final _supplierRepo = SupplierRepository();
+  final _orderRepo = OrderRepository();
+  final _customerRepo = CustomerRepository();
 
   List<InventoryItem> _items = [];
-  int _supplierCount = 0;
+  int _orderCount = 0;
+  int _customerCount = 0;
+  double _revenue = 0.0;
   bool _loading = true;
 
   @override
@@ -31,18 +35,27 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final itemsFuture = _inventoryRepo.getItems();
 
-      // Suppliers table may not be created yet — fail gracefully.
-      int supplierCount = 0;
+      int orderCount = 0;
+      int customerCount = 0;
+      double revenue = 0.0;
+
+      // Each of these may not exist yet — fail gracefully.
       try {
-        final suppliers = await _supplierRepo.getSuppliers();
-        supplierCount = suppliers.length;
+        final stats = await _orderRepo.getDashboardStats();
+        orderCount = stats.orderCount;
+        revenue = stats.revenue;
+      } catch (_) {}
+      try {
+        customerCount = await _customerRepo.getCustomerCount();
       } catch (_) {}
 
       final items = await itemsFuture;
       if (mounted) {
         setState(() {
           _items = items;
-          _supplierCount = supplierCount;
+          _orderCount = orderCount;
+          _customerCount = customerCount;
+          _revenue = revenue;
           _loading = false;
         });
       }
@@ -76,7 +89,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildStatsGrid() {
     final available = _countByStatus('available');
-    final value = _totalValue;
 
     return Column(
       children: [
@@ -99,6 +111,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 color: Colors.green,
               ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Inventory Value',
+                value: '€${_formatValue(_totalValue)}',
+                icon: Icons.euro_outlined,
+                color: Colors.amber.shade700,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -106,18 +127,27 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             Expanded(
               child: _StatCard(
-                label: 'Total Value',
-                value: '€${_formatValue(value)}',
-                icon: Icons.euro_outlined,
-                color: Colors.amber.shade700,
+                label: 'Revenue',
+                value: '€${_formatValue(_revenue)}',
+                icon: Icons.payments_outlined,
+                color: Colors.teal,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _StatCard(
-                label: 'Suppliers',
-                value: '$_supplierCount',
-                icon: Icons.people_outline,
+                label: 'Orders',
+                value: '$_orderCount',
+                icon: Icons.receipt_long_outlined,
+                color: Colors.deepPurple,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Customers',
+                value: '$_customerCount',
+                icon: Icons.person_outline,
                 color: Colors.blue,
               ),
             ),
