@@ -93,6 +93,23 @@ class InventoryRepository {
     await supabase.from('inventory_items').delete().eq('id', id);
   }
 
+  /// Sets is_listed=true, records the selling price and listed_at timestamp.
+  Future<void> listItem(String id, double sellingPrice) async {
+    await supabase.from('inventory_items').update({
+      'is_listed': true,
+      'selling_price': sellingPrice,
+      'listed_at': DateTime.now().toIso8601String(),
+    }).eq('id', id);
+  }
+
+  /// Clears is_listed; keeps selling_price so it can be reused next time.
+  Future<void> unlistItem(String id) async {
+    await supabase.from('inventory_items').update({
+      'is_listed': false,
+      'listed_at': null,
+    }).eq('id', id);
+  }
+
   // ── Image management ──────────────────────────────────────────────────────
 
   Future<String> uploadImage(

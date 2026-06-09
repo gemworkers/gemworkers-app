@@ -66,6 +66,90 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     }
   }
 
+  // ── List / Unlist ─────────────────────────────────────────────────────────
+
+  Future<void> _showListDialog() async {
+    final priceController = TextEditingController(
+      text: _item.sellingPrice != null
+          ? _item.sellingPrice!.toStringAsFixed(2)
+          : '',
+    );
+    try {
+      final price = await showDialog<double>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('List on Marketplace'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Selling price for "${_item.title}":'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Selling Price',
+                  prefixText: '€ ',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final p = double.tryParse(
+                    priceController.text.replaceAll(',', '.'));
+                if (p == null || p <= 0) return;
+                Navigator.pop(ctx, p);
+              },
+              child: const Text('List'),
+            ),
+          ],
+        ),
+      );
+      if (price == null || !mounted) return;
+      await _repository.listItem(_item.id!, price);
+      if (mounted) {
+        setState(() {
+          _item = _item.copyWith(
+            isListed: true,
+            sellingPrice: price,
+            listedAt: DateTime.now(),
+          );
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      priceController.dispose();
+    }
+  }
+
+  Future<void> _unlistItem() async {
+    try {
+      await _repository.unlistItem(_item.id!);
+      if (mounted) {
+        setState(() => _item = _item.copyWith(isListed: false, listedAt: null));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
   Future<void> _moveItem() async {
     final branchId = _item.branchId ?? kCurrentBranchId;
     final picked = await showLocationPicker(
@@ -591,6 +675,53 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
               ),
             ],
           ),
+
+          _sectionLabel('Marketplace'),
+          Row(
+            children: [
+              Expanded(
+                child: _row(
+                  'Listing',
+                  _item.isListed
+                      ? 'Listed · €${_item.sellingPrice?.toStringAsFixed(2) ?? ''}'
+                      : 'Private (not listed)',
+                ),
+              ),
+              if (_item.status != 'sold')
+                _item.isListed
+                    ? OutlinedButton(
+                        onPressed: _unlistItem,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Text('Unlist'),
+                      )
+                    : FilledButton(
+                        onPressed: _showListDialog,
+                        style: FilledButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Text('List'),
+                      ),
+            ],
+          ),
+          if (_item.isListed && _item.sellingPrice != null) ...[
+            _row('Selling Price',
+                '€${_item.sellingPrice!.toStringAsFixed(2)}'),
+            _row(
+              'Margin',
+              () {
+                final m = _item.sellingPrice! - _item.costPrice;
+                final p = _item.costPrice > 0
+                    ? m / _item.costPrice * 100
+                    : 0.0;
+                return '${m >= 0 ? '+' : ''}€${m.toStringAsFixed(2)} (${p.toStringAsFixed(1)}%)';
+              }(),
+            ),
+          ],
 
           _sectionLabel('Other'),
           _row('Status', _item.status),

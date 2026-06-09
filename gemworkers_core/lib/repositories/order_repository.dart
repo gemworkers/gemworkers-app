@@ -106,7 +106,7 @@ class OrderRepository {
       if (inventoryId != null) {
         await supabase
             .from('inventory_items')
-            .update({'status': 'sold'})
+            .update({'status': 'sold', 'is_listed': false})
             .eq('id', inventoryId);
       }
     }

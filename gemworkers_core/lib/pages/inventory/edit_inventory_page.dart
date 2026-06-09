@@ -150,6 +150,9 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         imageUrls: widget.item.imageUrls,
         supplierId: _supplierId,
         supplierName: supplierName,
+        isListed: widget.item.isListed,
+        sellingPrice: widget.item.sellingPrice,
+        listedAt: widget.item.listedAt,
         createdAt: widget.item.createdAt,
       );
 

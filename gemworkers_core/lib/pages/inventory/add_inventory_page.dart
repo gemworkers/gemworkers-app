@@ -41,6 +41,9 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   String _weightUnit = 'ct';
   String _status = 'available';
 
+  bool _listOnMarketplace = false;
+  final _sellingPrice = TextEditingController();
+
   // ── Supplier ──────────────────────────────────────────────────────────────
 
   List<Supplier> _suppliers = [];
@@ -68,7 +71,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
     for (final c in [
       _sku, _title, _gemType, _variety, _originCountry, _originRegion,
       _shape, _cutType, _weightValue, _quantity, _costPrice, _salePrice,
-      _barcode, _notes,
+      _barcode, _notes, _sellingPrice,
     ]) {
       c.dispose();
     }
@@ -127,6 +130,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
     if (_quantity.text.isNotEmpty && int.tryParse(_quantity.text) == null) {
       return 'Quantity must be a whole number.';
     }
+    if (_listOnMarketplace) {
+      final sp = double.tryParse(_sellingPrice.text);
+      if (sp == null || sp <= 0) return 'Enter a selling price to list on marketplace.';
+    }
     return null;
   }
 
@@ -172,6 +179,11 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         imageUrls: const [],
         supplierId: _supplierId,
         supplierName: supplierName,
+        isListed: _listOnMarketplace,
+        sellingPrice: _listOnMarketplace
+            ? double.tryParse(_sellingPrice.text)
+            : null,
+        listedAt: _listOnMarketplace ? DateTime.now() : null,
       );
 
       final created = await _repository.addItem(item);
@@ -385,6 +397,24 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
               const FormSection('Supplier'),
               _buildSupplierPicker(),
+
+              const FormSection('Marketplace'),
+              SwitchListTile(
+                title: const Text('List on marketplace now?'),
+                subtitle: const Text('Makes this item visible to buyers'),
+                value: _listOnMarketplace,
+                onChanged: _saving
+                    ? null
+                    : (v) => setState(() => _listOnMarketplace = v),
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (_listOnMarketplace)
+                FormTextField(
+                  'Selling Price *',
+                  _sellingPrice,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
 
               const FormSection('Other'),
               FormTextField('Barcode', _barcode),

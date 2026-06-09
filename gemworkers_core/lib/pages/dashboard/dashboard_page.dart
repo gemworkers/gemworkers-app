@@ -121,6 +121,12 @@ class _DashboardPageState extends State<DashboardPage> {
   int _countByStatus(String s) =>
       _filteredItems.where((e) => e.status == s).length;
 
+  int get _listedCount => _filteredItems.where((e) => e.isListed).length;
+
+  double get _listedValue => _filteredItems
+      .where((e) => e.isListed)
+      .fold(0.0, (sum, e) => sum + (e.sellingPrice ?? 0));
+
   double get _totalValue =>
       _filteredItems.fold(0.0, (sum, e) => sum + e.salePrice);
 
@@ -279,6 +285,29 @@ class _DashboardPageState extends State<DashboardPage> {
                 value: '$_customerCount',
                 icon: Icons.person_outline,
                 color: Colors.blue,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Row 4 — marketplace
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                label: 'Listed (marketplace)',
+                value: '$_listedCount',
+                icon: Icons.storefront_outlined,
+                color: Colors.cyan.shade700,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Listed Value',
+                value: '€${_formatValue(_listedValue)}',
+                icon: Icons.sell_outlined,
+                color: Colors.cyan.shade700,
               ),
             ),
           ],

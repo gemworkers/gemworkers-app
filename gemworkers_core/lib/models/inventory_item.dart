@@ -44,6 +44,11 @@ class InventoryItem {
   final String? branchId;
   final String? locationId;
 
+  // Marketplace listing (is_listed feeds a future public storefront).
+  final bool isListed;
+  final double? sellingPrice;
+  final DateTime? listedAt;
+
   final DateTime? createdAt;
 
   const InventoryItem({
@@ -70,6 +75,9 @@ class InventoryItem {
     this.supplierName = '',
     this.branchId,
     this.locationId,
+    this.isListed = false,
+    this.sellingPrice,
+    this.listedAt,
     this.createdAt,
   });
 
@@ -106,6 +114,13 @@ class InventoryItem {
               '',
       branchId: map['branch_id']?.toString(),
       locationId: map['location_id']?.toString(),
+      isListed: map['is_listed'] == true,
+      sellingPrice: map['selling_price'] != null
+          ? (map['selling_price'] as num).toDouble()
+          : null,
+      listedAt: map['listed_at'] != null
+          ? DateTime.parse(map['listed_at'].toString())
+          : null,
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -135,6 +150,9 @@ class InventoryItem {
       'supplier_id': supplierId,
       'branch_id': branchId,
       'location_id': locationId,
+      'is_listed': isListed,
+      'selling_price': sellingPrice,
+      'listed_at': listedAt?.toIso8601String(),
     };
   }
 
@@ -163,6 +181,9 @@ class InventoryItem {
     String? supplierName,
     Object? branchId = _omitted,
     Object? locationId = _omitted,
+    bool? isListed,
+    Object? sellingPrice = _omitted,
+    Object? listedAt = _omitted,
     DateTime? createdAt,
   }) {
     return InventoryItem(
@@ -192,6 +213,13 @@ class InventoryItem {
           identical(branchId, _omitted) ? this.branchId : branchId as String?,
       locationId:
           identical(locationId, _omitted) ? this.locationId : locationId as String?,
+      isListed: isListed ?? this.isListed,
+      sellingPrice: identical(sellingPrice, _omitted)
+          ? this.sellingPrice
+          : sellingPrice as double?,
+      listedAt: identical(listedAt, _omitted)
+          ? this.listedAt
+          : listedAt as DateTime?,
       createdAt: createdAt ?? this.createdAt,
     );
   }

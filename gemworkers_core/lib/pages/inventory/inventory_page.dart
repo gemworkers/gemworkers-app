@@ -21,6 +21,10 @@ enum _SortOrder {
   const _SortOrder(this.label);
 }
 
+// ── Listing tab ───────────────────────────────────────────────────────────────
+
+enum _ListingTab { all, private, listed, sold }
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 class InventoryPage extends StatefulWidget {
@@ -30,10 +34,12 @@ class InventoryPage extends StatefulWidget {
   State<InventoryPage> createState() => _InventoryPageState();
 }
 
-class _InventoryPageState extends State<InventoryPage> {
+class _InventoryPageState extends State<InventoryPage>
+    with SingleTickerProviderStateMixin {
   final _repository = InventoryRepository();
   final _locationRepo = LocationRepository();
   final _searchController = TextEditingController();
+  late final TabController _tabController;
 
   List<InventoryItem> _all = [];
   List<Location> _allLocations = [];
@@ -42,7 +48,7 @@ class _InventoryPageState extends State<InventoryPage> {
   // ── Filter & sort state ───────────────────────────────────────────────────
 
   String _query = '';
-  String? _statusFilter;
+  _ListingTab _selectedTab = _ListingTab.all;
   String? _gemTypeFilter;
   Location? _locationFilter;
   Set<String> _locationDescendantIds = {};
@@ -54,12 +60,20 @@ class _InventoryPageState extends State<InventoryPage> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this)
+      ..addListener(() {
+        if (!_tabController.indexIsChanging) {
+          setState(
+              () => _selectedTab = _ListingTab.values[_tabController.index]);
+        }
+      });
     _searchController.addListener(_onSearchChanged);
     _loadItems();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController
       ..removeListener(_onSearchChanged)
       ..dispose();
@@ -86,9 +100,8 @@ class _InventoryPageState extends State<InventoryPage> {
           _all = items;
           _allLocations = locs;
           if (!_priceRangeInitialized && items.isNotEmpty) {
-            final max = items
-                .map((e) => e.salePrice)
-                .reduce((a, b) => a > b ? a : b);
+            final max =
+                items.map((e) => e.salePrice).reduce((a, b) => a > b ? a : b);
             _maxPrice = max < 1 ? 10000 : max;
             _priceRange = RangeValues(0, _maxPrice);
             _priceRangeInitialized = true;
@@ -119,12 +132,96 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
+  // ── Listing actions ───────────────────────────────────────────────────────
+
+  Future<void> _showListDialog(InventoryItem item) async {
+    final priceController = TextEditingController(
+      text: item.sellingPrice != null
+          ? item.sellingPrice!.toStringAsFixed(2)
+          : '',
+    );
+    try {
+      final price = await showDialog<double>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('List on Marketplace'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Selling price for "${item.title}":'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Selling Price',
+                  prefixText: '€ ',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final p = double.tryParse(
+                    priceController.text.replaceAll(',', '.'));
+                if (p == null || p <= 0) return;
+                Navigator.pop(ctx, p);
+              },
+              child: const Text('List'),
+            ),
+          ],
+        ),
+      );
+      if (price == null || !mounted) return;
+      await _repository.listItem(item.id!, price);
+      _loadItems();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      priceController.dispose();
+    }
+  }
+
+  Future<void> _unlistItem(InventoryItem item) async {
+    try {
+      await _repository.unlistItem(item.id!);
+      _loadItems();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    }
+  }
+
   // ── Computed display list ─────────────────────────────────────────────────
 
   List<InventoryItem> get _displayItems => _applySorting(_filtered);
 
   List<InventoryItem> get _filtered {
     return _all.where((item) {
+      switch (_selectedTab) {
+        case _ListingTab.private:
+          if (item.isListed || item.status == 'sold') return false;
+        case _ListingTab.listed:
+          if (!item.isListed) return false;
+        case _ListingTab.sold:
+          if (item.status != 'sold') return false;
+        case _ListingTab.all:
+          break;
+      }
       if (_query.isNotEmpty) {
         final hit = item.title.toLowerCase().contains(_query) ||
             item.gemType.toLowerCase().contains(_query) ||
@@ -132,7 +229,6 @@ class _InventoryPageState extends State<InventoryPage> {
             item.variety.toLowerCase().contains(_query);
         if (!hit) return false;
       }
-      if (_statusFilter != null && item.status != _statusFilter) return false;
       if (_gemTypeFilter != null && _gemTypeFilter!.isNotEmpty) {
         if (!item.gemType
             .toLowerCase()
@@ -173,7 +269,6 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   bool get _hasFilters =>
-      _statusFilter != null ||
       (_gemTypeFilter?.isNotEmpty ?? false) ||
       _locationFilter != null ||
       _priceRange.start > 0 ||
@@ -181,7 +276,6 @@ class _InventoryPageState extends State<InventoryPage> {
 
   void _clearFilters() {
     setState(() {
-      _statusFilter = null;
       _gemTypeFilter = null;
       _locationFilter = null;
       _locationDescendantIds = {};
@@ -191,16 +285,13 @@ class _InventoryPageState extends State<InventoryPage> {
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
-  int get _availableCount =>
-      _all.where((e) => e.status == 'available').length;
+  int get _availableCount => _all.where((e) => e.status == 'available').length;
 
-  double get _totalValue =>
-      _all.fold(0, (sum, e) => sum + e.salePrice);
+  double get _totalValue => _all.fold(0, (sum, e) => sum + e.salePrice);
 
   // ── Filter bottom sheet ───────────────────────────────────────────────────
 
   void _showFilterSheet() {
-    String? tempStatus = _statusFilter;
     final gemController = TextEditingController(text: _gemTypeFilter ?? '');
     Location? tempLocation = _locationFilter;
     RangeValues tempPrice = _priceRange;
@@ -226,7 +317,6 @@ class _InventoryPageState extends State<InventoryPage> {
                   const Spacer(),
                   TextButton(
                     onPressed: () => setSheet(() {
-                      tempStatus = null;
                       gemController.clear();
                       tempLocation = null;
                       tempPrice = RangeValues(0, _maxPrice);
@@ -236,31 +326,6 @@ class _InventoryPageState extends State<InventoryPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                ),
-                child: DropdownButton<String?>(
-                  value: tempStatus,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(
-                        value: null, child: Text('All statuses')),
-                    DropdownMenuItem(
-                        value: 'available', child: Text('Available')),
-                    DropdownMenuItem(
-                        value: 'reserved', child: Text('Reserved')),
-                    DropdownMenuItem(value: 'sold', child: Text('Sold')),
-                    DropdownMenuItem(value: 'draft', child: Text('Draft')),
-                  ],
-                  onChanged: (v) => setSheet(() => tempStatus = v),
-                ),
-              ),
-              const SizedBox(height: 14),
               TextField(
                 controller: gemController,
                 decoration: const InputDecoration(
@@ -287,8 +352,8 @@ class _InventoryPageState extends State<InventoryPage> {
                           value: null, child: Text('All locations')),
                       ..._allLocations.map((l) => DropdownMenuItem(
                             value: l,
-                            child: Text(l.name,
-                                overflow: TextOverflow.ellipsis),
+                            child:
+                                Text(l.name, overflow: TextOverflow.ellipsis),
                           )),
                     ],
                     onChanged: (v) => setSheet(() => tempLocation = v),
@@ -317,7 +382,6 @@ class _InventoryPageState extends State<InventoryPage> {
                 child: FilledButton(
                   onPressed: () {
                     setState(() {
-                      _statusFilter = tempStatus;
                       _gemTypeFilter = gemController.text.trim().isEmpty
                           ? null
                           : gemController.text.trim();
@@ -364,32 +428,44 @@ class _InventoryPageState extends State<InventoryPage> {
       appBar: AppBar(
         title: const Text('Inventory'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search name, gem type, SKU…',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                suffixIcon: _query.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: _searchController.clear,
-                      )
-                    : null,
-                isDense: true,
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
+          preferredSize: const Size.fromHeight(104),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search name, gem type, SKU…',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _query.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: _searchController.clear,
+                          )
+                        : null,
+                    isDense: true,
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'All'),
+                  Tab(text: 'Private'),
+                  Tab(text: 'Listed'),
+                  Tab(text: 'Sold'),
+                ],
+              ),
+            ],
           ),
         ),
         actions: [
-          // Sort menu
           PopupMenuButton<_SortOrder>(
             icon: const Icon(Icons.sort),
             tooltip: 'Sort',
@@ -413,7 +489,6 @@ class _InventoryPageState extends State<InventoryPage> {
                 )
                 .toList(),
           ),
-          // Filter button with active indicator
           Badge(
             isLabelVisible: _hasFilters,
             child: IconButton(
@@ -429,18 +504,14 @@ class _InventoryPageState extends State<InventoryPage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // ── Stats strip ─────────────────────────────────────────
-                if (_all.isNotEmpty) _StatsStrip(_all.length, _availableCount, _totalValue),
-
-                // ── Active filter bar ───────────────────────────────────
+                if (_all.isNotEmpty)
+                  _StatsStrip(_all.length, _availableCount, _totalValue),
                 if (_hasFilters)
                   _FilterBar(
                     count: display.length,
                     total: _all.length,
                     onClear: _clearFilters,
                   ),
-
-                // ── List ────────────────────────────────────────────────
                 Expanded(
                   child: display.isEmpty
                       ? _EmptyState(
@@ -453,8 +524,19 @@ class _InventoryPageState extends State<InventoryPage> {
                             padding:
                                 const EdgeInsets.fromLTRB(8, 4, 8, 80),
                             itemCount: display.length,
-                            itemBuilder: (_, index) =>
-                                _ItemCard(display[index], onTap: _openDetail),
+                            itemBuilder: (_, index) {
+                              final item = display[index];
+                              return _ItemCard(
+                                item,
+                                onTap: _openDetail,
+                                onList: item.status != 'sold'
+                                    ? () => _showListDialog(item)
+                                    : null,
+                                onUnlist: item.status != 'sold'
+                                    ? () => _unlistItem(item)
+                                    : null,
+                              );
+                            },
                           ),
                         ),
                 ),
@@ -490,10 +572,7 @@ class _StatsStrip extends StatelessWidget {
           _divider(),
           _Stat(label: 'Available', value: available.toString()),
           _divider(),
-          _Stat(
-            label: 'Value',
-            value: '€${_formatValue(totalValue)}',
-          ),
+          _Stat(label: 'Value', value: '€${_formatValue(totalValue)}'),
         ],
       ),
     );
@@ -621,51 +700,150 @@ class _EmptyState extends StatelessWidget {
 class _ItemCard extends StatelessWidget {
   final InventoryItem item;
   final Future<void> Function(InventoryItem) onTap;
+  final VoidCallback? onList;
+  final VoidCallback? onUnlist;
 
-  const _ItemCard(this.item, {required this.onTap});
+  const _ItemCard(
+    this.item, {
+    required this.onTap,
+    required this.onList,
+    required this.onUnlist,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final listed = item.isListed && item.sellingPrice != null;
+    final margin = listed ? item.sellingPrice! - item.costPrice : null;
+    final marginPct = margin != null && item.costPrice > 0
+        ? margin / item.costPrice * 100
+        : null;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: ListTile(
-        onTap: () => onTap(item),
-        leading: item.imageUrls.isNotEmpty
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  item.imageUrls.first,
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      const Icon(Icons.diamond_outlined, size: 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            onTap: () => onTap(item),
+            leading: item.imageUrls.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(
+                      item.imageUrls.first,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          const Icon(Icons.diamond_outlined, size: 36),
+                    ),
+                  )
+                : const Icon(Icons.diamond_outlined, size: 36),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              )
-            : const Icon(Icons.diamond_outlined, size: 36),
-        title: Text(
-          item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          '${item.sku}  ·  ${item.gemType}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '€${item.salePrice.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+                if (item.isListed) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Listed',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 4),
-            _StatusChip(item.status),
-          ],
-        ),
+            subtitle: Text(
+              '${item.sku}  ·  ${item.gemType}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (listed) ...[
+                  Text(
+                    '€${item.sellingPrice!.toStringAsFixed(2)}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600, color: cs.primary),
+                  ),
+                  Text(
+                    'cost €${item.costPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  if (margin != null && marginPct != null)
+                    Text(
+                      '${margin >= 0 ? '+' : ''}€${margin.toStringAsFixed(0)} (${marginPct.toStringAsFixed(0)}%)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: margin >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ] else
+                  Text(
+                    '€${item.costPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                const SizedBox(height: 4),
+                _StatusChip(item.status),
+              ],
+            ),
+          ),
+          if (onList != null || onUnlist != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (item.isListed)
+                    TextButton(
+                      onPressed: onUnlist,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Unlist',
+                          style: TextStyle(fontSize: 12)),
+                    )
+                  else
+                    TextButton(
+                      onPressed: onList,
+                      style: TextButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('List',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
