@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../models/branch.dart';
 import '../../models/inventory_item.dart';
+import '../../models/location.dart';
+import '../../repositories/branch_repository.dart';
 import '../../repositories/customer_repository.dart';
 import '../../repositories/inventory_repository.dart';
+import '../../repositories/location_repository.dart';
 import '../../repositories/order_repository.dart';
+import '../../repositories/purchase_repository.dart';
 import '../inventory/inventory_detail_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -17,11 +22,18 @@ class _DashboardPageState extends State<DashboardPage> {
   final _inventoryRepo = InventoryRepository();
   final _orderRepo = OrderRepository();
   final _customerRepo = CustomerRepository();
+  final _purchaseRepo = PurchaseRepository();
+  final _branchRepo = BranchRepository();
+  final _locationRepo = LocationRepository();
 
   List<InventoryItem> _items = [];
+  List<Branch> _branches = [];
+  List<Location> _statusZones = [];
+  Branch? _selectedBranch;
   int _orderCount = 0;
   int _customerCount = 0;
   double _revenue = 0.0;
+  double _totalSpent = 0.0;
   bool _loading = true;
 
   @override
@@ -34,12 +46,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => _loading = true);
     try {
       final itemsFuture = _inventoryRepo.getItems();
+      final branchesFuture = _branchRepo.getBranches();
 
       int orderCount = 0;
       int customerCount = 0;
       double revenue = 0.0;
+      double totalSpent = 0.0;
 
-      // Each of these may not exist yet — fail gracefully.
       try {
         final stats = await _orderRepo.getDashboardStats();
         orderCount = stats.orderCount;
@@ -48,16 +61,25 @@ class _DashboardPageState extends State<DashboardPage> {
       try {
         customerCount = await _customerRepo.getCustomerCount();
       } catch (_) {}
+      try {
+        totalSpent = await _purchaseRepo.getTotalSpent();
+      } catch (_) {}
 
-      final items = await itemsFuture;
+      final results = await Future.wait([itemsFuture, branchesFuture]);
+      final items = results[0] as List<InventoryItem>;
+      final branches = results[1] as List<Branch>;
+
       if (mounted) {
         setState(() {
           _items = items;
+          _branches = branches;
           _orderCount = orderCount;
           _customerCount = customerCount;
           _revenue = revenue;
+          _totalSpent = totalSpent;
           _loading = false;
         });
+        _loadStatusZones();
       }
     } catch (e) {
       debugPrint(e.toString());
@@ -65,15 +87,107 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _loadStatusZones() async {
+    if (_branches.isEmpty) return;
+    final branchId =
+        _selectedBranch?.id ?? _branches.first.id ?? '';
+    if (branchId.isEmpty) return;
+    try {
+      final locs = await _locationRepo.getLocationsFlat(branchId);
+      if (mounted) {
+        setState(() {
+          _statusZones = locs.where((l) => l.isStatusZone).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _selectBranch(Branch? branch) async {
+    setState(() {
+      _selectedBranch = branch;
+      _statusZones = [];
+    });
+    _loadStatusZones();
+  }
+
   // ── Computed stats ────────────────────────────────────────────────────────
 
-  int get _totalItems => _items.length;
+  List<InventoryItem> get _filteredItems => _selectedBranch == null
+      ? _items
+      : _items.where((e) => e.branchId == _selectedBranch!.id).toList();
 
-  int _countByStatus(String s) => _items.where((e) => e.status == s).length;
+  int get _totalItems => _filteredItems.length;
 
-  double get _totalValue => _items.fold(0.0, (sum, e) => sum + e.salePrice);
+  int _countByStatus(String s) =>
+      _filteredItems.where((e) => e.status == s).length;
 
-  List<InventoryItem> get _recentItems => _items.take(5).toList();
+  double get _totalValue =>
+      _filteredItems.fold(0.0, (sum, e) => sum + e.salePrice);
+
+  List<InventoryItem> get _recentItems => _filteredItems.take(5).toList();
+
+  int _countInZone(Location zone) =>
+      _filteredItems.where((e) => e.locationId == zone.id).length;
+
+  // ── Build sections ────────────────────────────────────────────────────────
+
+  Widget _buildBranchFilter() {
+    if (_branches.isEmpty) return const SizedBox.shrink();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          _BranchChip(
+            label: 'All',
+            selected: _selectedBranch == null,
+            onTap: () => _selectBranch(null),
+          ),
+          ..._branches.map((b) => _BranchChip(
+                label: b.name.replaceFirst('GemWorkers ', ''),
+                selected: _selectedBranch?.id == b.id,
+                onTap: () => _selectBranch(b),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildZoneBreakdown() {
+    if (_statusZones.isEmpty) return const SizedBox.shrink();
+    final total = _filteredItems.length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Location Zones',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            if (total == 0)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Text('No items',
+                      style: TextStyle(color: Colors.grey)),
+                ),
+              )
+            else
+              ..._statusZones.map((zone) {
+                final count = _countInZone(zone);
+                return _StatusBar(
+                  label: zone.name,
+                  count: count,
+                  total: total,
+                  color: Colors.blueGrey,
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -92,6 +206,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return Column(
       children: [
+        // Row 1 — inventory overview
         Row(
           children: [
             Expanded(
@@ -123,6 +238,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         const SizedBox(height: 12),
+        // Row 2 — money in vs money out
         Row(
           children: [
             Expanded(
@@ -134,6 +250,20 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Spent on Purchases',
+                value: '€${_formatValue(_totalSpent)}',
+                icon: Icons.shopping_bag_outlined,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Row 3 — activity
+        Row(
+          children: [
             Expanded(
               child: _StatCard(
                 label: 'Orders',
@@ -291,9 +421,12 @@ class _DashboardPageState extends State<DashboardPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  _buildBranchFilter(),
                   _buildStatsGrid(),
                   const SizedBox(height: 16),
                   _buildStatusBreakdown(),
+                  const SizedBox(height: 16),
+                  _buildZoneBreakdown(),
                   const SizedBox(height: 16),
                   _buildRecentItems(),
                   const SizedBox(height: 24),
@@ -410,6 +543,33 @@ class _StatusBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BranchChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BranchChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: color.withValues(alpha: 0.15),
+        checkmarkColor: color,
       ),
     );
   }

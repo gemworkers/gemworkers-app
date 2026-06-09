@@ -40,6 +40,10 @@ class InventoryItem {
   final String? supplierId;
   final String supplierName;
 
+  // Branch & location ownership.
+  final String? branchId;
+  final String? locationId;
+
   final DateTime? createdAt;
 
   const InventoryItem({
@@ -64,6 +68,8 @@ class InventoryItem {
     required this.imageUrls,
     this.supplierId,
     this.supplierName = '',
+    this.branchId,
+    this.locationId,
     this.createdAt,
   });
 
@@ -98,6 +104,8 @@ class InventoryItem {
       supplierName:
           (map['suppliers'] as Map<String, dynamic>?)?['name']?.toString() ??
               '',
+      branchId: map['branch_id']?.toString(),
+      locationId: map['location_id']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -125,6 +133,8 @@ class InventoryItem {
       'notes': notes,
       'image_urls': imageUrls,
       'supplier_id': supplierId,
+      'branch_id': branchId,
+      'location_id': locationId,
     };
   }
 
@@ -151,6 +161,8 @@ class InventoryItem {
     // Use Object? with _omitted sentinel so callers can explicitly set null.
     Object? supplierId = _omitted,
     String? supplierName,
+    Object? branchId = _omitted,
+    Object? locationId = _omitted,
     DateTime? createdAt,
   }) {
     return InventoryItem(
@@ -176,6 +188,10 @@ class InventoryItem {
       supplierId:
           identical(supplierId, _omitted) ? this.supplierId : supplierId as String?,
       supplierName: supplierName ?? this.supplierName,
+      branchId:
+          identical(branchId, _omitted) ? this.branchId : branchId as String?,
+      locationId:
+          identical(locationId, _omitted) ? this.locationId : locationId as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }

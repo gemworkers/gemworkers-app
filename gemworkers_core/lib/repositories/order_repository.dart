@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/services/branch_service.dart';
 import '../models/order.dart';
 
 class OrderRepository {
@@ -43,10 +44,13 @@ class OrderRepository {
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   /// Creates the order and returns the server row (with auto-generated order_number).
+  /// branch_id defaults to kCurrentBranchId (see branch_service.dart) when not set.
   Future<Order> addOrder(Order order) async {
+    final map = order.toMap();
+    map['branch_id'] ??= kCurrentBranchId;
     final response = await supabase
         .from('orders')
-        .insert(order.toMap())
+        .insert(map)
         .select()
         .single();
     return Order.fromMap(response);

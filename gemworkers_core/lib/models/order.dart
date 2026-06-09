@@ -64,6 +64,7 @@ class Order {
   // Populated when loaded via getOrderDetail / getOrdersForCustomer.
   final List<OrderItem> items;
 
+  final String? branchId;
   final DateTime? createdAt;
 
   const Order({
@@ -75,6 +76,7 @@ class Order {
     required this.orderDate,
     required this.notes,
     this.items = const [],
+    this.branchId,
     this.createdAt,
   });
 
@@ -101,6 +103,7 @@ class Order {
           : DateTime.now(),
       notes: map['notes'] ?? '',
       items: parseItems(map['order_items']),
+      branchId: map['branch_id']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -116,6 +119,7 @@ class Order {
             '${orderDate.month.toString().padLeft(2, '0')}-'
             '${orderDate.day.toString().padLeft(2, '0')}',
         'notes': notes,
+        'branch_id': branchId,
       };
 
   Order copyWith({
@@ -127,6 +131,7 @@ class Order {
     DateTime? orderDate,
     String? notes,
     List<OrderItem>? items,
+    Object? branchId = _omitted,
     DateTime? createdAt,
   }) {
     return Order(
@@ -140,6 +145,8 @@ class Order {
       orderDate: orderDate ?? this.orderDate,
       notes: notes ?? this.notes,
       items: items ?? this.items,
+      branchId:
+          identical(branchId, _omitted) ? this.branchId : branchId as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }

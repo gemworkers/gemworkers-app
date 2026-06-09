@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/services/branch_service.dart';
 import '../models/inventory_item.dart';
 
 class InventoryRepository {
@@ -34,14 +35,51 @@ class InventoryRepository {
         .toList();
   }
 
-  /// Inserts the item and returns the server-created row (with assigned id).
-  Future<InventoryItem> addItem(InventoryItem item) async {
+  Future<InventoryItem> getItem(String id) async {
     final response = await supabase
         .from('inventory_items')
-        .insert(item.toMap())
+        .select('*, suppliers(name)')
+        .eq('id', id)
+        .single();
+    return InventoryItem.fromMap(response);
+  }
+
+  Future<List<InventoryItem>> getItemsByPurchase(String purchaseId) async {
+    final response = await supabase
+        .from('inventory_items')
+        .select('*, suppliers(name)')
+        .eq('purchase_id', purchaseId)
+        .order('created_at');
+    return response
+        .map<InventoryItem>((row) => InventoryItem.fromMap(row))
+        .toList();
+  }
+
+  /// Inserts the item and returns the server-created row (with assigned id).
+  /// branch_id defaults to kCurrentBranchId (see branch_service.dart) when not set.
+  Future<InventoryItem> addItem(InventoryItem item) async {
+    final map = item.toMap();
+    map['branch_id'] ??= kCurrentBranchId;
+    final response = await supabase
+        .from('inventory_items')
+        .insert(map)
         .select()
         .single();
     return InventoryItem.fromMap(response);
+  }
+
+  /// Items in a given location and all its descendants.
+  /// Pass [locationIds] as the pre-computed set from LocationRepository.getDescendantIds().
+  Future<List<InventoryItem>> getItemsByLocations(
+      List<String> locationIds) async {
+    final response = await supabase
+        .from('inventory_items')
+        .select('*, suppliers(name)')
+        .inFilter('location_id', locationIds)
+        .order('created_at', ascending: false);
+    return response
+        .map<InventoryItem>((row) => InventoryItem.fromMap(row))
+        .toList();
   }
 
   Future<void> updateItem(String id, InventoryItem item) async {

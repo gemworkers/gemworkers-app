@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/services/branch_service.dart';
 import '../../models/inventory_item.dart';
+import '../../models/item_movement.dart';
 import '../../repositories/inventory_repository.dart';
+import '../../repositories/item_movement_repository.dart';
+import '../../repositories/location_repository.dart';
+import '../locations/location_picker_dialog.dart';
 import 'edit_inventory_page.dart';
 
 class InventoryDetailPage extends StatefulWidget {
@@ -17,16 +22,84 @@ class InventoryDetailPage extends StatefulWidget {
 
 class _InventoryDetailPageState extends State<InventoryDetailPage> {
   final _repository = InventoryRepository();
+  final _movementRepo = ItemMovementRepository();
+  final _locationRepo = LocationRepository();
   final _picker = ImagePicker();
 
   late InventoryItem _item;
   bool _uploadingImage = false;
   bool _deleting = false;
 
+  List<ItemMovement> _movements = [];
+  String _locationBreadcrumb = '';
+  bool _movementsLoading = false;
+
   @override
   void initState() {
     super.initState();
     _item = widget.item;
+    _loadLocationAndMovements();
+  }
+
+  Future<void> _loadLocationAndMovements() async {
+    if (_item.id == null) return;
+    setState(() => _movementsLoading = true);
+    try {
+      final branchId = _item.branchId ?? kCurrentBranchId;
+      final futures = <Future>[
+        _movementRepo.getMovementsForItem(_item.id!),
+        if (_item.locationId != null)
+          _locationRepo.getBreadcrumb(_item.locationId!, branchId),
+      ];
+      final results = await Future.wait(futures);
+      if (mounted) {
+        setState(() {
+          _movements = results[0] as List<ItemMovement>;
+          if (_item.locationId != null && results.length > 1) {
+            _locationBreadcrumb = results[1] as String;
+          }
+          _movementsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _movementsLoading = false);
+    }
+  }
+
+  Future<void> _moveItem() async {
+    final branchId = _item.branchId ?? kCurrentBranchId;
+    final picked = await showLocationPicker(
+      context,
+      branchId: branchId,
+      currentLocationId: _item.locationId,
+    );
+    if (picked == null || !mounted) return;
+
+    try {
+      final fromLocationId = _item.locationId;
+      await _repository.updateItem(
+        _item.id!,
+        _item.copyWith(locationId: picked.id),
+      );
+      await _movementRepo.recordMovement(
+        inventoryItemId: _item.id!,
+        fromLocationId: fromLocationId,
+        toLocationId: picked.id,
+        reason: 'Manual move',
+      );
+      if (mounted) {
+        setState(() {
+          _item = _item.copyWith(locationId: picked.id);
+          _locationBreadcrumb = picked.name;
+        });
+        _loadLocationAndMovements();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Move failed: $e')));
+      }
+    }
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
@@ -352,6 +425,83 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     );
   }
 
+  Widget _buildMovementTimeline() {
+    if (_movementsLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_movements.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('Movement History'),
+        ..._movements.map((m) {
+          final from = m.fromLocationName.isNotEmpty
+              ? m.fromLocationName
+              : 'None';
+          final to = m.toLocationName.isNotEmpty ? m.toLocationName : 'None';
+          final date = '${m.movedAt.day.toString().padLeft(2, '0')}/'
+              '${m.movedAt.month.toString().padLeft(2, '0')}/'
+              '${m.movedAt.year}';
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(top: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color: Colors.grey.shade300,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$from → $to',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                      Text(
+                        m.reason.isNotEmpty
+                            ? '$date · ${m.reason}'
+                            : date,
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                      if (m.note.isNotEmpty)
+                        Text(m.note,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -362,6 +512,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             icon: const Icon(Icons.qr_code_outlined),
             onPressed: _showQRCode,
             tooltip: 'QR Code',
+          ),
+          IconButton(
+            icon: const Icon(Icons.move_down_outlined),
+            onPressed: _moveItem,
+            tooltip: 'Move to location',
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
@@ -414,6 +569,29 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             _item.supplierName.isNotEmpty ? _item.supplierName : '—',
           ),
 
+          _sectionLabel('Location'),
+          Row(
+            children: [
+              Expanded(
+                child: _row(
+                  'Location',
+                  _item.locationId == null
+                      ? '—'
+                      : _locationBreadcrumb.isNotEmpty
+                          ? _locationBreadcrumb
+                          : _item.locationId!,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _moveItem,
+                icon: const Icon(Icons.move_down_outlined, size: 16),
+                label: const Text('Move'),
+                style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8)),
+              ),
+            ],
+          ),
+
           _sectionLabel('Other'),
           _row('Status', _item.status),
           _row('Barcode', _item.barcode),
@@ -423,6 +601,8 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             Text(_item.notes),
           ],
 
+          const SizedBox(height: 24),
+          _buildMovementTimeline(),
           const SizedBox(height: 32),
         ],
       ),

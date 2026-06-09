@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/branch_service.dart';
 import '../../models/inventory_item.dart';
+import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
+import '../../repositories/location_repository.dart';
 import 'add_inventory_page.dart';
 import 'inventory_detail_page.dart';
 
@@ -29,9 +32,11 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   final _repository = InventoryRepository();
+  final _locationRepo = LocationRepository();
   final _searchController = TextEditingController();
 
   List<InventoryItem> _all = [];
+  List<Location> _allLocations = [];
   bool _loading = true;
 
   // ── Filter & sort state ───────────────────────────────────────────────────
@@ -39,6 +44,8 @@ class _InventoryPageState extends State<InventoryPage> {
   String _query = '';
   String? _statusFilter;
   String? _gemTypeFilter;
+  Location? _locationFilter;
+  Set<String> _locationDescendantIds = {};
   double _maxPrice = 10000;
   RangeValues _priceRange = const RangeValues(0, 10000);
   bool _priceRangeInitialized = false;
@@ -68,22 +75,47 @@ class _InventoryPageState extends State<InventoryPage> {
   Future<void> _loadItems() async {
     setState(() => _loading = true);
     try {
-      final items = await _repository.getItems();
-      setState(() {
-        _all = items;
-        if (!_priceRangeInitialized && items.isNotEmpty) {
-          final max = items
-              .map((e) => e.salePrice)
-              .reduce((a, b) => a > b ? a : b);
-          _maxPrice = max < 1 ? 10000 : max;
-          _priceRange = RangeValues(0, _maxPrice);
-          _priceRangeInitialized = true;
-        }
-        _loading = false;
-      });
+      final results = await Future.wait([
+        _repository.getItems(),
+        _locationRepo.getLocationsFlat(kCurrentBranchId),
+      ]);
+      final items = results[0] as List<InventoryItem>;
+      final locs = results[1] as List<Location>;
+      if (mounted) {
+        setState(() {
+          _all = items;
+          _allLocations = locs;
+          if (!_priceRangeInitialized && items.isNotEmpty) {
+            final max = items
+                .map((e) => e.salePrice)
+                .reduce((a, b) => a > b ? a : b);
+            _maxPrice = max < 1 ? 10000 : max;
+            _priceRange = RangeValues(0, _maxPrice);
+            _priceRangeInitialized = true;
+          }
+          _loading = false;
+        });
+      }
     } catch (e) {
       debugPrint(e.toString());
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _applyLocationFilter(Location? loc) async {
+    if (loc == null) {
+      setState(() {
+        _locationFilter = null;
+        _locationDescendantIds = {};
+      });
+      return;
+    }
+    final ids = await _locationRepo.getDescendantIds(loc.id!, kCurrentBranchId);
+    if (mounted) {
+      setState(() {
+        _locationFilter = loc;
+        _locationDescendantIds = ids.toSet();
+      });
     }
   }
 
@@ -105,6 +137,11 @@ class _InventoryPageState extends State<InventoryPage> {
         if (!item.gemType
             .toLowerCase()
             .contains(_gemTypeFilter!.toLowerCase())) {
+          return false;
+        }
+      }
+      if (_locationFilter != null) {
+        if (!_locationDescendantIds.contains(item.locationId ?? '')) {
           return false;
         }
       }
@@ -138,6 +175,7 @@ class _InventoryPageState extends State<InventoryPage> {
   bool get _hasFilters =>
       _statusFilter != null ||
       (_gemTypeFilter?.isNotEmpty ?? false) ||
+      _locationFilter != null ||
       _priceRange.start > 0 ||
       _priceRange.end < _maxPrice;
 
@@ -145,6 +183,8 @@ class _InventoryPageState extends State<InventoryPage> {
     setState(() {
       _statusFilter = null;
       _gemTypeFilter = null;
+      _locationFilter = null;
+      _locationDescendantIds = {};
       _priceRange = RangeValues(0, _maxPrice);
     });
   }
@@ -162,6 +202,7 @@ class _InventoryPageState extends State<InventoryPage> {
   void _showFilterSheet() {
     String? tempStatus = _statusFilter;
     final gemController = TextEditingController(text: _gemTypeFilter ?? '');
+    Location? tempLocation = _locationFilter;
     RangeValues tempPrice = _priceRange;
 
     showModalBottomSheet<void>(
@@ -187,6 +228,7 @@ class _InventoryPageState extends State<InventoryPage> {
                     onPressed: () => setSheet(() {
                       tempStatus = null;
                       gemController.clear();
+                      tempLocation = null;
                       tempPrice = RangeValues(0, _maxPrice);
                     }),
                     child: const Text('Clear all'),
@@ -228,6 +270,31 @@ class _InventoryPageState extends State<InventoryPage> {
                 ),
               ),
               const SizedBox(height: 14),
+              if (_allLocations.isNotEmpty)
+                InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Location',
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                  child: DropdownButton<Location?>(
+                    value: tempLocation,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: [
+                      const DropdownMenuItem(
+                          value: null, child: Text('All locations')),
+                      ..._allLocations.map((l) => DropdownMenuItem(
+                            value: l,
+                            child: Text(l.name,
+                                overflow: TextOverflow.ellipsis),
+                          )),
+                    ],
+                    onChanged: (v) => setSheet(() => tempLocation = v),
+                  ),
+                ),
+              const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -256,6 +323,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           : gemController.text.trim();
                       _priceRange = tempPrice;
                     });
+                    _applyLocationFilter(tempLocation);
                     Navigator.pop(ctx);
                   },
                   child: const Text('Apply'),
