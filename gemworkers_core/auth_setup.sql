@@ -28,15 +28,11 @@ CREATE POLICY user_profiles_all ON user_profiles
 --
 -- Step 2: After the auth user exists, insert their profile row below.
 --
--- ── Template: owner profile ───────────────────────────────────────────────────
---
--- INSERT INTO user_profiles (id, role, display_name)
--- VALUES (
---   (SELECT id FROM auth.users WHERE email = 'zakariauz@hotmail.com'),
---   'owner',
---   'Zakaria'
--- )
--- ON CONFLICT (id) DO NOTHING;
+-- ── Owner profile (zakariauz@hotmail.com) ────────────────────────────────────
+
+INSERT INTO user_profiles (id, role, display_name)
+VALUES ('feb102da-a9b4-4054-83e1-95985f8caf1e', 'owner', 'Zakaria')
+ON CONFLICT (id) DO NOTHING;
 --
 -- ── Template: seller profile ──────────────────────────────────────────────────
 --
