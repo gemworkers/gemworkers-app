@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import 'add_edit_order_page.dart';
@@ -30,8 +31,12 @@ class _OrdersPageState extends State<OrdersPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final orders =
+      var orders =
           await _repository.getOrders(statusFilter: _statusFilter);
+      final svc = UserProfileService.instance;
+      if (svc.shouldFilterBySeller) {
+        orders = orders.where((o) => o.sellerId == svc.sellerId).toList();
+      }
       if (mounted) {
         setState(() {
           _orders = orders;

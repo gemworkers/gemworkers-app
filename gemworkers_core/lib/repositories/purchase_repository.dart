@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/services/seller_service.dart';
+import '../core/services/user_profile_service.dart';
 import '../models/purchase.dart';
 
 class PurchaseRepository {
@@ -12,7 +12,7 @@ class PurchaseRepository {
   Future<List<Purchase>> getPurchases({String? supplierId}) async {
     final query = _supabase.from('purchases').select(
         'id, purchase_number, purchase_date, gem_cost, shipping_cost, '
-        'customs_cost, other_fees, total_cost, notes, supplier_id, '
+        'customs_cost, other_fees, total_cost, notes, supplier_id, seller_id, '
         'created_at, suppliers(name)');
 
     final response = supplierId != null
@@ -46,7 +46,7 @@ class PurchaseRepository {
   }) async {
     // 1. Insert purchase header. Default seller to kCurrentSellerId if not set.
     final purchaseMap = purchase.toMap();
-    purchaseMap['seller_id'] ??= kCurrentSellerId;
+    purchaseMap['seller_id'] ??= UserProfileService.instance.effectiveSellerId;
     final sellerId = purchaseMap['seller_id'] as String;
 
     final row = await _supabase

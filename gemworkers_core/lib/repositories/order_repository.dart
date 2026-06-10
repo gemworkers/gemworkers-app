@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/services/seller_service.dart';
+import '../core/services/user_profile_service.dart';
 import '../models/order.dart';
 
 class OrderRepository {
@@ -12,7 +12,7 @@ class OrderRepository {
   Future<List<Order>> getOrders({String? statusFilter}) async {
     final query = supabase
         .from('orders')
-        .select('id, order_number, status, order_date, notes, customer_id, created_at, customers(name)');
+        .select('id, order_number, status, order_date, notes, customer_id, seller_id, created_at, customers(name)');
 
     final response = statusFilter != null
         ? await query.eq('status', statusFilter).order('created_at', ascending: false)
@@ -47,7 +47,7 @@ class OrderRepository {
   /// seller_id defaults to kCurrentSellerId (see seller_service.dart) when not set.
   Future<Order> addOrder(Order order) async {
     final map = order.toMap();
-    map['seller_id'] ??= kCurrentSellerId;
+    map['seller_id'] ??= UserProfileService.instance.effectiveSellerId;
     final response = await supabase
         .from('orders')
         .insert(map)

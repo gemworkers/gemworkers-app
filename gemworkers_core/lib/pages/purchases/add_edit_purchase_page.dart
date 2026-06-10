@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/services/seller_service.dart';
+import '../../core/services/user_profile_service.dart';
 import '../../models/location.dart';
 import '../../models/purchase.dart';
 import '../../models/supplier.dart';
@@ -102,7 +102,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
   Future<void> _loadDefaultDestination() async {
     try {
       final locations =
-          await _locationRepo.getLocationsFlat(kCurrentSellerId);
+          await _locationRepo.getLocationsFlat(UserProfileService.instance.effectiveSellerId);
       final intake = locations
           .where((l) =>
               l.isStatusZone && l.name.toLowerCase().contains('intake'))
@@ -116,7 +116,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
   Future<void> _pickDestination() async {
     final picked = await showLocationPicker(
       context,
-      sellerId: kCurrentSellerId,
+      sellerId: UserProfileService.instance.effectiveSellerId,
       currentLocationId: _destinationLocation?.id,
       statusZonesOnly: false,
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../models/seller.dart';
@@ -69,10 +70,20 @@ class _DashboardPageState extends State<DashboardPage> {
       final items = results[0] as List<InventoryItem>;
       final sellers = results[1] as List<Seller>;
 
+      // Seller users are locked to their own seller — auto-select and lock it.
+      Seller? selectedSeller = _selectedSeller;
+      if (UserProfileService.instance.isSeller) {
+        final sid = UserProfileService.instance.sellerId;
+        try {
+          selectedSeller = sellers.firstWhere((s) => s.id == sid);
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           _items = items;
           _sellers = sellers;
+          _selectedSeller = selectedSeller;
           _orderCount = orderCount;
           _customerCount = customerCount;
           _revenue = revenue;
@@ -158,7 +169,10 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Build sections ────────────────────────────────────────────────────────
 
   Widget _buildSellerFilter() {
-    if (_sellers.isEmpty) return const SizedBox.shrink();
+    // Seller users are always locked to their own seller — no picker shown.
+    if (_sellers.isEmpty || UserProfileService.instance.isSeller) {
+      return const SizedBox.shrink();
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.only(bottom: 12),

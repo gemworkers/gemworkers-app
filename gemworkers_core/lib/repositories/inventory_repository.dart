@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/services/seller_service.dart';
+import '../core/services/user_profile_service.dart';
 import '../models/inventory_item.dart';
 
 class InventoryRepository {
@@ -59,7 +59,7 @@ class InventoryRepository {
   /// seller_id defaults to kCurrentSellerId (see seller_service.dart) when not set.
   Future<InventoryItem> addItem(InventoryItem item) async {
     final map = item.toMap();
-    map['seller_id'] ??= kCurrentSellerId;
+    map['seller_id'] ??= UserProfileService.instance.effectiveSellerId;
     final response = await supabase
         .from('inventory_items')
         .insert(map)

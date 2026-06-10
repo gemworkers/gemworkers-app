@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/services/seller_service.dart';
+import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
@@ -89,12 +89,16 @@ class _InventoryPageState extends State<InventoryPage>
   Future<void> _loadItems() async {
     setState(() => _loading = true);
     try {
+      final svc = UserProfileService.instance;
       final results = await Future.wait([
         _repository.getItems(),
-        _locationRepo.getLocationsFlat(kCurrentSellerId),
+        _locationRepo.getLocationsFlat(svc.effectiveSellerId),
       ]);
-      final items = results[0] as List<InventoryItem>;
+      var items = results[0] as List<InventoryItem>;
       final locs = results[1] as List<Location>;
+      if (svc.shouldFilterBySeller) {
+        items = items.where((e) => e.sellerId == svc.sellerId).toList();
+      }
       if (mounted) {
         setState(() {
           _all = items;
@@ -123,7 +127,8 @@ class _InventoryPageState extends State<InventoryPage>
       });
       return;
     }
-    final ids = await _locationRepo.getDescendantIds(loc.id!, kCurrentSellerId);
+    final ids = await _locationRepo.getDescendantIds(
+        loc.id!, UserProfileService.instance.effectiveSellerId);
     if (mounted) {
       setState(() {
         _locationFilter = loc;

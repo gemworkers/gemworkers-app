@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/auth_service.dart';
 
@@ -39,15 +38,14 @@ class _LoginPageState extends State<LoginPage> {
       _error = null;
     });
 
-    try {
-      await AuthService.signIn(email: email, password: password);
-      // StreamBuilder in app.dart handles navigation on success.
-    } on AuthException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } catch (e) {
-      if (mounted) setState(() => _error = 'Sign in failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    // signIn returns null on success or a friendly error string on failure.
+    // Navigation on success is handled by the StreamBuilder in app.dart.
+    final error = await AuthService.signIn(email: email, password: password);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _error = error;
+      });
     }
   }
 

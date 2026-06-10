@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/purchase.dart';
 import '../../repositories/purchase_repository.dart';
 import 'add_edit_purchase_page.dart';
@@ -28,7 +29,12 @@ class _PurchasesPageState extends State<PurchasesPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final purchases = await _repository.getPurchases();
+      var purchases = await _repository.getPurchases();
+      final svc = UserProfileService.instance;
+      if (svc.shouldFilterBySeller) {
+        purchases =
+            purchases.where((p) => p.sellerId == svc.sellerId).toList();
+      }
       if (mounted) {
         setState(() {
           _purchases = purchases;
