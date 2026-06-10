@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../models/branch.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
-import '../../repositories/branch_repository.dart';
+import '../../models/seller.dart';
 import '../../repositories/customer_repository.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/location_repository.dart';
 import '../../repositories/order_repository.dart';
 import '../../repositories/purchase_repository.dart';
+import '../../repositories/seller_repository.dart';
 import '../inventory/inventory_detail_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -23,13 +23,13 @@ class _DashboardPageState extends State<DashboardPage> {
   final _orderRepo = OrderRepository();
   final _customerRepo = CustomerRepository();
   final _purchaseRepo = PurchaseRepository();
-  final _branchRepo = BranchRepository();
+  final _sellerRepo = SellerRepository();
   final _locationRepo = LocationRepository();
 
   List<InventoryItem> _items = [];
-  List<Branch> _branches = [];
+  List<Seller> _sellers = [];
   List<Location> _statusZones = [];
-  Branch? _selectedBranch;
+  Seller? _selectedSeller;
   int _orderCount = 0;
   int _customerCount = 0;
   double _revenue = 0.0;
@@ -46,7 +46,7 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => _loading = true);
     try {
       final itemsFuture = _inventoryRepo.getItems();
-      final branchesFuture = _branchRepo.getBranches();
+      final sellersFuture = _sellerRepo.getSellers();
 
       int orderCount = 0;
       int customerCount = 0;
@@ -65,14 +65,14 @@ class _DashboardPageState extends State<DashboardPage> {
         totalSpent = await _purchaseRepo.getTotalSpent();
       } catch (_) {}
 
-      final results = await Future.wait([itemsFuture, branchesFuture]);
+      final results = await Future.wait([itemsFuture, sellersFuture]);
       final items = results[0] as List<InventoryItem>;
-      final branches = results[1] as List<Branch>;
+      final sellers = results[1] as List<Seller>;
 
       if (mounted) {
         setState(() {
           _items = items;
-          _branches = branches;
+          _sellers = sellers;
           _orderCount = orderCount;
           _customerCount = customerCount;
           _revenue = revenue;
@@ -88,12 +88,12 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadStatusZones() async {
-    if (_branches.isEmpty) return;
-    final branchId =
-        _selectedBranch?.id ?? _branches.first.id ?? '';
-    if (branchId.isEmpty) return;
+    if (_sellers.isEmpty) return;
+    final sellerId =
+        _selectedSeller?.id ?? _sellers.first.id ?? '';
+    if (sellerId.isEmpty) return;
     try {
-      final locs = await _locationRepo.getLocationsFlat(branchId);
+      final locs = await _locationRepo.getLocationsFlat(sellerId);
       if (mounted) {
         setState(() {
           _statusZones = locs.where((l) => l.isStatusZone).toList();
@@ -102,9 +102,9 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (_) {}
   }
 
-  Future<void> _selectBranch(Branch? branch) async {
+  Future<void> _selectSeller(Seller? seller) async {
     setState(() {
-      _selectedBranch = branch;
+      _selectedSeller = seller;
       _statusZones = [];
     });
     _loadStatusZones();
@@ -112,20 +112,40 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ── Computed stats ────────────────────────────────────────────────────────
 
-  List<InventoryItem> get _filteredItems => _selectedBranch == null
+  List<InventoryItem> get _filteredItems => _selectedSeller == null
       ? _items
-      : _items.where((e) => e.branchId == _selectedBranch!.id).toList();
+      : _items.where((e) => e.sellerId == _selectedSeller!.id).toList();
 
   int get _totalItems => _filteredItems.length;
 
   int _countByStatus(String s) =>
       _filteredItems.where((e) => e.status == s).length;
 
-  int get _listedCount => _filteredItems.where((e) => e.isListed).length;
+  Set<String> get _suspendedSellerIds => _sellers
+      .where((s) => s.status == 'suspended' && s.id != null)
+      .map((s) => s.id!)
+      .toSet();
 
-  double get _listedValue => _filteredItems
-      .where((e) => e.isListed)
-      .fold(0.0, (sum, e) => sum + (e.sellingPrice ?? 0));
+  // Excluded suspended sellers' items from the "All" marketplace count.
+  int get _listedCount {
+    final items = _filteredItems.where((e) => e.isListed);
+    if (_selectedSeller == null) {
+      final suspended = _suspendedSellerIds;
+      return items.where((e) => !suspended.contains(e.sellerId)).length;
+    }
+    return items.length;
+  }
+
+  double get _listedValue {
+    final items = _filteredItems.where((e) => e.isListed);
+    if (_selectedSeller == null) {
+      final suspended = _suspendedSellerIds;
+      return items
+          .where((e) => !suspended.contains(e.sellerId))
+          .fold(0.0, (sum, e) => sum + (e.sellingPrice ?? 0));
+    }
+    return items.fold(0.0, (sum, e) => sum + (e.sellingPrice ?? 0));
+  }
 
   double get _totalValue =>
       _filteredItems.fold(0.0, (sum, e) => sum + e.salePrice);
@@ -137,22 +157,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ── Build sections ────────────────────────────────────────────────────────
 
-  Widget _buildBranchFilter() {
-    if (_branches.isEmpty) return const SizedBox.shrink();
+  Widget _buildSellerFilter() {
+    if (_sellers.isEmpty) return const SizedBox.shrink();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          _BranchChip(
+          _SellerChip(
             label: 'All',
-            selected: _selectedBranch == null,
-            onTap: () => _selectBranch(null),
+            selected: _selectedSeller == null,
+            onTap: () => _selectSeller(null),
           ),
-          ..._branches.map((b) => _BranchChip(
-                label: b.name.replaceFirst('GemWorkers ', ''),
-                selected: _selectedBranch?.id == b.id,
-                onTap: () => _selectBranch(b),
+          ..._sellers.map((s) => _SellerChip(
+                label: s.name,
+                selected: _selectedSeller?.id == s.id,
+                onTap: () => _selectSeller(s),
               )),
         ],
       ),
@@ -417,7 +437,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       Text(
                         '€${item.salePrice.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style:
+                            const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       _StatusDot(item.status),
                     ],
@@ -450,7 +471,7 @@ class _DashboardPageState extends State<DashboardPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _buildBranchFilter(),
+                  _buildSellerFilter(),
                   _buildStatsGrid(),
                   const SizedBox(height: 16),
                   _buildStatusBreakdown(),
@@ -560,7 +581,8 @@ class _StatusBar extends StatelessWidget {
             child: Text(
               '$count',
               textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
           const SizedBox(width: 4),
@@ -568,7 +590,8 @@ class _StatusBar extends StatelessWidget {
             width: 36,
             child: Text(
               '${(pct * 100).toStringAsFixed(0)}%',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              style:
+                  TextStyle(color: Colors.grey.shade500, fontSize: 12),
             ),
           ),
         ],
@@ -577,12 +600,12 @@ class _StatusBar extends StatelessWidget {
   }
 }
 
-class _BranchChip extends StatelessWidget {
+class _SellerChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _BranchChip({
+  const _SellerChip({
     required this.label,
     required this.selected,
     required this.onTap,

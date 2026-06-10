@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/services/branch_service.dart';
+import '../../core/services/seller_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
@@ -91,7 +91,7 @@ class _InventoryPageState extends State<InventoryPage>
     try {
       final results = await Future.wait([
         _repository.getItems(),
-        _locationRepo.getLocationsFlat(kCurrentBranchId),
+        _locationRepo.getLocationsFlat(kCurrentSellerId),
       ]);
       final items = results[0] as List<InventoryItem>;
       final locs = results[1] as List<Location>;
@@ -123,7 +123,7 @@ class _InventoryPageState extends State<InventoryPage>
       });
       return;
     }
-    final ids = await _locationRepo.getDescendantIds(loc.id!, kCurrentBranchId);
+    final ids = await _locationRepo.getDescendantIds(loc.id!, kCurrentSellerId);
     if (mounted) {
       setState(() {
         _locationFilter = loc;

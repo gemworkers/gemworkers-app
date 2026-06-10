@@ -86,13 +86,14 @@ DROP POLICY IF EXISTS purchase_items_all ON purchase_items;
 CREATE POLICY purchase_items_all ON purchase_items
   FOR ALL TO public USING (true) WITH CHECK (true);
 
--- ── branches ──────────────────────────────────────────────────
+-- ── sellers ───────────────────────────────────────────────────
 
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sellers ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS branches_all ON branches;
+DROP POLICY IF EXISTS branches_all ON sellers;
+DROP POLICY IF EXISTS sellers_all  ON sellers;
 
-CREATE POLICY branches_all ON branches
+CREATE POLICY sellers_all ON sellers
   FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- ── locations ─────────────────────────────────────────────────

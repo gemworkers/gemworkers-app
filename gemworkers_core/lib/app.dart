@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/services/auth_service.dart';
 import 'pages/auth/login_page.dart';
-import 'pages/branches/branches_page.dart';
+import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
@@ -54,7 +54,7 @@ class _MainLayoutState extends State<MainLayout> {
     CustomersPage(),
     PurchasesPage(),
     SuppliersPage(),
-    BranchesPage(),
+    SellersPage(),
   ];
 
   static const _destinations = [
@@ -91,7 +91,7 @@ class _MainLayoutState extends State<MainLayout> {
     NavigationRailDestination(
       icon: Icon(Icons.store_outlined),
       selectedIcon: Icon(Icons.store),
-      label: Text('Branches'),
+      label: Text('Sellers'),
     ),
   ];
 

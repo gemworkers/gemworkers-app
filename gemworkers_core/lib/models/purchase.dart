@@ -83,7 +83,7 @@ class Purchase {
   // Populated when loaded via getPurchaseDetail.
   final List<PurchaseItem> items;
 
-  final String? branchId;
+  final String? sellerId;
   final DateTime? createdAt;
 
   const Purchase({
@@ -98,7 +98,7 @@ class Purchase {
     this.otherFees = 0,
     required this.notes,
     this.items = const [],
-    this.branchId,
+    this.sellerId,
     this.createdAt,
   });
 
@@ -134,7 +134,7 @@ class Purchase {
       otherFees: (map['other_fees'] ?? 0).toDouble(),
       notes: map['notes'] ?? '',
       items: parseItems(map['purchase_items']),
-      branchId: map['branch_id']?.toString(),
+      sellerId: map['seller_id']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -154,7 +154,7 @@ class Purchase {
         'other_fees': otherFees,
         'total_cost': totalCost,
         'notes': notes,
-        'branch_id': branchId,
+        'seller_id': sellerId,
       };
 
   Purchase copyWith({
@@ -169,7 +169,7 @@ class Purchase {
     double? otherFees,
     String? notes,
     List<PurchaseItem>? items,
-    Object? branchId = _omitted,
+    Object? sellerId = _omitted,
     DateTime? createdAt,
   }) {
     return Purchase(
@@ -186,8 +186,8 @@ class Purchase {
       otherFees: otherFees ?? this.otherFees,
       notes: notes ?? this.notes,
       items: items ?? this.items,
-      branchId:
-          identical(branchId, _omitted) ? this.branchId : branchId as String?,
+      sellerId:
+          identical(sellerId, _omitted) ? this.sellerId : sellerId as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }

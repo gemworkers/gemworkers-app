@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../core/services/branch_service.dart';
+import '../../core/services/seller_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/item_movement.dart';
 import '../../repositories/inventory_repository.dart';
@@ -45,11 +45,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     if (_item.id == null) return;
     setState(() => _movementsLoading = true);
     try {
-      final branchId = _item.branchId ?? kCurrentBranchId;
+      final sellerId = _item.sellerId ?? kCurrentSellerId;
       final futures = <Future>[
         _movementRepo.getMovementsForItem(_item.id!),
         if (_item.locationId != null)
-          _locationRepo.getBreadcrumb(_item.locationId!, branchId),
+          _locationRepo.getBreadcrumb(_item.locationId!, sellerId),
       ];
       final results = await Future.wait(futures);
       if (mounted) {
@@ -151,10 +151,10 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   }
 
   Future<void> _moveItem() async {
-    final branchId = _item.branchId ?? kCurrentBranchId;
+    final sellerId = _item.sellerId ?? kCurrentSellerId;
     final picked = await showLocationPicker(
       context,
-      branchId: branchId,
+      sellerId: sellerId,
       currentLocationId: _item.locationId,
     );
     if (picked == null || !mounted) return;

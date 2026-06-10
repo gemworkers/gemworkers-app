@@ -8,18 +8,18 @@ class LocationRepository {
   // ── Queries ───────────────────────────────────────────────────────────────
 
   /// Flat list of all locations for a branch, ordered by name.
-  Future<List<Location>> getLocationsFlat(String branchId) async {
+  Future<List<Location>> getLocationsFlat(String sellerId) async {
     final response = await _supabase
         .from('locations')
         .select()
-        .eq('branch_id', branchId)
+        .eq('seller_id', sellerId)
         .order('name');
     return response.map<Location>((row) => Location.fromMap(row)).toList();
   }
 
   /// Root nodes of the tree for a branch, with children populated recursively.
-  Future<List<Location>> getTree(String branchId) async {
-    final flat = await getLocationsFlat(branchId);
+  Future<List<Location>> getTree(String sellerId) async {
+    final flat = await getLocationsFlat(sellerId);
     return _buildTree(flat, null);
   }
 
@@ -33,8 +33,8 @@ class LocationRepository {
   /// IDs of the location itself and all its descendants.
   /// Used for "filter by location including sub-locations".
   Future<List<String>> getDescendantIds(
-      String locationId, String branchId) async {
-    final flat = await getLocationsFlat(branchId);
+      String locationId, String sellerId) async {
+    final flat = await getLocationsFlat(sellerId);
     final ids = <String>[];
     _collectDescendants(flat, locationId, ids);
     return ids;
@@ -50,8 +50,8 @@ class LocationRepository {
 
   /// Human-readable breadcrumb from root to the given location.
   /// Returns e.g. "Shop › Storage › Shelf A".
-  Future<String> getBreadcrumb(String locationId, String branchId) async {
-    final flat = await getLocationsFlat(branchId);
+  Future<String> getBreadcrumb(String locationId, String sellerId) async {
+    final flat = await getLocationsFlat(sellerId);
     final path = <String>[];
     _buildBreadcrumb(flat, locationId, path);
     return path.reversed.join(' › ');

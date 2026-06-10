@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/services/branch_service.dart';
+import '../core/services/seller_service.dart';
 import '../models/inventory_item.dart';
 
 class InventoryRepository {
@@ -56,10 +56,10 @@ class InventoryRepository {
   }
 
   /// Inserts the item and returns the server-created row (with assigned id).
-  /// branch_id defaults to kCurrentBranchId (see branch_service.dart) when not set.
+  /// seller_id defaults to kCurrentSellerId (see seller_service.dart) when not set.
   Future<InventoryItem> addItem(InventoryItem item) async {
     final map = item.toMap();
-    map['branch_id'] ??= kCurrentBranchId;
+    map['seller_id'] ??= kCurrentSellerId;
     final response = await supabase
         .from('inventory_items')
         .insert(map)

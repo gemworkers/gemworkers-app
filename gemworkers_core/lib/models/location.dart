@@ -1,6 +1,6 @@
 class Location {
   final String? id;
-  final String branchId;
+  final String sellerId;
   final String name;
   final String code; // Short label used for QR codes
   final String? parentId; // Self-reference for tree structure
@@ -17,7 +17,7 @@ class Location {
 
   const Location({
     this.id,
-    required this.branchId,
+    required this.sellerId,
     required this.name,
     required this.code,
     this.parentId,
@@ -32,7 +32,7 @@ class Location {
   factory Location.fromMap(Map<String, dynamic> map) {
     return Location(
       id: map['id']?.toString(),
-      branchId: map['branch_id']?.toString() ?? '',
+      sellerId: map['seller_id']?.toString() ?? '',
       name: map['name'] ?? '',
       code: map['code'] ?? '',
       parentId: map['parent_id']?.toString(),
@@ -46,7 +46,7 @@ class Location {
   }
 
   Map<String, dynamic> toMap() => {
-        'branch_id': branchId,
+        'seller_id': sellerId,
         'name': name,
         'code': code,
         'parent_id': parentId,
@@ -57,7 +57,7 @@ class Location {
 
   Location copyWith({
     String? id,
-    String? branchId,
+    String? sellerId,
     String? name,
     String? code,
     Object? parentId = _omitted,
@@ -70,7 +70,7 @@ class Location {
   }) {
     return Location(
       id: id ?? this.id,
-      branchId: branchId ?? this.branchId,
+      sellerId: sellerId ?? this.sellerId,
       name: name ?? this.name,
       code: code ?? this.code,
       parentId:

@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/services/branch_service.dart';
+import '../core/services/seller_service.dart';
 import '../models/purchase.dart';
 
 class PurchaseRepository {
@@ -38,16 +38,16 @@ class PurchaseRepository {
 
   /// Creates the purchase and its line items, then optionally creates one draft
   /// inventory item per gem (quantity × lines).
-  /// branch_id defaults to kCurrentBranchId (see branch_service.dart) when not set.
+  /// seller_id defaults to kCurrentSellerId (see seller_service.dart) when not set.
   Future<Purchase> addPurchase(
     Purchase purchase, {
     bool createInventoryItems = true,
     String? destinationLocationId,
   }) async {
-    // 1. Insert purchase header. Default branch to kCurrentBranchId if not set.
+    // 1. Insert purchase header. Default seller to kCurrentSellerId if not set.
     final purchaseMap = purchase.toMap();
-    purchaseMap['branch_id'] ??= kCurrentBranchId;
-    final branchId = purchaseMap['branch_id'] as String;
+    purchaseMap['seller_id'] ??= kCurrentSellerId;
+    final sellerId = purchaseMap['seller_id'] as String;
 
     final row = await _supabase
         .from('purchases')
@@ -69,7 +69,7 @@ class PurchaseRepository {
       await _createInventoryItems(
         purchaseId: purchaseId,
         supplierId: purchase.supplierId,
-        branchId: branchId,
+        sellerId: sellerId,
         items: itemsWithCosts,
         destinationLocationId: destinationLocationId,
       );
@@ -125,7 +125,7 @@ class PurchaseRepository {
   Future<void> _createInventoryItems({
     required String purchaseId,
     required String? supplierId,
-    required String branchId,
+    required String sellerId,
     required List<PurchaseItem> items,
     String? destinationLocationId,
   }) async {
@@ -147,7 +147,7 @@ class PurchaseRepository {
               'cost_price': costPerGem,
               'sale_price': 0.0,
               'purchase_id': purchaseId,
-              'branch_id': branchId,
+              'seller_id': sellerId,
               'location_id': destinationLocationId,
               'sku': '',
               'variety': '',

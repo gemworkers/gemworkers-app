@@ -9,14 +9,14 @@ import '../../repositories/location_repository.dart';
 /// Returns the selected [Location], or null if dismissed.
 Future<Location?> showLocationPicker(
   BuildContext context, {
-  required String branchId,
+  required String sellerId,
   String? currentLocationId,
   bool statusZonesOnly = false,
 }) {
   return showDialog<Location>(
     context: context,
     builder: (_) => _LocationPickerDialog(
-      branchId: branchId,
+      sellerId: sellerId,
       currentLocationId: currentLocationId,
       statusZonesOnly: statusZonesOnly,
     ),
@@ -24,12 +24,12 @@ Future<Location?> showLocationPicker(
 }
 
 class _LocationPickerDialog extends StatefulWidget {
-  final String branchId;
+  final String sellerId;
   final String? currentLocationId;
   final bool statusZonesOnly;
 
   const _LocationPickerDialog({
-    required this.branchId,
+    required this.sellerId,
     this.currentLocationId,
     required this.statusZonesOnly,
   });
@@ -56,7 +56,7 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
 
   Future<void> _load() async {
     try {
-      final flat = await _repo.getLocationsFlat(widget.branchId);
+      final flat = await _repo.getLocationsFlat(widget.sellerId);
       if (mounted) {
         setState(() {
           _flat = flat;

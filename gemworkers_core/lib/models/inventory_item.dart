@@ -40,8 +40,8 @@ class InventoryItem {
   final String? supplierId;
   final String supplierName;
 
-  // Branch & location ownership.
-  final String? branchId;
+  // Seller & location ownership.
+  final String? sellerId;
   final String? locationId;
 
   // Marketplace listing (is_listed feeds a future public storefront).
@@ -73,7 +73,7 @@ class InventoryItem {
     required this.imageUrls,
     this.supplierId,
     this.supplierName = '',
-    this.branchId,
+    this.sellerId,
     this.locationId,
     this.isListed = false,
     this.sellingPrice,
@@ -112,7 +112,7 @@ class InventoryItem {
       supplierName:
           (map['suppliers'] as Map<String, dynamic>?)?['name']?.toString() ??
               '',
-      branchId: map['branch_id']?.toString(),
+      sellerId: map['seller_id']?.toString(),
       locationId: map['location_id']?.toString(),
       isListed: map['is_listed'] == true,
       sellingPrice: map['selling_price'] != null
@@ -148,7 +148,7 @@ class InventoryItem {
       'notes': notes,
       'image_urls': imageUrls,
       'supplier_id': supplierId,
-      'branch_id': branchId,
+      'seller_id': sellerId,
       'location_id': locationId,
       'is_listed': isListed,
       'selling_price': sellingPrice,
@@ -179,7 +179,7 @@ class InventoryItem {
     // Use Object? with _omitted sentinel so callers can explicitly set null.
     Object? supplierId = _omitted,
     String? supplierName,
-    Object? branchId = _omitted,
+    Object? sellerId = _omitted,
     Object? locationId = _omitted,
     bool? isListed,
     Object? sellingPrice = _omitted,
@@ -209,8 +209,8 @@ class InventoryItem {
       supplierId:
           identical(supplierId, _omitted) ? this.supplierId : supplierId as String?,
       supplierName: supplierName ?? this.supplierName,
-      branchId:
-          identical(branchId, _omitted) ? this.branchId : branchId as String?,
+      sellerId:
+          identical(sellerId, _omitted) ? this.sellerId : sellerId as String?,
       locationId:
           identical(locationId, _omitted) ? this.locationId : locationId as String?,
       isListed: isListed ?? this.isListed,

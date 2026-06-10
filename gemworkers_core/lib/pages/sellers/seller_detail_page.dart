@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../models/branch.dart';
 import '../../models/location.dart';
-import '../../repositories/branch_repository.dart';
+import '../../models/seller.dart';
 import '../../repositories/location_repository.dart';
-import 'add_edit_branch_page.dart';
+import '../../repositories/seller_repository.dart';
+import 'add_edit_seller_page.dart';
 
-class BranchDetailPage extends StatefulWidget {
-  final String branchId;
-  const BranchDetailPage({super.key, required this.branchId});
+class SellerDetailPage extends StatefulWidget {
+  final String sellerId;
+  const SellerDetailPage({super.key, required this.sellerId});
 
   @override
-  State<BranchDetailPage> createState() => _BranchDetailPageState();
+  State<SellerDetailPage> createState() => _SellerDetailPageState();
 }
 
-class _BranchDetailPageState extends State<BranchDetailPage> {
-  final _branchRepo = BranchRepository();
+class _SellerDetailPageState extends State<SellerDetailPage> {
+  final _sellerRepo = SellerRepository();
   final _locationRepo = LocationRepository();
 
-  Branch? _branch;
+  Seller? _seller;
   List<Location> _locationTree = [];
   bool _loading = true;
   bool _deleting = false;
@@ -34,19 +34,23 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
-        _branchRepo.getBranch(widget.branchId),
-        _branchRepo.getInventoryCount(widget.branchId),
-        _branchRepo.getSalesCount(widget.branchId),
-        _locationRepo.getTree(widget.branchId),
+        _sellerRepo.getSeller(widget.sellerId),
+        _sellerRepo.getInventoryCount(widget.sellerId),
+        _sellerRepo.getListedCount(widget.sellerId),
+        _sellerRepo.getSalesCount(widget.sellerId),
+        _sellerRepo.getRevenue(widget.sellerId),
+        _locationRepo.getTree(widget.sellerId),
       ]);
       if (mounted) {
-        final branch = results[0] as Branch;
+        final seller = results[0] as Seller;
         setState(() {
-          _branch = branch.copyWith(
+          _seller = seller.copyWith(
             inventoryCount: results[1] as int,
-            salesCount: results[2] as int,
+            listedCount: results[2] as int,
+            salesCount: results[3] as int,
+            revenue: results[4] as double,
           );
-          _locationTree = results[3] as List<Location>;
+          _locationTree = results[5] as List<Location>;
           _loading = false;
         });
       }
@@ -60,7 +64,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-          builder: (_) => AddEditBranchPage(branch: _branch)),
+          builder: (_) => AddEditSellerPage(seller: _seller)),
     );
     if (saved == true) _load();
   }
@@ -69,18 +73,17 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Branch'),
+        title: const Text('Delete Seller'),
         content: Text(
-            'Delete "${_branch!.name}"? This will also delete all its locations. '
-            'Inventory items, orders, and purchases will have their branch reference cleared.'),
+            'Delete "${_seller!.name}"? This will also delete all its locations. '
+            'Inventory items, orders, and purchases will have their seller reference cleared.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style:
-                FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
           ),
         ],
@@ -90,7 +93,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
 
     setState(() => _deleting = true);
     try {
-      await _branchRepo.deleteBranch(widget.branchId);
+      await _sellerRepo.deleteSeller(widget.sellerId);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -119,7 +122,8 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: Text(existing == null ? 'Add Location' : 'Edit Location'),
+          title:
+              Text(existing == null ? 'Add Location' : 'Edit Location'),
           content: SizedBox(
             width: 340,
             child: Column(
@@ -129,7 +133,8 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
                   controller: nameCtrl,
                   autofocus: true,
                   decoration: const InputDecoration(
-                      labelText: 'Name *', border: OutlineInputBorder()),
+                      labelText: 'Name *',
+                      border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -209,7 +214,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     try {
       final location = Location(
         id: existing?.id,
-        branchId: widget.branchId,
+        sellerId: widget.sellerId,
         name: nameCtrl.text.trim(),
         code: codeCtrl.text.trim(),
         parentId: existing?.parentId,
@@ -245,8 +250,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style:
-                FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
           ),
         ],
@@ -268,13 +272,13 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final branch = _branch;
+    final seller = _seller;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(branch?.name ?? 'Branch'),
+        title: Text(seller?.name ?? 'Seller'),
         actions: [
-          if (!_loading && branch != null) ...[
+          if (!_loading && seller != null) ...[
             IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Edit',
@@ -284,8 +288,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2))
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.delete_outline),
               tooltip: 'Delete',
               onPressed: _deleting ? null : _confirmDelete,
@@ -295,21 +298,23 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : branch == null
-              ? const Center(child: Text('Branch not found'))
+          : seller == null
+              ? const Center(child: Text('Seller not found'))
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    _buildHeader(branch),
+                    _buildHeader(seller),
                     const SizedBox(height: 12),
-                    _buildStats(branch),
+                    _buildContact(seller),
                     const SizedBox(height: 12),
-                    _buildFeeSettings(branch),
+                    _buildStats(seller),
+                    const SizedBox(height: 12),
+                    _buildFeeSettings(seller),
                     const SizedBox(height: 12),
                     _buildLocations(),
-                    if (branch.notes.isNotEmpty) ...[
+                    if (seller.notes.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      _buildNotes(branch),
+                      _buildNotes(seller),
                     ],
                     const SizedBox(height: 32),
                   ],
@@ -317,9 +322,12 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     );
   }
 
-  Widget _buildHeader(Branch branch) {
-    final statusColor =
-        branch.status == 'active' ? Colors.green : Colors.orange;
+  Widget _buildHeader(Seller seller) {
+    final statusColor = switch (seller.status) {
+      'active' => Colors.green,
+      'pending' => Colors.orange,
+      _ => Colors.red,
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -330,78 +338,75 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
               children: [
                 Expanded(
                   child: Text(
-                    branch.name,
+                    seller.name,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                _StatusChip(branch.status, statusColor),
+                _StatusChip(seller.status, statusColor),
               ],
             ),
             const Divider(height: 20),
-            _row('Country', branch.country.isEmpty ? '—' : branch.country),
-            if (branch.joinedDate != null)
+            _row('Country',
+                seller.country.isEmpty ? '—' : seller.country),
+            if (seller.joinedDate != null)
               _row(
                 'Joined',
-                '${branch.joinedDate!.day.toString().padLeft(2, '0')}/'
-                    '${branch.joinedDate!.month.toString().padLeft(2, '0')}/'
-                    '${branch.joinedDate!.year}',
+                '${seller.joinedDate!.day.toString().padLeft(2, '0')}/'
+                    '${seller.joinedDate!.month.toString().padLeft(2, '0')}/'
+                    '${seller.joinedDate!.year}',
               ),
-            if (branch.contactNote.isNotEmpty)
-              _row('Contact', branch.contactNote),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStats(Branch branch) {
+  Widget _buildContact(Seller seller) {
+    final hasContact = seller.contactName.isNotEmpty ||
+        seller.email.isNotEmpty ||
+        seller.phone.isNotEmpty;
+    if (!hasContact) return const SizedBox.shrink();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Contact',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            if (seller.contactName.isNotEmpty)
+              _row('Name', seller.contactName),
+            if (seller.email.isNotEmpty) _row('Email', seller.email),
+            if (seller.phone.isNotEmpty) _row('Phone', seller.phone),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStats(Seller seller) {
     return Row(
       children: [
+        Expanded(child: _StatCard('${seller.inventoryCount}', 'Items')),
+        const SizedBox(width: 8),
         Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    '${branch.inventoryCount}',
-                    style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const Text('Inventory items',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
+            child: _StatCard('${seller.listedCount}', 'Listed')),
+        const SizedBox(width: 8),
         Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    '${branch.salesCount}',
-                    style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const Text('Sales (paid)',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-          ),
-        ),
+            child: _StatCard('${seller.salesCount}', 'Sales')),
+        const SizedBox(width: 8),
+        Expanded(
+            child:
+                _StatCard('€${seller.revenue.toStringAsFixed(0)}', 'Revenue')),
       ],
     );
   }
 
-  Widget _buildFeeSettings(Branch branch) {
-    final hasFees = branch.commissionRate != null ||
-        branch.userFee != null ||
-        branch.startingFee != null;
+  Widget _buildFeeSettings(Seller seller) {
+    final hasFees = seller.commissionRate != null ||
+        seller.userFee != null ||
+        seller.startingFee != null;
     if (!hasFees) return const SizedBox.shrink();
     return Card(
       child: Padding(
@@ -412,18 +417,18 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
             Text('Fee Settings',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            if (branch.commissionRate != null)
+            if (seller.commissionRate != null)
               _row('Commission',
-                  '${(branch.commissionRate! * 100).toStringAsFixed(2)}%'),
-            if (branch.userFee != null)
+                  '${(seller.commissionRate! * 100).toStringAsFixed(2)}%'),
+            if (seller.userFee != null)
               _row(
                 'User Fee',
-                '€${branch.userFee!.toStringAsFixed(2)}'
-                    '${branch.userFeePeriod != null ? ' / ${branch.userFeePeriod}' : ''}',
+                '€${seller.userFee!.toStringAsFixed(2)}'
+                    '${seller.userFeePeriod != null ? ' / ${seller.userFeePeriod}' : ''}',
               ),
-            if (branch.startingFee != null)
+            if (seller.startingFee != null)
               _row('Starting Fee',
-                  '€${branch.startingFee!.toStringAsFixed(2)} (one-time)'),
+                  '€${seller.startingFee!.toStringAsFixed(2)} (one-time)'),
           ],
         ),
       ),
@@ -467,8 +472,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     );
   }
 
-  List<Widget> _buildLocationNodes(
-      List<Location> nodes, int depth) {
+  List<Widget> _buildLocationNodes(List<Location> nodes, int depth) {
     final widgets = <Widget>[];
     for (final loc in nodes) {
       widgets.add(_LocationTile(
@@ -510,7 +514,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
     );
   }
 
-  Widget _buildNotes(Branch branch) => Card(
+  Widget _buildNotes(Seller seller) => Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -519,7 +523,7 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
               Text('Notes',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              Text(branch.notes),
+              Text(seller.notes),
             ],
           ),
         ),
@@ -543,6 +547,31 @@ class _BranchDetailPageState extends State<BranchDetailPage> {
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+class _StatCard extends StatelessWidget {
+  final String value;
+  final String label;
+  const _StatCard(this.value, this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        child: Column(
+          children: [
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 2),
+            Text(label,
+                style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _StatusChip extends StatelessWidget {
   final String status;
@@ -596,8 +625,8 @@ class _LocationTile extends StatelessWidget {
           size: 18,
           color: location.isStatusZone ? Colors.blue : Colors.grey,
         ),
-        title: Text(location.name,
-            style: const TextStyle(fontSize: 14)),
+        title:
+            Text(location.name, style: const TextStyle(fontSize: 14)),
         subtitle: location.code.isNotEmpty
             ? Text(location.code,
                 style: const TextStyle(fontSize: 11))
