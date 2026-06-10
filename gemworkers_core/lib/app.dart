@@ -102,7 +102,7 @@ class _MainLayoutState extends State<MainLayout> {
         const DashboardPage(),
         const InventoryPage(),
         const OrdersPage(),
-        const CustomersPage(),
+        if (_isOwner) const CustomersPage(),
         const PurchasesPage(),
         const SuppliersPage(),
         if (_isOwner) const SellersPage(),
@@ -124,11 +124,12 @@ class _MainLayoutState extends State<MainLayout> {
           selectedIcon: Icon(Icons.receipt_long),
           label: Text('Orders'),
         ),
-        const NavigationRailDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
-          label: Text('Customers'),
-        ),
+        if (_isOwner)
+          const NavigationRailDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: Text('Customers'),
+          ),
         const NavigationRailDestination(
           icon: Icon(Icons.shopping_bag_outlined),
           selectedIcon: Icon(Icons.shopping_bag),

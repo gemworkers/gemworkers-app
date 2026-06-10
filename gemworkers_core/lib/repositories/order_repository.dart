@@ -142,10 +142,16 @@ class OrderRepository {
   // ── Dashboard stats ───────────────────────────────────────────────────────
 
   /// Returns total order count and cumulative revenue from paid orders.
-  Future<({int orderCount, double revenue})> getDashboardStats() async {
-    final response = await supabase
+  /// Pass [sellerId] to scope to a single seller.
+  Future<({int orderCount, double revenue})> getDashboardStats(
+      {String? sellerId}) async {
+    final query = supabase
         .from('orders')
         .select('status, order_items(price_at_sale, quantity)');
+
+    final response = sellerId != null
+        ? await query.eq('seller_id', sellerId)
+        : await query;
 
     int count = (response as List).length;
     double revenue = 0.0;

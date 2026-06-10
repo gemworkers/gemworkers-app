@@ -54,16 +54,24 @@ class _DashboardPageState extends State<DashboardPage> {
       double revenue = 0.0;
       double totalSpent = 0.0;
 
+      // Seller users see only their own stats — customer count is hidden.
+      final svc = UserProfileService.instance;
+      final sellerScopeId = svc.isSeller ? svc.sellerId : null;
+
       try {
-        final stats = await _orderRepo.getDashboardStats();
+        final stats =
+            await _orderRepo.getDashboardStats(sellerId: sellerScopeId);
         orderCount = stats.orderCount;
         revenue = stats.revenue;
       } catch (_) {}
+      if (!svc.isSeller) {
+        try {
+          customerCount = await _customerRepo.getCustomerCount();
+        } catch (_) {}
+      }
       try {
-        customerCount = await _customerRepo.getCustomerCount();
-      } catch (_) {}
-      try {
-        totalSpent = await _purchaseRepo.getTotalSpent();
+        totalSpent =
+            await _purchaseRepo.getTotalSpent(sellerId: sellerScopeId);
       } catch (_) {}
 
       final results = await Future.wait([itemsFuture, sellersFuture]);
@@ -301,7 +309,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         const SizedBox(height: 12),
-        // Row 3 — activity
+        // Row 3 — activity (Customers hidden for seller role)
         Row(
           children: [
             Expanded(
@@ -312,15 +320,17 @@ class _DashboardPageState extends State<DashboardPage> {
                 color: Colors.deepPurple,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                label: 'Customers',
-                value: '$_customerCount',
-                icon: Icons.person_outline,
-                color: Colors.blue,
+            if (!UserProfileService.instance.isSeller) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  label: 'Customers',
+                  value: '$_customerCount',
+                  icon: Icons.person_outline,
+                  color: Colors.blue,
+                ),
               ),
-            ),
+            ],
           ],
         ),
         const SizedBox(height: 12),

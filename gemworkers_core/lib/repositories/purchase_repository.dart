@@ -182,9 +182,12 @@ class PurchaseRepository {
   // ── Dashboard stats ───────────────────────────────────────────────────────
 
   /// Returns the sum of total_cost across all purchases.
-  Future<double> getTotalSpent() async {
-    final response =
-        await _supabase.from('purchases').select('total_cost');
+  /// Pass [sellerId] to scope to a single seller.
+  Future<double> getTotalSpent({String? sellerId}) async {
+    final query = _supabase.from('purchases').select('total_cost');
+    final response = sellerId != null
+        ? await query.eq('seller_id', sellerId)
+        : await query;
     return (response as List).fold<double>(
       0.0,
       (sum, row) =>
