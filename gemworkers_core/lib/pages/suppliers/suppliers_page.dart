@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/supplier.dart';
 import '../../repositories/supplier_repository.dart';
 import 'add_edit_supplier_page.dart';
@@ -43,7 +44,10 @@ class _SuppliersPageState extends State<SuppliersPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final suppliers = await _repository.getSuppliers();
+      final svc = UserProfileService.instance;
+      final suppliers = await _repository.getSuppliers(
+        sellerId: svc.shouldFilterBySeller ? svc.sellerId : null,
+      );
       if (mounted) setState(() { _all = suppliers; _loading = false; });
     } catch (e) {
       debugPrint(e.toString());

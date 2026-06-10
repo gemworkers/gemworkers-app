@@ -127,7 +127,10 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
 
   Future<void> _loadSuppliers() async {
     try {
-      final suppliers = await _supplierRepo.getSuppliers();
+      final svc = UserProfileService.instance;
+      final suppliers = await _supplierRepo.getSuppliers(
+        sellerId: svc.shouldFilterBySeller ? svc.sellerId : null,
+      );
       if (mounted) {
         setState(() {
           _suppliers = suppliers;

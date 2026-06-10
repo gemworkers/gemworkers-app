@@ -13,6 +13,8 @@ class Supplier {
 
   final String notes;
 
+  // Join-derived / server-managed — excluded from toMap().
+  final String? sellerId;
   final DateTime? createdAt;
 
   const Supplier({
@@ -24,6 +26,7 @@ class Supplier {
     required this.phone,
     required this.reliabilityScore,
     required this.notes,
+    this.sellerId,
     this.createdAt,
   });
 
@@ -37,6 +40,7 @@ class Supplier {
       phone: map['phone'] ?? '',
       reliabilityScore: (map['reliability_score'] ?? 0).toDouble(),
       notes: map['notes'] ?? '',
+      sellerId: map['seller_id']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -64,6 +68,7 @@ class Supplier {
     String? phone,
     double? reliabilityScore,
     String? notes,
+    String? sellerId,
     DateTime? createdAt,
   }) {
     return Supplier(
@@ -75,6 +80,7 @@ class Supplier {
       phone: phone ?? this.phone,
       reliabilityScore: reliabilityScore ?? this.reliabilityScore,
       notes: notes ?? this.notes,
+      sellerId: sellerId ?? this.sellerId,
       createdAt: createdAt ?? this.createdAt,
     );
   }

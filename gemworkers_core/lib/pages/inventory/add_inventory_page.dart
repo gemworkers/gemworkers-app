@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/supplier.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/supplier_repository.dart';
@@ -83,7 +84,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   Future<void> _loadSuppliers() async {
     setState(() => _loadingSuppliers = true);
     try {
-      final suppliers = await _supplierRepository.getSuppliers();
+      final svc = UserProfileService.instance;
+      final suppliers = await _supplierRepository.getSuppliers(
+        sellerId: svc.shouldFilterBySeller ? svc.sellerId : null,
+      );
       if (mounted) setState(() { _suppliers = suppliers; _loadingSuppliers = false; });
     } catch (_) {
       if (mounted) setState(() => _loadingSuppliers = false);
