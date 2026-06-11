@@ -140,6 +140,24 @@ class _InventoryPageState extends State<InventoryPage>
     }
   }
 
+  // ── Location breadcrumb helper ─────────────────────────────────────────────
+
+  /// Returns the full breadcrumb for [locationId] from the loaded flat list.
+  /// Returns null when locationId is null (no location).
+  /// Returns '' when locationId is set but not found in the loaded list.
+  String? _locationLabel(String? locationId) {
+    if (locationId == null) return null;
+    final path = <String>[];
+    String? current = locationId;
+    while (current != null) {
+      final loc = _allLocations.where((l) => l.id == current).firstOrNull;
+      if (loc == null) break;
+      path.add(loc.name);
+      current = loc.parentId;
+    }
+    return path.reversed.join(' › ');
+  }
+
   // ── Listing actions ───────────────────────────────────────────────────────
 
   Future<void> _showListDialog(InventoryItem item) async {
@@ -235,7 +253,8 @@ class _InventoryPageState extends State<InventoryPage>
         final hit = item.title.toLowerCase().contains(_query) ||
             item.gemType.toLowerCase().contains(_query) ||
             item.sku.toLowerCase().contains(_query) ||
-            item.variety.toLowerCase().contains(_query);
+            item.variety.toLowerCase().contains(_query) ||
+            item.originCountry.toLowerCase().contains(_query);
         if (!hit) return false;
       }
       if (_gemTypeFilter != null && _gemTypeFilter!.isNotEmpty) {
@@ -296,6 +315,15 @@ class _InventoryPageState extends State<InventoryPage>
       _showUnassignedOnly = false;
     });
   }
+
+  // ── Gem type chips ────────────────────────────────────────────────────────
+
+  List<String> get _gemTypes => _all
+      .map((e) => e.gemType)
+      .where((g) => g.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
@@ -437,6 +465,7 @@ class _InventoryPageState extends State<InventoryPage>
   @override
   Widget build(BuildContext context) {
     final display = _displayItems;
+    final gemTypes = _gemTypes;
 
     return Scaffold(
       appBar: AppBar(
@@ -450,7 +479,7 @@ class _InventoryPageState extends State<InventoryPage>
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search name, gem type, SKU…',
+                    hintText: 'Search by name, gem type, SKU…',
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: _query.isNotEmpty
                         ? IconButton(
@@ -530,6 +559,16 @@ class _InventoryPageState extends State<InventoryPage>
                     onDismiss: () =>
                         setState(() => _bannerDismissed = true),
                   ),
+                // ── Gem type quick-filter chips ───────────────────────────
+                if (gemTypes.isNotEmpty)
+                  _GemTypeChips(
+                    gemTypes: gemTypes,
+                    selected: _gemTypeFilter,
+                    onSelect: (g) => setState(() =>
+                        _gemTypeFilter = _gemTypeFilter == g ? null : g),
+                    onClearAll: () =>
+                        setState(() => _gemTypeFilter = null),
+                  ),
                 if (_hasFilters)
                   _FilterBar(
                     count: display.length,
@@ -539,7 +578,8 @@ class _InventoryPageState extends State<InventoryPage>
                 Expanded(
                   child: display.isEmpty
                       ? _EmptyState(
-                          hasSearch: _query.isNotEmpty || _hasFilters,
+                          query: _query,
+                          hasFilters: _hasFilters,
                           onClear: _clearFilters,
                         )
                       : RefreshIndicator(
@@ -552,6 +592,7 @@ class _InventoryPageState extends State<InventoryPage>
                               final item = display[index];
                               return _ItemCard(
                                 item,
+                                locationLabel: _locationLabel(item.locationId),
                                 onTap: _openDetail,
                                 onList: item.status != 'sold'
                                     ? () => _showListDialog(item)
@@ -640,6 +681,53 @@ class _Stat extends StatelessWidget {
               ?.copyWith(color: Colors.grey),
         ),
       ],
+    );
+  }
+}
+
+class _GemTypeChips extends StatelessWidget {
+  final List<String> gemTypes;
+  final String? selected;
+  final void Function(String gem) onSelect;
+  final VoidCallback onClearAll;
+
+  const _GemTypeChips({
+    required this.gemTypes,
+    required this.selected,
+    required this.onSelect,
+    required this.onClearAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: FilterChip(
+              label: const Text('All'),
+              selected: selected == null,
+              onSelected: (_) => onClearAll(),
+              showCheckmark: false,
+            ),
+          ),
+          ...gemTypes.map(
+            (g) => Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: FilterChip(
+                label: Text(g),
+                selected: selected == g,
+                onSelected: (_) => onSelect(g),
+                showCheckmark: false,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -737,13 +825,19 @@ class _UnassignedBanner extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  final bool hasSearch;
+  final String query;
+  final bool hasFilters;
   final VoidCallback onClear;
 
-  const _EmptyState({required this.hasSearch, required this.onClear});
+  const _EmptyState({
+    required this.query,
+    required this.hasFilters,
+    required this.onClear,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasSearch = query.isNotEmpty || hasFilters;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -755,10 +849,13 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            hasSearch
-                ? 'No items match your search'
-                : 'No inventory items yet',
+            query.isNotEmpty
+                ? 'No items found for "$query"'
+                : hasFilters
+                    ? 'No items match your filters'
+                    : 'No inventory items yet',
             style: const TextStyle(fontSize: 16, color: Colors.grey),
+            textAlign: TextAlign.center,
           ),
           if (hasSearch) ...[
             const SizedBox(height: 8),
@@ -775,12 +872,14 @@ class _EmptyState extends StatelessWidget {
 
 class _ItemCard extends StatelessWidget {
   final InventoryItem item;
+  final String? locationLabel;
   final Future<void> Function(InventoryItem) onTap;
   final VoidCallback? onList;
   final VoidCallback? onUnlist;
 
   const _ItemCard(
     this.item, {
+    required this.locationLabel,
     required this.onTap,
     required this.onList,
     required this.onUnlist,
@@ -794,6 +893,12 @@ class _ItemCard extends StatelessWidget {
     final marginPct = margin != null && item.costPrice > 0
         ? margin / item.costPrice * 100
         : null;
+
+    // locationLabel == null → no location set
+    // locationLabel == ''  → locationId set but not resolved yet
+    // locationLabel non-empty → breadcrumb to display
+    final hasLocation = item.locationId != null;
+    final showLabel = locationLabel != null && locationLabel!.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -845,11 +950,34 @@ class _ItemCard extends StatelessWidget {
                 ],
               ],
             ),
-            subtitle: Text(
-              '${item.sku}  ·  ${item.gemType}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${item.sku}  ·  ${item.gemType}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  showLabel
+                      ? locationLabel!
+                      : hasLocation
+                          ? ''
+                          : 'No location set',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: showLabel
+                        ? Colors.grey.shade500
+                        : hasLocation
+                            ? Colors.transparent
+                            : Colors.red.shade300,
+                  ),
+                ),
+              ],
             ),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
