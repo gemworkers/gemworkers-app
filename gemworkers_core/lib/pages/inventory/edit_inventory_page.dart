@@ -8,6 +8,7 @@ import '../../repositories/item_movement_repository.dart';
 import '../../repositories/supplier_repository.dart';
 import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
+import 'widgets/gem_and_variety_fields.dart';
 
 class EditInventoryPage extends StatefulWidget {
   final InventoryItem item;
@@ -250,8 +251,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Title *', _title),
 
           const FormSection('Gem Details'),
-          FormTextField('Gem Type', _gemType),
-          FormTextField('Variety', _variety),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
           FormTextField('Shape', _shape),
           FormTextField('Cut Type', _cutType),
 
