@@ -4,9 +4,11 @@ import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
+import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
 import 'add_inventory_page.dart';
 import 'inventory_detail_page.dart';
+import 'widgets/cascading_location_picker.dart';
 
 // ── Sort options ──────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ class _InventoryPageState extends State<InventoryPage>
     with SingleTickerProviderStateMixin {
   final _repository = InventoryRepository();
   final _locationRepo = LocationRepository();
+  final _movementRepo = ItemMovementRepository();
   final _searchController = TextEditingController();
   late final TabController _tabController;
 
@@ -59,6 +62,11 @@ class _InventoryPageState extends State<InventoryPage>
 
   bool _bannerDismissed = false;
   bool _showUnassignedOnly = false;
+
+  // ── Selection state ───────────────────────────────────────────────────────
+
+  bool _selectionMode = false;
+  Set<String> _selectedIds = {};
 
   @override
   void initState() {
@@ -142,9 +150,6 @@ class _InventoryPageState extends State<InventoryPage>
 
   // ── Location breadcrumb helper ─────────────────────────────────────────────
 
-  /// Returns the full breadcrumb for [locationId] from the loaded flat list.
-  /// Returns null when locationId is null (no location).
-  /// Returns '' when locationId is set but not found in the loaded list.
   String? _locationLabel(String? locationId) {
     if (locationId == null) return null;
     final path = <String>[];
@@ -156,6 +161,142 @@ class _InventoryPageState extends State<InventoryPage>
       current = loc.parentId;
     }
     return path.reversed.join(' › ');
+  }
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+
+  void _enterSelectionMode({Set<String>? preSelected}) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds = preSelected ?? {};
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds = {};
+      _showUnassignedOnly = false;
+    });
+  }
+
+  void _toggleItem(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds = {..._selectedIds}..remove(id);
+      } else {
+        _selectedIds = {..._selectedIds, id};
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      _selectedIds = _displayItems
+          .where((i) => i.id != null)
+          .map((i) => i.id!)
+          .toSet();
+    });
+  }
+
+  // ── Bulk assign ───────────────────────────────────────────────────────────
+
+  void _showBulkAssignSheet() {
+    final svc = UserProfileService.instance;
+    final count = _selectedIds.length;
+    String? pickedId;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Assign location to $count item${count == 1 ? '' : 's'}',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              CascadingLocationPicker(
+                sellerId: svc.effectiveSellerId,
+                onChanged: (id) => setSheet(() => pickedId = id),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: pickedId != null
+                      ? () {
+                          Navigator.pop(ctx);
+                          _applyBulkAssign(pickedId!);
+                        }
+                      : null,
+                  child: Text(
+                      'Assign to $count item${count == 1 ? '' : 's'}'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _applyBulkAssign(String locationId) async {
+    final affected = _all
+        .where((i) => i.id != null && _selectedIds.contains(i.id))
+        .toList();
+    final count = affected.length;
+
+    try {
+      await _repository.batchSetLocation(_selectedIds.toList(), locationId);
+
+      for (final item in affected) {
+        if (item.locationId != locationId) {
+          await _movementRepo.recordMovement(
+            inventoryItemId: item.id!,
+            fromLocationId: item.locationId,
+            toLocationId: locationId,
+            reason: 'Bulk assign',
+          );
+        }
+      }
+
+      // Reload so _allLocations is fresh (may include newly created locations).
+      await _loadItems();
+
+      if (!mounted) return;
+
+      final locName = _allLocations
+              .where((l) => l.id == locationId)
+              .firstOrNull
+              ?.name ??
+          'location';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '$count item${count == 1 ? '' : 's'} assigned to $locName'),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Assignment failed: $e')),
+        );
+      }
+    }
+
+    if (mounted) _exitSelectionMode();
   }
 
   // ── Listing actions ───────────────────────────────────────────────────────
@@ -466,10 +607,13 @@ class _InventoryPageState extends State<InventoryPage>
   Widget build(BuildContext context) {
     final display = _displayItems;
     final gemTypes = _gemTypes;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inventory'),
+        title: _selectionMode
+            ? Text('${_selectedIds.length} selected')
+            : const Text('Inventory'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(104),
           child: Column(
@@ -508,41 +652,65 @@ class _InventoryPageState extends State<InventoryPage>
             ],
           ),
         ),
-        actions: [
-          PopupMenuButton<_SortOrder>(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Sort',
-            initialValue: _sortOrder,
-            onSelected: (order) => setState(() => _sortOrder = order),
-            itemBuilder: (_) => _SortOrder.values
-                .map(
-                  (o) => PopupMenuItem(
-                    value: o,
-                    child: Row(
-                      children: [
-                        if (_sortOrder == o)
-                          const Icon(Icons.check, size: 18)
-                        else
-                          const SizedBox(width: 18),
-                        const SizedBox(width: 8),
-                        Text(o.label),
-                      ],
-                    ),
+        actions: _selectionMode
+            ? [
+                TextButton(
+                  onPressed: _selectAll,
+                  child: Text(
+                    'Select all',
+                    style: TextStyle(color: cs.onSurface),
                   ),
-                )
-                .toList(),
-          ),
-          Badge(
-            isLabelVisible: _hasFilters,
-            child: IconButton(
-              icon: const Icon(Icons.filter_list),
-              onPressed: _showFilterSheet,
-              tooltip: 'Filter',
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
+                ),
+              ]
+            : [
+                PopupMenuButton<_SortOrder>(
+                  icon: const Icon(Icons.sort),
+                  tooltip: 'Sort',
+                  initialValue: _sortOrder,
+                  onSelected: (order) =>
+                      setState(() => _sortOrder = order),
+                  itemBuilder: (_) => _SortOrder.values
+                      .map(
+                        (o) => PopupMenuItem(
+                          value: o,
+                          child: Row(
+                            children: [
+                              if (_sortOrder == o)
+                                const Icon(Icons.check, size: 18)
+                              else
+                                const SizedBox(width: 18),
+                              const SizedBox(width: 8),
+                              Text(o.label),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                Badge(
+                  isLabelVisible: _hasFilters,
+                  child: IconButton(
+                    icon: const Icon(Icons.filter_list),
+                    onPressed: _showFilterSheet,
+                    tooltip: 'Filter',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _enterSelectionMode(),
+                  child: Text(
+                    'Select',
+                    style: TextStyle(color: cs.onSurface),
+                  ),
+                ),
+              ],
       ),
+      bottomNavigationBar: _selectionMode ? _buildSelectionBar(cs) : null,
+      floatingActionButton: _selectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: _openAdd,
+              child: const Icon(Icons.add),
+            ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -552,20 +720,29 @@ class _InventoryPageState extends State<InventoryPage>
                 if (_unassignedCount > 0 && !_bannerDismissed)
                   _UnassignedBanner(
                     count: _unassignedCount,
-                    onAssignNow: () => setState(() {
-                      _showUnassignedOnly = true;
-                      _bannerDismissed = true;
-                    }),
+                    onAssignNow: () {
+                      final unassignedIds = _all
+                          .where((i) =>
+                              i.locationId == null && i.id != null)
+                          .map((i) => i.id!)
+                          .toSet();
+                      setState(() {
+                        _bannerDismissed = true;
+                        _selectionMode = true;
+                        _selectedIds = unassignedIds;
+                        _showUnassignedOnly = true;
+                      });
+                    },
                     onDismiss: () =>
                         setState(() => _bannerDismissed = true),
                   ),
-                // ── Gem type quick-filter chips ───────────────────────────
                 if (gemTypes.isNotEmpty)
                   _GemTypeChips(
                     gemTypes: gemTypes,
                     selected: _gemTypeFilter,
                     onSelect: (g) => setState(() =>
-                        _gemTypeFilter = _gemTypeFilter == g ? null : g),
+                        _gemTypeFilter =
+                            _gemTypeFilter == g ? null : g),
                     onClearAll: () =>
                         setState(() => _gemTypeFilter = null),
                   ),
@@ -585,14 +762,21 @@ class _InventoryPageState extends State<InventoryPage>
                       : RefreshIndicator(
                           onRefresh: _loadItems,
                           child: ListView.builder(
-                            padding:
-                                const EdgeInsets.fromLTRB(8, 4, 8, 80),
+                            padding: const EdgeInsets.fromLTRB(8, 4, 8, 80),
                             itemCount: display.length,
                             itemBuilder: (_, index) {
                               final item = display[index];
+                              final isSelected = item.id != null &&
+                                  _selectedIds.contains(item.id);
                               return _ItemCard(
                                 item,
-                                locationLabel: _locationLabel(item.locationId),
+                                locationLabel:
+                                    _locationLabel(item.locationId),
+                                selectionMode: _selectionMode,
+                                isSelected: isSelected,
+                                onToggleSelect: item.id != null
+                                    ? () => _toggleItem(item.id!)
+                                    : null,
                                 onTap: _openDetail,
                                 onList: item.status != 'sold'
                                     ? () => _showListDialog(item)
@@ -607,9 +791,43 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAdd,
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildSelectionBar(ColorScheme cs) {
+    final count = _selectedIds.length;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        boxShadow: const [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 8, offset: Offset(0, -2)),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Text(
+                '$count item${count == 1 ? '' : 's'} selected',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: _exitSelectionMode,
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed:
+                    count > 0 ? _showBulkAssignSheet : null,
+                icon: const Icon(Icons.location_on_outlined, size: 18),
+                label: const Text('Assign Location'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -797,8 +1015,7 @@ class _UnassignedBanner extends StatelessWidget {
           Expanded(
             child: Text(
               '$count item${count == 1 ? '' : 's'} have no physical location',
-              style: TextStyle(
-                  fontSize: 13, color: cs.onTertiaryContainer),
+              style: TextStyle(fontSize: 13, color: cs.onTertiaryContainer),
             ),
           ),
           TextButton(
@@ -808,8 +1025,7 @@ class _UnassignedBanner extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               minimumSize: const Size(0, 28),
             ),
-            child: const Text('Assign now',
-                style: TextStyle(fontSize: 12)),
+            child: const Text('Assign now', style: TextStyle(fontSize: 12)),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 16),
@@ -873,6 +1089,9 @@ class _EmptyState extends StatelessWidget {
 class _ItemCard extends StatelessWidget {
   final InventoryItem item;
   final String? locationLabel;
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback? onToggleSelect;
   final Future<void> Function(InventoryItem) onTap;
   final VoidCallback? onList;
   final VoidCallback? onUnlist;
@@ -880,6 +1099,9 @@ class _ItemCard extends StatelessWidget {
   const _ItemCard(
     this.item, {
     required this.locationLabel,
+    required this.selectionMode,
+    required this.isSelected,
+    required this.onToggleSelect,
     required this.onTap,
     required this.onList,
     required this.onUnlist,
@@ -894,32 +1116,39 @@ class _ItemCard extends StatelessWidget {
         ? margin / item.costPrice * 100
         : null;
 
-    // locationLabel == null → no location set
-    // locationLabel == ''  → locationId set but not resolved yet
-    // locationLabel non-empty → breadcrumb to display
     final hasLocation = item.locationId != null;
     final showLabel = locationLabel != null && locationLabel!.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      color: isSelected
+          ? cs.primaryContainer.withValues(alpha: 0.4)
+          : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            onTap: () => onTap(item),
-            leading: item.imageUrls.isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      item.imageUrls.first,
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          const Icon(Icons.diamond_outlined, size: 36),
-                    ),
+            onTap: selectionMode
+                ? () => onToggleSelect?.call()
+                : () => onTap(item),
+            leading: selectionMode
+                ? Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => onToggleSelect?.call(),
                   )
-                : const Icon(Icons.diamond_outlined, size: 36),
+                : item.imageUrls.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          item.imageUrls.first,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.diamond_outlined, size: 36),
+                        ),
+                      )
+                    : const Icon(Icons.diamond_outlined, size: 36),
             title: Row(
               children: [
                 Expanded(
@@ -932,8 +1161,8 @@ class _ItemCard extends StatelessWidget {
                 if (item.isListed) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
@@ -979,41 +1208,46 @@ class _ItemCard extends StatelessWidget {
                 ),
               ],
             ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (listed) ...[
-                  Text(
-                    '€${item.sellingPrice!.toStringAsFixed(2)}',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, color: cs.primary),
+            trailing: selectionMode
+                ? null
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (listed) ...[
+                        Text(
+                          '€${item.sellingPrice!.toStringAsFixed(2)}',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, color: cs.primary),
+                        ),
+                        Text(
+                          'cost €${item.costPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.grey),
+                        ),
+                        if (margin != null && marginPct != null)
+                          Text(
+                            '${margin >= 0 ? '+' : ''}€${margin.toStringAsFixed(0)} (${marginPct.toStringAsFixed(0)}%)',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color:
+                                  margin >= 0 ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ] else
+                        Text(
+                          '€${item.costPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600),
+                        ),
+                      const SizedBox(height: 4),
+                      _StatusChip(item.status),
+                    ],
                   ),
-                  Text(
-                    'cost €${item.costPrice.toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                  if (margin != null && marginPct != null)
-                    Text(
-                      '${margin >= 0 ? '+' : ''}€${margin.toStringAsFixed(0)} (${marginPct.toStringAsFixed(0)}%)',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: margin >= 0 ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ] else
-                  Text(
-                    '€${item.costPrice.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                const SizedBox(height: 4),
-                _StatusChip(item.status),
-              ],
-            ),
           ),
-          if (onList != null || onUnlist != null)
+          if (!selectionMode && (onList != null || onUnlist != null))
             Padding(
               padding: const EdgeInsets.only(right: 8, bottom: 4),
               child: Row(
