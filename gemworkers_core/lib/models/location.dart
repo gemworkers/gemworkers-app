@@ -2,11 +2,12 @@ class Location {
   final String? id;
   final String sellerId;
   final String name;
-  final String code; // Short label used for QR codes
-  final String? parentId; // Self-reference for tree structure
-  final String type; // 'country'|'shop'|'zone'|'unit'|'slot'|'other'
-  final bool isStatusZone; // true = this location represents a workflow stage
+  final String code;
+  final String? parentId;
+  final String type;
+  final bool isStatusZone;
   final String managerNote;
+  final int? slotCount;
   final DateTime? createdAt;
 
   // Tree support — populated by LocationRepository, not stored in DB.
@@ -24,6 +25,7 @@ class Location {
     this.type = 'other',
     this.isStatusZone = false,
     this.managerNote = '',
+    this.slotCount,
     this.createdAt,
     this.children = const [],
     this.breadcrumb = '',
@@ -39,6 +41,7 @@ class Location {
       type: map['type'] ?? 'other',
       isStatusZone: (map['is_status_zone'] ?? false) as bool,
       managerNote: map['manager_note'] ?? '',
+      slotCount: map['slot_count'] as int?,
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -53,6 +56,7 @@ class Location {
         'type': type,
         'is_status_zone': isStatusZone,
         'manager_note': managerNote,
+        'slot_count': slotCount,
       };
 
   Location copyWith({
@@ -64,6 +68,7 @@ class Location {
     String? type,
     bool? isStatusZone,
     String? managerNote,
+    Object? slotCount = _omitted,
     DateTime? createdAt,
     List<Location>? children,
     String? breadcrumb,
@@ -78,6 +83,8 @@ class Location {
       type: type ?? this.type,
       isStatusZone: isStatusZone ?? this.isStatusZone,
       managerNote: managerNote ?? this.managerNote,
+      slotCount:
+          identical(slotCount, _omitted) ? this.slotCount : slotCount as int?,
       createdAt: createdAt ?? this.createdAt,
       children: children ?? this.children,
       breadcrumb: breadcrumb ?? this.breadcrumb,

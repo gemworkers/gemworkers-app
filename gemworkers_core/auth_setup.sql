@@ -15,11 +15,33 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
+-- Drop any prior open dev policy.
 DROP POLICY IF EXISTS user_profiles_all ON user_profiles;
 
--- DEV: open policy — replace with authenticated policies before production.
-CREATE POLICY user_profiles_all ON user_profiles
-  FOR ALL TO public USING (true) WITH CHECK (true);
+-- Idempotent drops so this file is safe to re-run.
+DROP POLICY IF EXISTS user_profiles_owner       ON user_profiles;
+DROP POLICY IF EXISTS user_profiles_self_select ON user_profiles;
+DROP POLICY IF EXISTS user_profiles_self_update ON user_profiles;
+
+-- owner: full access to all rows.
+-- Requires rls_policies.sql to have been run first (defines public.is_owner()).
+CREATE POLICY user_profiles_owner
+  ON user_profiles FOR ALL
+  TO authenticated
+  USING      (public.is_owner())
+  WITH CHECK (public.is_owner());
+
+-- Any authenticated user can read and update their own row.
+CREATE POLICY user_profiles_self_select
+  ON user_profiles FOR SELECT
+  TO authenticated
+  USING (id = auth.uid());
+
+CREATE POLICY user_profiles_self_update
+  ON user_profiles FOR UPDATE
+  TO authenticated
+  USING      (id = auth.uid())
+  WITH CHECK (id = auth.uid());
 
 -- ── How to add users ──────────────────────────────────────────────────────────
 --

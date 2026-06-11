@@ -22,23 +22,16 @@ class GemWorkersApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'GemWorkers',
       theme: ThemeData(useMaterial3: true),
-      home: ValueListenableBuilder<bool>(
-        valueListenable: AuthService.devBypass,
-        builder: (context, bypass, _) => StreamBuilder<AuthState>(
-          stream: AuthService.authStateChanges,
-          builder: (context, _) {
-            if (bypass) {
-              UserProfileService.instance.setDevOwner();
-              return const MainLayout();
-            }
-            final session = Supabase.instance.client.auth.currentSession;
-            if (session != null) {
-              return _ProfileGate(userId: session.user.id);
-            }
-            UserProfileService.instance.clear();
-            return const LoginPage();
-          },
-        ),
+      home: StreamBuilder<AuthState>(
+        stream: AuthService.authStateChanges,
+        builder: (context, _) {
+          final session = Supabase.instance.client.auth.currentSession;
+          if (session != null) {
+            return _ProfileGate(userId: session.user.id);
+          }
+          UserProfileService.instance.clear();
+          return const LoginPage();
+        },
       ),
     );
   }
@@ -227,7 +220,7 @@ class _UserMenu extends StatelessWidget {
         PopupMenuItem(
           enabled: false,
           child: Text(
-            email.isNotEmpty ? email : 'Dev bypass',
+            email,
             style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
         ),
@@ -245,7 +238,6 @@ class _UserMenu extends StatelessWidget {
       ],
       onSelected: (value) async {
         if (value == 'signout') {
-          AuthService.devBypass.value = false; // TODO remove before production
           UserProfileService.instance.clear();
           await AuthService.signOut();
         }

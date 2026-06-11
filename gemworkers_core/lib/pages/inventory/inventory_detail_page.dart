@@ -8,7 +8,6 @@ import '../../models/item_movement.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
-import '../locations/location_picker_dialog.dart';
 import 'edit_inventory_page.dart';
 
 class InventoryDetailPage extends StatefulWidget {
@@ -150,42 +149,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     }
   }
 
-  Future<void> _moveItem() async {
-    final sellerId = _item.sellerId ?? kCurrentSellerId;
-    final picked = await showLocationPicker(
-      context,
-      sellerId: sellerId,
-      currentLocationId: _item.locationId,
-    );
-    if (picked == null || !mounted) return;
-
-    try {
-      final fromLocationId = _item.locationId;
-      await _repository.updateItem(
-        _item.id!,
-        _item.copyWith(locationId: picked.id),
-      );
-      await _movementRepo.recordMovement(
-        inventoryItemId: _item.id!,
-        fromLocationId: fromLocationId,
-        toLocationId: picked.id,
-        reason: 'Manual move',
-      );
-      if (mounted) {
-        setState(() {
-          _item = _item.copyWith(locationId: picked.id);
-          _locationBreadcrumb = picked.name;
-        });
-        _loadLocationAndMovements();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Move failed: $e')));
-      }
-    }
-  }
-
   // ── Edit ──────────────────────────────────────────────────────────────────
 
   Future<void> _openEdit() async {
@@ -195,6 +158,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     );
     if (updated != null && mounted) {
       setState(() => _item = updated);
+      _loadLocationAndMovements();
     }
   }
 
@@ -598,11 +562,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             tooltip: 'QR Code',
           ),
           IconButton(
-            icon: const Icon(Icons.move_down_outlined),
-            onPressed: _moveItem,
-            tooltip: 'Move to location',
-          ),
-          IconButton(
             icon: const Icon(Icons.edit_outlined),
             onPressed: _openEdit,
             tooltip: 'Edit',
@@ -653,27 +612,14 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             _item.supplierName.isNotEmpty ? _item.supplierName : '—',
           ),
 
-          _sectionLabel('Location'),
-          Row(
-            children: [
-              Expanded(
-                child: _row(
-                  'Location',
-                  _item.locationId == null
-                      ? '—'
-                      : _locationBreadcrumb.isNotEmpty
-                          ? _locationBreadcrumb
-                          : _item.locationId!,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: _moveItem,
-                icon: const Icon(Icons.move_down_outlined, size: 16),
-                label: const Text('Move'),
-                style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8)),
-              ),
-            ],
+          _sectionLabel('Where is this item?'),
+          _row(
+            'Location',
+            _item.locationId == null
+                ? 'No location set'
+                : _locationBreadcrumb.isNotEmpty
+                    ? _locationBreadcrumb
+                    : _item.locationId!,
           ),
 
           _sectionLabel('Marketplace'),

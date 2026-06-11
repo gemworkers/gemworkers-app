@@ -1,11 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
   static SupabaseClient get _client => Supabase.instance.client;
-
-  // TODO remove before production — allows testing without a Supabase account.
-  static final ValueNotifier<bool> devBypass = ValueNotifier(false);
 
   /// Returns null on success, or a human-readable error message on failure.
   static Future<String?> signIn({

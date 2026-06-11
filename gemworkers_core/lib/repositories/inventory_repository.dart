@@ -93,6 +93,16 @@ class InventoryRepository {
     await supabase.from('inventory_items').delete().eq('id', id);
   }
 
+  /// Batch-assigns a new location (or clears it) for a list of item IDs.
+  Future<void> batchSetLocation(
+      List<String> itemIds, String? locationId) async {
+    if (itemIds.isEmpty) return;
+    await supabase
+        .from('inventory_items')
+        .update({'location_id': locationId})
+        .inFilter('id', itemIds);
+  }
+
   /// Sets is_listed=true, records the selling price and listed_at timestamp.
   Future<void> listItem(String id, double sellingPrice) async {
     await supabase.from('inventory_items').update({

@@ -7,18 +7,24 @@ class LocationRepository {
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
-  /// Flat list of all locations for a branch, ordered by name.
-  Future<List<Location>> getLocationsFlat(String sellerId) async {
-    final response = await _supabase
-        .from('locations')
-        .select()
-        .eq('seller_id', sellerId)
-        .order('name');
+  /// Flat list of all locations, ordered by name.
+  /// Pass [sellerId] to scope to one seller; omit to fetch all (owner view).
+  Future<List<Location>> getLocationsFlat([String? sellerId]) async {
+    final List<dynamic> response;
+    if (sellerId != null) {
+      response = await _supabase
+          .from('locations')
+          .select()
+          .eq('seller_id', sellerId)
+          .order('name');
+    } else {
+      response = await _supabase.from('locations').select().order('name');
+    }
     return response.map<Location>((row) => Location.fromMap(row)).toList();
   }
 
-  /// Root nodes of the tree for a branch, with children populated recursively.
-  Future<List<Location>> getTree(String sellerId) async {
+  /// Root nodes of the tree, with children populated recursively.
+  Future<List<Location>> getTree([String? sellerId]) async {
     final flat = await getLocationsFlat(sellerId);
     return _buildTree(flat, null);
   }
@@ -31,17 +37,15 @@ class LocationRepository {
   }
 
   /// IDs of the location itself and all its descendants.
-  /// Used for "filter by location including sub-locations".
   Future<List<String>> getDescendantIds(
-      String locationId, String sellerId) async {
+      String locationId, [String? sellerId]) async {
     final flat = await getLocationsFlat(sellerId);
     final ids = <String>[];
     _collectDescendants(flat, locationId, ids);
     return ids;
   }
 
-  void _collectDescendants(
-      List<Location> all, String id, List<String> ids) {
+  void _collectDescendants(List<Location> all, String id, List<String> ids) {
     ids.add(id);
     for (final child in all.where((l) => l.parentId == id)) {
       _collectDescendants(all, child.id!, ids);
@@ -49,23 +53,39 @@ class LocationRepository {
   }
 
   /// Human-readable breadcrumb from root to the given location.
-  /// Returns e.g. "Shop › Storage › Shelf A".
-  Future<String> getBreadcrumb(String locationId, String sellerId) async {
+  Future<String> getBreadcrumb(String locationId, [String? sellerId]) async {
     final flat = await getLocationsFlat(sellerId);
     final path = <String>[];
     _buildBreadcrumb(flat, locationId, path);
     return path.reversed.join(' › ');
   }
 
-  void _buildBreadcrumb(
-      List<Location> all, String id, List<String> path) {
+  void _buildBreadcrumb(List<Location> all, String id, List<String> path) {
     try {
       final loc = all.firstWhere((l) => l.id == id);
       path.add(loc.name);
       if (loc.parentId != null) _buildBreadcrumb(all, loc.parentId!, path);
-    } catch (_) {
-      // Location not found — stop traversal.
+    } catch (_) {}
+  }
+
+  /// Map of locationId → item count (only locations that have ≥1 item).
+  /// Omit [sellerId] to count across all sellers (owner view).
+  Future<Map<String, int>> getItemCountsByLocation({String? sellerId}) async {
+    final List<dynamic> rows;
+    if (sellerId != null) {
+      rows = await _supabase
+          .from('inventory_items')
+          .select('location_id')
+          .eq('seller_id', sellerId);
+    } else {
+      rows = await _supabase.from('inventory_items').select('location_id');
     }
+    final map = <String, int>{};
+    for (final row in rows) {
+      final id = row['location_id'] as String?;
+      if (id != null) map[id] = (map[id] ?? 0) + 1;
+    }
+    return map;
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────────

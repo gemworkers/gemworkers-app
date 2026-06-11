@@ -9,6 +9,7 @@ import '../../repositories/inventory_repository.dart';
 import '../../repositories/supplier_repository.dart';
 import '../../models/inventory_item.dart';
 import 'widgets/inventory_form_widgets.dart';
+import 'widgets/cascading_location_picker.dart';
 
 class AddInventoryPage extends StatefulWidget {
   const AddInventoryPage({super.key});
@@ -50,6 +51,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   List<Supplier> _suppliers = [];
   bool _loadingSuppliers = false;
   String? _supplierId;
+
+  // ── Location ──────────────────────────────────────────────────────────────
+
+  String? _locationId;
 
   // ── Photo selection ───────────────────────────────────────────────────────
 
@@ -183,6 +188,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         imageUrls: const [],
         supplierId: _supplierId,
         supplierName: supplierName,
+        locationId: _locationId,
         isListed: _listOnMarketplace,
         sellingPrice: _listOnMarketplace
             ? double.tryParse(_sellingPrice.text)
@@ -329,6 +335,8 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final svc = UserProfileService.instance;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Inventory Item'),
@@ -402,6 +410,16 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               const FormSection('Supplier'),
               _buildSupplierPicker(),
 
+              const FormSection('Where is this item?'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: CascadingLocationPicker(
+                  sellerId: svc.effectiveSellerId,
+                  onChanged: (id) => _locationId = id,
+                  enabled: !_saving,
+                ),
+              ),
+
               const FormSection('Marketplace'),
               SwitchListTile(
                 title: const Text('List on marketplace now?'),
@@ -442,7 +460,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             ],
           ),
 
-          // Full-screen saving overlay
           if (_saving)
             Container(
               color: Colors.black26,

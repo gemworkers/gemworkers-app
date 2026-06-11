@@ -57,6 +57,9 @@ class _InventoryPageState extends State<InventoryPage>
   bool _priceRangeInitialized = false;
   _SortOrder _sortOrder = _SortOrder.newestFirst;
 
+  bool _bannerDismissed = false;
+  bool _showUnassignedOnly = false;
+
   @override
   void initState() {
     super.initState();
@@ -217,6 +220,7 @@ class _InventoryPageState extends State<InventoryPage>
 
   List<InventoryItem> get _filtered {
     return _all.where((item) {
+      if (_showUnassignedOnly && item.locationId != null) return false;
       switch (_selectedTab) {
         case _ListingTab.private:
           if (item.isListed || item.status == 'sold') return false;
@@ -273,9 +277,13 @@ class _InventoryPageState extends State<InventoryPage>
     return sorted;
   }
 
+  int get _unassignedCount =>
+      _all.where((e) => e.locationId == null).length;
+
   bool get _hasFilters =>
       (_gemTypeFilter?.isNotEmpty ?? false) ||
       _locationFilter != null ||
+      _showUnassignedOnly ||
       _priceRange.start > 0 ||
       _priceRange.end < _maxPrice;
 
@@ -285,6 +293,7 @@ class _InventoryPageState extends State<InventoryPage>
       _locationFilter = null;
       _locationDescendantIds = {};
       _priceRange = RangeValues(0, _maxPrice);
+      _showUnassignedOnly = false;
     });
   }
 
@@ -511,6 +520,16 @@ class _InventoryPageState extends State<InventoryPage>
               children: [
                 if (_all.isNotEmpty)
                   _StatsStrip(_all.length, _availableCount, _totalValue),
+                if (_unassignedCount > 0 && !_bannerDismissed)
+                  _UnassignedBanner(
+                    count: _unassignedCount,
+                    onAssignNow: () => setState(() {
+                      _showUnassignedOnly = true;
+                      _bannerDismissed = true;
+                    }),
+                    onDismiss: () =>
+                        setState(() => _bannerDismissed = true),
+                  ),
                 if (_hasFilters)
                   _FilterBar(
                     count: display.length,
@@ -658,6 +677,58 @@ class _FilterBar extends StatelessWidget {
               minimumSize: const Size(0, 32),
             ),
             child: const Text('Clear filters'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnassignedBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onAssignNow;
+  final VoidCallback onDismiss;
+
+  const _UnassignedBanner({
+    required this.count,
+    required this.onAssignNow,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      color: cs.tertiaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.location_off_outlined,
+              size: 18, color: cs.onTertiaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$count item${count == 1 ? '' : 's'} have no physical location',
+              style: TextStyle(
+                  fontSize: 13, color: cs.onTertiaryContainer),
+            ),
+          ),
+          TextButton(
+            onPressed: onAssignNow,
+            style: TextButton.styleFrom(
+              foregroundColor: cs.onTertiaryContainer,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 28),
+            ),
+            child: const Text('Assign now',
+                style: TextStyle(fontSize: 12)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            onPressed: onDismiss,
+            color: cs.onTertiaryContainer,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),

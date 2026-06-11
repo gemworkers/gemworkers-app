@@ -19,22 +19,14 @@ class UserProfileService {
   UserProfile? get profile => _profile;
   String? get loadedUserId => _loadedUserId;
 
-  // null profile in ready state means dev bypass → treat as owner
-  bool get isOwner => _profile == null || _profile!.role == 'owner';
+  bool get isOwner => _profile?.role == 'owner';
   bool get isSeller => _profile?.role == 'seller';
   String? get sellerId => _profile?.sellerId;
 
-  // For inserts: seller's own seller_id, or kCurrentSellerId for owner/dev.
+  // For inserts: seller's own seller_id, or kCurrentSellerId for owner.
   String get effectiveSellerId => _profile?.sellerId ?? kCurrentSellerId;
 
   bool get shouldFilterBySeller => isSeller && _profile?.sellerId != null;
-
-  // Called when dev bypass is activated.
-  void setDevOwner() {
-    _profile = null;
-    _loadedUserId = null;
-    appState.value = AppAuthState.ready;
-  }
 
   Future<void> loadForUser(String userId) async {
     // Skip if we already loaded this user's profile successfully.

@@ -156,16 +156,6 @@ class _LoginPageState extends State<LoginPage> {
 
                     const SizedBox(height: 24),
 
-                    // Dev bypass — remove before shipping
-                    TextButton(
-                      onPressed: () => AuthService.devBypass.value = true,
-                      child: const Text(
-                        'Skip login (dev)',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
                     // Sign in button
                     FilledButton(
                       onPressed: _loading ? null : _signIn,

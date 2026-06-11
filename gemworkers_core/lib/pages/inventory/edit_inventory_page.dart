@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/supplier.dart';
 import '../../repositories/inventory_repository.dart';
+import '../../repositories/item_movement_repository.dart';
 import '../../repositories/supplier_repository.dart';
 import 'widgets/inventory_form_widgets.dart';
+import 'widgets/cascading_location_picker.dart';
 
 class EditInventoryPage extends StatefulWidget {
   final InventoryItem item;
@@ -18,6 +21,7 @@ class EditInventoryPage extends StatefulWidget {
 class _EditInventoryPageState extends State<EditInventoryPage> {
   final _repository = InventoryRepository();
   final _supplierRepository = SupplierRepository();
+  final _movementRepo = ItemMovementRepository();
 
   late final TextEditingController _sku;
   late final TextEditingController _title;
@@ -43,6 +47,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   bool _loadingSuppliers = false;
   String? _supplierId;
 
+  // ── Location ──────────────────────────────────────────────────────────────
+
+  String? _locationId;
+  String? _originalLocationId;
+
   bool _saving = false;
 
   @override
@@ -66,6 +75,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _weightUnit = i.weightUnit;
     _status = i.status;
     _supplierId = i.supplierId;
+    _locationId = i.locationId;
+    _originalLocationId = i.locationId;
     _loadSuppliers();
   }
 
@@ -81,6 +92,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     super.dispose();
   }
 
+  // ── Suppliers ─────────────────────────────────────────────────────────────
+
   Future<void> _loadSuppliers() async {
     setState(() => _loadingSuppliers = true);
     try {
@@ -90,6 +103,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       if (mounted) setState(() => _loadingSuppliers = false);
     }
   }
+
+  // ── Validation & save ─────────────────────────────────────────────────────
 
   String? _validate() {
     if (_sku.text.trim().isEmpty) return 'SKU is required.';
@@ -127,7 +142,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
               .firstOrNull ?? widget.item.supplierName
           : '';
 
-      // Construct directly (not via copyWith) so _supplierId: null is sent to DB.
       final updated = InventoryItem(
         id: widget.item.id,
         sku: _sku.text.trim(),
@@ -150,6 +164,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         imageUrls: widget.item.imageUrls,
         supplierId: _supplierId,
         supplierName: supplierName,
+        locationId: _locationId,
         isListed: widget.item.isListed,
         sellingPrice: widget.item.sellingPrice,
         listedAt: widget.item.listedAt,
@@ -157,6 +172,15 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       );
 
       await _repository.updateItem(widget.item.id!, updated);
+
+      if (_locationId != _originalLocationId && widget.item.id != null) {
+        await _movementRepo.recordMovement(
+          inventoryItemId: widget.item.id!,
+          fromLocationId: _originalLocationId,
+          toLocationId: _locationId,
+          reason: 'Manual edit',
+        );
+      }
 
       if (mounted) Navigator.pop(context, updated);
     } catch (e) {
@@ -169,6 +193,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  // ── Supplier picker ───────────────────────────────────────────────────────
 
   Widget _buildSupplierPicker() {
     if (_loadingSuppliers) {
@@ -191,8 +217,12 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final svc = UserProfileService.instance;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Item'),
@@ -245,6 +275,17 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
           const FormSection('Supplier'),
           _buildSupplierPicker(),
+
+          const FormSection('Where is this item?'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: CascadingLocationPicker(
+              sellerId: widget.item.sellerId ?? svc.effectiveSellerId,
+              initialLocationId: _originalLocationId,
+              onChanged: (id) => _locationId = id,
+              enabled: !_saving,
+            ),
+          ),
 
           const FormSection('Other'),
           FormTextField('Barcode', _barcode),
