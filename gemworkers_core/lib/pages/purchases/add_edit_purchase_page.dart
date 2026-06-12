@@ -9,7 +9,26 @@ import '../../repositories/location_repository.dart';
 import '../../repositories/purchase_repository.dart';
 import '../../repositories/supplier_repository.dart';
 import '../../shared/form_widgets.dart';
+import '../inventory/widgets/gem_and_variety_fields.dart';
 import '../locations/location_picker_dialog.dart';
+
+// ── Line type enum ────────────────────────────────────────────────────────────
+
+enum PurchaseLineType {
+  individual,
+  multiple,
+  lot;
+
+  String get displayName => switch (this) {
+        PurchaseLineType.individual => 'Individual Gem',
+        PurchaseLineType.multiple => 'Multiple Items',
+        PurchaseLineType.lot => 'Unsorted Lot',
+      };
+
+  String get dbValue => name; // 'individual' | 'multiple' | 'lot'
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 class AddEditPurchasePage extends StatefulWidget {
   final Purchase? purchase;
@@ -30,8 +49,8 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
 
   String? _supplierId;
   DateTime _purchaseDate = DateTime.now();
-  // Destination location for auto-created inventory items (Intake by default).
   Location? _destinationLocation;
+
   final _gemCostCtrl = TextEditingController();
   final _shippingCtrl = TextEditingController();
   final _customsCtrl = TextEditingController();
@@ -52,7 +71,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
   double get _totalLanded => _gemCost + _shipping + _customs + _otherFees;
 
   int get _totalQty => _items.fold(0, (sum, i) => sum + i.quantity);
-  double get _costPerGem => _totalQty > 0 ? _totalLanded / _totalQty : 0;
+  double get _costPerUnit => _totalQty > 0 ? _totalLanded / _totalQty : 0;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -71,7 +90,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
       _otherFeesCtrl.text = p.otherFees.toStringAsFixed(2);
       _notesCtrl.text = p.notes;
       _items.addAll(p.items.map((i) => _DraftLineItem.fromPurchaseItem(i)));
-      _createInventoryItems = false; // edit: items already exist
+      _createInventoryItems = false;
     } else {
       _gemCostCtrl.text = '0.00';
       _shippingCtrl.text = '0.00';
@@ -101,8 +120,8 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
 
   Future<void> _loadDefaultDestination() async {
     try {
-      final locations =
-          await _locationRepo.getLocationsFlat(UserProfileService.instance.effectiveSellerId);
+      final locations = await _locationRepo
+          .getLocationsFlat(UserProfileService.instance.effectiveSellerId);
       final intake = locations
           .where((l) =>
               l.isStatusZone && l.name.toLowerCase().contains('intake'))
@@ -152,12 +171,49 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
     if (picked != null) setState(() => _purchaseDate = picked);
   }
 
-  void _addItem() {
-    setState(() =>
-        _items.add(const _DraftLineItem(gemType: '', quantity: 1)));
+  // ── Line item management ──────────────────────────────────────────────────
+
+  Future<void> _addItem() async {
+    final type = await showDialog<PurchaseLineType>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Choose line item type'),
+        children: [
+          _TypeOption(
+            icon: Icons.diamond_outlined,
+            color: Colors.blue,
+            title: 'Individual Gem',
+            subtitle: 'One unique stone — gem type, weight, origin',
+            onTap: () => Navigator.pop(ctx, PurchaseLineType.individual),
+          ),
+          _TypeOption(
+            icon: Icons.inventory_2_outlined,
+            color: Colors.green,
+            title: 'Multiple / Identical',
+            subtitle: 'Many of the same item, e.g. 20 tiger eye bracelets',
+            onTap: () => Navigator.pop(ctx, PurchaseLineType.multiple),
+          ),
+          _TypeOption(
+            icon: Icons.category_outlined,
+            color: Colors.orange,
+            title: 'Unsorted Lot',
+            subtitle: 'Mixed batch — one placeholder, sort into gems later',
+            onTap: () => Navigator.pop(ctx, PurchaseLineType.lot),
+          ),
+        ],
+      ),
+    );
+    if (type != null && mounted) {
+      setState(() => _items.add(_DraftLineItem(
+            lineType: type,
+            quantity: type == PurchaseLineType.individual ? 1 : 1,
+          )));
+    }
   }
 
   void _removeItem(int index) => setState(() => _items.removeAt(index));
+
+  // ── Save ──────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
     setState(() => _saving = true);
@@ -173,7 +229,14 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
         items: _items
             .map((i) => PurchaseItem(
                   id: i.purchaseItemId,
+                  lineType: i.lineType.dbValue,
                   gemType: i.gemType,
+                  variety: i.variety,
+                  weightValue: i.weightValue,
+                  weightUnit: i.weightUnit,
+                  originCountry: i.originCountry,
+                  itemName: i.itemName,
+                  approxCount: i.approxCount,
                   quantity: i.quantity,
                   allocatedCost: 0, // computed by repository
                   notes: i.notes,
@@ -248,18 +311,17 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                   _TotalBanner(
                     total: _totalLanded,
                     totalQty: _totalQty,
-                    costPerGem: _costPerGem,
+                    costPerUnit: _costPerUnit,
                   ),
 
-                  const FormSection('Gem Line Items'),
+                  const FormSection('Line Items'),
                   if (_items.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Center(
                         child: Text(
-                          'No line items — the total landed cost will not be split',
-                          style:
-                              TextStyle(color: Colors.grey.shade500),
+                          'No line items — total landed cost will not be split',
+                          style: TextStyle(color: Colors.grey.shade500),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -267,11 +329,12 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                   else ...[
                     if (_totalQty == 0)
                       _WarningBanner(
-                          'Set at least 1 quantity to calculate cost shares'),
+                          'Enter quantities or stone counts to calculate cost shares'),
                     ..._items.asMap().entries.map(
                           (e) => _LineItemCard(
+                            key: ValueKey(e.key),
                             item: e.value,
-                            costPerGem: _costPerGem,
+                            costPerUnit: _costPerUnit,
                             onRemove: () => _removeItem(e.key),
                             onChanged: (updated) =>
                                 setState(() => _items[e.key] = updated),
@@ -282,7 +345,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                   OutlinedButton.icon(
                     onPressed: _addItem,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Gem Line'),
+                    label: const Text('Add Line Item'),
                   ),
 
                   if (!_isEdit) ...[
@@ -292,8 +355,9 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                       title: const Text(
                           'Create inventory items from this purchase'),
                       subtitle: const Text(
-                        'Creates one draft inventory item per gem '
-                        '(respecting quantity), each with its landed cost.',
+                        'Creates one draft inventory item per line '
+                        '(individual gems, multiples, or lot placeholders), '
+                        'each with its allocated landed cost.',
                         style: TextStyle(fontSize: 12),
                       ),
                       value: _createInventoryItems,
@@ -308,12 +372,14 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                           decoration: const InputDecoration(
                             labelText: 'Destination Location',
                             border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.place_outlined, size: 18),
+                            suffixIcon:
+                                Icon(Icons.place_outlined, size: 18),
                             helperText:
                                 'Where to place the created items (default: Intake)',
                           ),
                           child: Text(
-                            _destinationLocation?.name ?? 'None — tap to pick',
+                            _destinationLocation?.name ??
+                                'None — tap to pick',
                             style: TextStyle(
                               color: _destinationLocation == null
                                   ? Colors.grey
@@ -358,8 +424,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
       onChanged: (v) => setState(() => _supplierId = v),
       itemLabel: (id) {
         if (id == null) return 'No supplier';
-        return _suppliers.where((s) => s.id == id).firstOrNull?.name ??
-            id;
+        return _suppliers.where((s) => s.id == id).firstOrNull?.name ?? id;
       },
     );
   }
@@ -369,36 +434,93 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
 
 class _DraftLineItem {
   final String? purchaseItemId;
+  final PurchaseLineType lineType;
+
+  // individual
   final String gemType;
+  final String variety;
+  final double? weightValue;
+  final String weightUnit;
+  final String originCountry;
+
+  // multiple + lot
+  final String itemName;
+
+  // lot
+  final int? approxCount;
+
+  // all — drives cost allocation (individual=1, multiple=count, lot=approxCount)
   final int quantity;
   final String notes;
 
   const _DraftLineItem({
     this.purchaseItemId,
-    required this.gemType,
+    required this.lineType,
+    this.gemType = '',
+    this.variety = '',
+    this.weightValue,
+    this.weightUnit = 'ct',
+    this.originCountry = '',
+    this.itemName = '',
+    this.approxCount,
     required this.quantity,
     this.notes = '',
   });
 
-  factory _DraftLineItem.fromPurchaseItem(PurchaseItem item) =>
-      _DraftLineItem(
-        purchaseItemId: item.id,
-        gemType: item.gemType,
-        quantity: item.quantity,
-        notes: item.notes,
-      );
-
-  _DraftLineItem copyWith(
-          {String? gemType, int? quantity, String? notes}) =>
-      _DraftLineItem(
-        purchaseItemId: purchaseItemId,
-        gemType: gemType ?? this.gemType,
-        quantity: quantity ?? this.quantity,
-        notes: notes ?? this.notes,
-      );
+  factory _DraftLineItem.fromPurchaseItem(PurchaseItem item) {
+    final type = switch (item.lineType) {
+      'multiple' => PurchaseLineType.multiple,
+      'lot' => PurchaseLineType.lot,
+      _ => PurchaseLineType.individual,
+    };
+    return _DraftLineItem(
+      purchaseItemId: item.id,
+      lineType: type,
+      gemType: item.gemType,
+      variety: item.variety,
+      weightValue: item.weightValue,
+      weightUnit: item.weightUnit,
+      originCountry: item.originCountry,
+      itemName: item.itemName,
+      approxCount: item.approxCount,
+      quantity: item.quantity,
+      notes: item.notes,
+    );
+  }
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+class _TypeOption extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _TypeOption({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 18,
+        backgroundColor: color.withValues(alpha: 0.14),
+        child: Icon(icon, color: color, size: 18),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle:
+          Text(subtitle, style: const TextStyle(fontSize: 12)),
+      onTap: onTap,
+    );
+  }
+}
 
 class _DatePickerRow extends StatelessWidget {
   final DateTime date;
@@ -415,8 +537,7 @@ class _DatePickerRow extends StatelessWidget {
           decoration: const InputDecoration(
             labelText: 'Purchase Date',
             border: OutlineInputBorder(),
-            suffixIcon:
-                Icon(Icons.calendar_today_outlined, size: 18),
+            suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
           ),
           child: Text(
             '${date.day.toString().padLeft(2, '0')}/'
@@ -440,8 +561,7 @@ class _CostField extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: TextField(
         controller: controller,
-        keyboardType:
-            const TextInputType.numberWithOptions(decimal: true),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
         ],
@@ -458,11 +578,12 @@ class _CostField extends StatelessWidget {
 class _TotalBanner extends StatelessWidget {
   final double total;
   final int totalQty;
-  final double costPerGem;
+  final double costPerUnit;
+
   const _TotalBanner({
     required this.total,
     required this.totalQty,
-    required this.costPerGem,
+    required this.costPerUnit,
   });
 
   @override
@@ -488,11 +609,10 @@ class _TotalBanner extends StatelessWidget {
                         fontWeight: FontWeight.w600, fontSize: 15)),
                 if (totalQty > 0)
                   Text(
-                    '$totalQty gem${totalQty == 1 ? '' : 's'} · '
-                    '€${costPerGem.toStringAsFixed(2)} each',
+                    '$totalQty unit${totalQty == 1 ? '' : 's'} · '
+                    '€${costPerUnit.toStringAsFixed(2)} each',
                     style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700),
+                        fontSize: 12, color: Colors.grey.shade700),
                   ),
               ],
             ),
@@ -538,15 +658,18 @@ class _WarningBanner extends StatelessWidget {
   }
 }
 
+// ── Line item card ────────────────────────────────────────────────────────────
+
 class _LineItemCard extends StatefulWidget {
   final _DraftLineItem item;
-  final double costPerGem;
+  final double costPerUnit;
   final VoidCallback onRemove;
   final ValueChanged<_DraftLineItem> onChanged;
 
   const _LineItemCard({
+    super.key,
     required this.item,
-    required this.costPerGem,
+    required this.costPerUnit,
     required this.onRemove,
     required this.onChanged,
   });
@@ -557,34 +680,92 @@ class _LineItemCard extends StatefulWidget {
 
 class _LineItemCardState extends State<_LineItemCard> {
   late final TextEditingController _gemType;
+  late final TextEditingController _variety;
+  late final TextEditingController _weight;
+  late final TextEditingController _origin;
+  late final TextEditingController _itemName;
+  late final TextEditingController _approxCount;
   late final TextEditingController _notes;
+  late String _weightUnit;
 
   @override
   void initState() {
     super.initState();
-    _gemType = TextEditingController(text: widget.item.gemType);
-    _notes = TextEditingController(text: widget.item.notes);
+    final i = widget.item;
+    _gemType = TextEditingController(text: i.gemType);
+    _variety = TextEditingController(text: i.variety);
+    _weight = TextEditingController(
+        text: i.weightValue != null
+            ? i.weightValue!.toStringAsFixed(3)
+            : '');
+    _origin = TextEditingController(text: i.originCountry);
+    _itemName = TextEditingController(text: i.itemName);
+    _approxCount = TextEditingController(
+        text: i.approxCount?.toString() ?? '');
+    _notes = TextEditingController(text: i.notes);
+    _weightUnit = i.weightUnit;
+
+    for (final c in [
+      _gemType, _variety, _weight, _origin,
+      _itemName, _approxCount, _notes,
+    ]) {
+      c.addListener(_notify);
+    }
   }
 
   @override
   void dispose() {
-    _gemType.dispose();
-    _notes.dispose();
+    for (final c in [
+      _gemType, _variety, _weight, _origin,
+      _itemName, _approxCount, _notes,
+    ]) {
+      c.removeListener(_notify);
+      c.dispose();
+    }
     super.dispose();
   }
 
-  void _notifyText() {
-    widget.onChanged(widget.item.copyWith(
+  void _notify() => widget.onChanged(_build());
+
+  int _computeQty() => switch (widget.item.lineType) {
+        PurchaseLineType.individual => 1,
+        PurchaseLineType.lot =>
+          int.tryParse(_approxCount.text) ?? 1,
+        PurchaseLineType.multiple => widget.item.quantity,
+      };
+
+  _DraftLineItem _build() => _DraftLineItem(
+        purchaseItemId: widget.item.purchaseItemId,
+        lineType: widget.item.lineType,
+        gemType: _gemType.text.trim(),
+        variety: _variety.text.trim(),
+        weightValue: double.tryParse(_weight.text),
+        weightUnit: _weightUnit,
+        originCountry: _origin.text.trim(),
+        itemName: _itemName.text.trim(),
+        approxCount: int.tryParse(_approxCount.text),
+        quantity: _computeQty(),
+        notes: _notes.text.trim(),
+      );
+
+  void _setMultipleQty(int qty) {
+    widget.onChanged(_DraftLineItem(
+      purchaseItemId: widget.item.purchaseItemId,
+      lineType: widget.item.lineType,
       gemType: _gemType.text.trim(),
+      variety: _variety.text.trim(),
+      itemName: _itemName.text.trim(),
+      quantity: qty,
       notes: _notes.text.trim(),
     ));
   }
 
-  double get _lineTotal => widget.item.quantity * widget.costPerGem;
+  double get _lineTotal => widget.item.quantity * widget.costPerUnit;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final type = widget.item.lineType;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -593,79 +774,203 @@ class _LineItemCardState extends State<_LineItemCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gem type + remove
+            // ── Header: type chip + remove ──────────────────────────────
             Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _gemType,
-                    onChanged: (_) => _notifyText(),
-                    decoration: const InputDecoration(
-                      labelText: 'Gem Type',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                _LineTypeChip(type),
+                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close, size: 18),
                   onPressed: widget.onRemove,
                   visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            // Quantity stepper + cost display
+
+            // ── Type-specific fields ────────────────────────────────────
+            if (type == PurchaseLineType.individual) ...[
+              GemAndVarietyFields(
+                gemTypeController: _gemType,
+                varietyController: _variety,
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: TextField(
+                        controller: _weight,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Weight',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Unit',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                        ),
+                        child: DropdownButton<String>(
+                          value: _weightUnit,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          items: const ['ct', 'g', 'kg']
+                              .map((u) => DropdownMenuItem(
+                                  value: u, child: Text(u)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => _weightUnit = v);
+                              _notify();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              TextField(
+                controller: _origin,
+                decoration: const InputDecoration(
+                  labelText: 'Origin Country',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ] else if (type == PurchaseLineType.multiple) ...[
+              TextField(
+                controller: _itemName,
+                decoration: const InputDecoration(
+                  labelText: 'Item Name',
+                  hintText: 'e.g. Tiger Eye Bracelet',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Text('Qty:', style: TextStyle(fontSize: 13)),
+                  IconButton(
+                    icon: const Icon(Icons.remove, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: widget.item.quantity > 1
+                        ? () => _setMultipleQty(widget.item.quantity - 1)
+                        : null,
+                  ),
+                  Text(
+                    '${widget.item.quantity}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () =>
+                        _setMultipleQty(widget.item.quantity + 1),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+            ] else ...[
+              // lot
+              TextField(
+                controller: _itemName,
+                decoration: const InputDecoration(
+                  labelText: 'Lot Name',
+                  hintText: 'e.g. Mixed Sapphire Lot',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _approxCount,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Approx. stone count',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _gemType,
+                      decoration: const InputDecoration(
+                        labelText: 'Gem type (optional)',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // ── Notes ───────────────────────────────────────────────────
+            TextField(
+              controller: _notes,
+              maxLines: 1,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── Cost footer ─────────────────────────────────────────────
             Row(
               children: [
-                const Text('Qty:', style: TextStyle(fontSize: 13)),
-                IconButton(
-                  icon: const Icon(Icons.remove, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: widget.item.quantity > 1
-                      ? () => widget.onChanged(
-                          widget.item.copyWith(
-                              quantity: widget.item.quantity - 1))
-                      : null,
-                ),
-                Text(
-                  '${widget.item.quantity}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => widget.onChanged(
-                      widget.item.copyWith(
-                          quantity: widget.item.quantity + 1)),
-                ),
-                const SizedBox(width: 8),
-                // Per-gem cost (read-only)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('per gem',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600)),
                     Text(
-                      '€${widget.costPerGem.toStringAsFixed(2)}',
+                      _perUnitLabel(type),
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                    Text(
+                      '€${widget.costPerUnit.toStringAsFixed(2)}',
                       style: const TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
                 const Spacer(),
-                // Landed share (read-only)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('landed share',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600)),
+                    Text(
+                      'landed share',
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey.shade600),
+                    ),
                     Text(
                       '€${_lineTotal.toStringAsFixed(2)}',
                       style: TextStyle(
@@ -677,21 +982,49 @@ class _LineItemCardState extends State<_LineItemCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            // Notes
-            TextField(
-              controller: _notes,
-              onChanged: (_) => _notifyText(),
-              maxLines: 1,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  static String _perUnitLabel(PurchaseLineType type) => switch (type) {
+        PurchaseLineType.individual => 'per gem',
+        PurchaseLineType.multiple => 'per item',
+        PurchaseLineType.lot => 'per stone (est.)',
+      };
+}
+
+// ── Line type chip ────────────────────────────────────────────────────────────
+
+class _LineTypeChip extends StatelessWidget {
+  final PurchaseLineType type;
+  const _LineTypeChip(this.type);
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, icon) = switch (type) {
+      PurchaseLineType.individual =>
+        (Colors.blue, Icons.diamond_outlined),
+      PurchaseLineType.multiple =>
+        (Colors.green, Icons.inventory_2_outlined),
+      PurchaseLineType.lot =>
+        (Colors.orange, Icons.category_outlined),
+    };
+    return Chip(
+      avatar: Icon(icon, size: 14, color: color),
+      label: Text(
+        type.displayName,
+        style: TextStyle(
+            fontSize: 11,
+            color: color,
+            fontWeight: FontWeight.w600),
+      ),
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.3)),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      visualDensity: VisualDensity.compact,
     );
   }
 }

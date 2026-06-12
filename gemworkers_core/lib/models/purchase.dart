@@ -2,7 +2,26 @@ class PurchaseItem {
   final String? id;
   final String? purchaseId;
 
+  /// 'individual' | 'multiple' | 'lot'
+  final String lineType;
+
+  // ── individual gem ──────────────────────────────────────────────────────────
   final String gemType;
+  final String variety;
+  final double? weightValue;
+  final String weightUnit;
+  final String originCountry;
+
+  // ── multiple / lot ──────────────────────────────────────────────────────────
+  /// Display name: item name for multiples, lot name for lots.
+  final String itemName;
+
+  // ── lot ─────────────────────────────────────────────────────────────────────
+  /// Approximate stone count — also drives cost allocation (stored in quantity).
+  final int? approxCount;
+
+  // ── all ─────────────────────────────────────────────────────────────────────
+  /// Used for cost allocation: 1 for individual, count for multiple, approxCount for lot.
   final int quantity;
 
   /// This line's share of the purchase's total landed cost.
@@ -14,21 +33,44 @@ class PurchaseItem {
   const PurchaseItem({
     this.id,
     this.purchaseId,
+    this.lineType = 'individual',
     required this.gemType,
+    this.variety = '',
+    this.weightValue,
+    this.weightUnit = 'ct',
+    this.originCountry = '',
+    this.itemName = '',
+    this.approxCount,
     this.quantity = 1,
     required this.allocatedCost,
     this.notes = '',
   });
 
-  double get costPerGem =>
-      quantity > 0 ? allocatedCost / quantity : 0;
+  /// Per-unit cost for display purposes.
+  double get costPerUnit => quantity > 0 ? allocatedCost / quantity : 0;
+  double get costPerGem => costPerUnit;
 
   factory PurchaseItem.fromMap(Map<String, dynamic> map) {
+    final lineType = map['line_type']?.toString() ?? 'individual';
+    final approxCount = map['approx_count'] as int?;
     return PurchaseItem(
       id: map['id']?.toString(),
       purchaseId: map['purchase_id']?.toString(),
+      lineType: lineType,
       gemType: map['gem_type'] ?? '',
-      quantity: (map['quantity'] ?? 1) as int,
+      variety: map['variety'] ?? '',
+      weightValue: map['weight_value'] != null
+          ? (map['weight_value'] as num).toDouble()
+          : null,
+      weightUnit: map['weight_unit'] ?? 'ct',
+      originCountry: map['origin_country'] ?? '',
+      itemName: map['item_name'] ?? '',
+      // approxCount is only meaningful for lots; multiples store their count
+      // in approx_count in the DB but expose it via quantity in the model.
+      approxCount: lineType == 'lot' ? approxCount : null,
+      // quantity is a derived, in-memory-only field — not stored in the DB.
+      // For individual it is always 1; for multiple/lot it comes from approx_count.
+      quantity: lineType == 'individual' ? 1 : (approxCount ?? 1),
       allocatedCost: (map['allocated_cost'] ?? 0).toDouble(),
       notes: map['notes'] ?? '',
     );
@@ -36,8 +78,16 @@ class PurchaseItem {
 
   Map<String, dynamic> toMap() => {
         if (purchaseId != null) 'purchase_id': purchaseId,
+        'line_type': lineType,
         'gem_type': gemType,
-        'quantity': quantity,
+        'variety': variety,
+        'weight_value': weightValue,
+        'weight_unit': weightUnit,
+        'origin_country': originCountry,
+        'item_name': itemName,
+        // quantity is not a DB column — approx_count stores the count for both
+        // multiples (their item count) and lots (the stone estimate).
+        'approx_count': lineType == 'multiple' ? quantity : approxCount,
         'allocated_cost': allocatedCost,
         'notes': notes,
       };
@@ -45,7 +95,14 @@ class PurchaseItem {
   PurchaseItem copyWith({
     String? id,
     String? purchaseId,
+    String? lineType,
     String? gemType,
+    String? variety,
+    double? weightValue,
+    String? weightUnit,
+    String? originCountry,
+    String? itemName,
+    int? approxCount,
     int? quantity,
     double? allocatedCost,
     String? notes,
@@ -53,7 +110,14 @@ class PurchaseItem {
     return PurchaseItem(
       id: id ?? this.id,
       purchaseId: purchaseId ?? this.purchaseId,
+      lineType: lineType ?? this.lineType,
       gemType: gemType ?? this.gemType,
+      variety: variety ?? this.variety,
+      weightValue: weightValue ?? this.weightValue,
+      weightUnit: weightUnit ?? this.weightUnit,
+      originCountry: originCountry ?? this.originCountry,
+      itemName: itemName ?? this.itemName,
+      approxCount: approxCount ?? this.approxCount,
       quantity: quantity ?? this.quantity,
       allocatedCost: allocatedCost ?? this.allocatedCost,
       notes: notes ?? this.notes,
@@ -104,11 +168,9 @@ class Purchase {
 
   double get totalCost => gemCost + shippingCost + customsCost + otherFees;
 
-  int get totalGems =>
-      items.fold(0, (sum, i) => sum + i.quantity);
+  int get totalGems => items.fold(0, (sum, i) => sum + i.quantity);
 
-  double get costPerGem =>
-      totalGems > 0 ? totalCost / totalGems : 0;
+  double get costPerGem => totalGems > 0 ? totalCost / totalGems : 0;
 
   factory Purchase.fromMap(Map<String, dynamic> map) {
     List<PurchaseItem> parseItems(dynamic value) {

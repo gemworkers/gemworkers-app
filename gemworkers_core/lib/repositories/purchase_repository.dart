@@ -37,14 +37,12 @@ class PurchaseRepository {
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   /// Creates the purchase and its line items, then optionally creates one draft
-  /// inventory item per gem (quantity × lines).
-  /// seller_id defaults to kCurrentSellerId (see seller_service.dart) when not set.
+  /// inventory item per line (see _createInventoryItems for per-type behaviour).
   Future<Purchase> addPurchase(
     Purchase purchase, {
     bool createInventoryItems = true,
     String? destinationLocationId,
   }) async {
-    // 1. Insert purchase header. Default seller to kCurrentSellerId if not set.
     final purchaseMap = purchase.toMap();
     purchaseMap['seller_id'] ??= UserProfileService.instance.effectiveSellerId;
     final sellerId = purchaseMap['seller_id'] as String;
@@ -56,7 +54,6 @@ class PurchaseRepository {
         .single();
     final purchaseId = row['id'] as String;
 
-    // 2. Compute per-line landed-cost allocation and insert purchase_items.
     final itemsWithCosts = _allocateCosts(purchase);
     for (final item in itemsWithCosts) {
       await _supabase
@@ -64,7 +61,6 @@ class PurchaseRepository {
           .insert({...item.toMap(), 'purchase_id': purchaseId});
     }
 
-    // 3. Optionally create one draft inventory item per gem.
     if (createInventoryItems && itemsWithCosts.isNotEmpty) {
       await _createInventoryItems(
         purchaseId: purchaseId,
@@ -98,8 +94,9 @@ class PurchaseRepository {
 
   // ── Landed-cost allocation ────────────────────────────────────────────────
 
-  /// Divides the total landed cost equally across every gem in the lot.
-  /// Each line's allocatedCost = line.quantity × costPerGem.
+  /// Divides the total landed cost equally across every unit in the purchase.
+  /// Each line's allocatedCost = line.quantity × costPerUnit.
+  /// For lots, quantity = approxCount — so stones share the cost proportionally.
   List<PurchaseItem> _allocateCosts(Purchase purchase) {
     final items = purchase.items;
     if (items.isEmpty) return [];
@@ -109,19 +106,20 @@ class PurchaseRepository {
       return items.map((i) => i.copyWith(allocatedCost: 0)).toList();
     }
 
-    final costPerGem = purchase.totalCost / totalQty;
+    final costPerUnit = purchase.totalCost / totalQty;
     return items
         .map((item) =>
-            item.copyWith(allocatedCost: item.quantity * costPerGem))
+            item.copyWith(allocatedCost: item.quantity * costPerUnit))
         .toList();
   }
 
   // ── Auto-create inventory ─────────────────────────────────────────────────
 
-  /// Creates one draft inventory_item per gem — i.e. `item.quantity` items
-  /// per purchase line. Each item gets cost_price = costPerGem, is linked
-  /// back to this purchase via inventory_items.purchase_id, and is placed
-  /// at destinationLocationId (typically the branch's Intake zone).
+  /// Creates one draft inventory_item per purchase line.
+  ///
+  /// - individual → 1 item, quantity=1, full gem details, cost=allocatedCost
+  /// - multiple   → 1 item, quantity=count, title=itemName, cost=allocatedCost/count
+  /// - lot        → 1 placeholder item, is_unsorted_lot=true, lot_remaining_count=approxCount
   Future<void> _createInventoryItems({
     required String purchaseId,
     required String? supplierId,
@@ -129,52 +127,88 @@ class PurchaseRepository {
     required List<PurchaseItem> items,
     String? destinationLocationId,
   }) async {
-    final totalQty = items.fold(0, (sum, i) => sum + i.quantity);
-    final totalLandedCost =
-        items.fold(0.0, (sum, i) => sum + i.allocatedCost);
-    final costPerGem =
-        totalQty > 0 ? totalLandedCost / totalQty : 0.0;
-
     for (final item in items) {
-      for (int g = 0; g < item.quantity; g++) {
-        final insertedRow = await _supabase
-            .from('inventory_items')
-            .insert({
-              'title': item.gemType.isNotEmpty ? item.gemType : 'Unnamed Gem',
-              'gem_type': item.gemType,
-              'status': 'draft',
-              'supplier_id': supplierId,
-              'cost_price': costPerGem,
-              'sale_price': 0.0,
-              'purchase_id': purchaseId,
-              'seller_id': sellerId,
-              'location_id': destinationLocationId,
-              'sku': '',
-              'variety': '',
-              'origin_country': '',
-              'origin_region': '',
-              'shape': '',
-              'cut_type': '',
-              'weight_value': 0.0,
-              'weight_unit': 'ct',
-              'quantity': 1,
-              'barcode': '',
-              'qr_code': '',
-              'notes': item.notes,
-              'image_urls': [],
-            })
-            .select('id')
-            .single();
+      final Map<String, dynamic> row;
 
-        // Record initial placement movement (null → destination).
-        if (destinationLocationId != null) {
-          await _supabase.from('item_movements').insert({
-            'inventory_item_id': insertedRow['id'],
-            'from_location_id': null,
-            'to_location_id': destinationLocationId,
-            'reason': 'Initial placement from purchase',
-          });
-        }
+      if (item.lineType == 'individual') {
+        row = {
+          'title': item.gemType.isNotEmpty ? item.gemType : 'Unnamed Gem',
+          'gem_type': item.gemType,
+          'variety': item.variety,
+          'weight_value': item.weightValue ?? 0.0,
+          'weight_unit': item.weightUnit,
+          'origin_country': item.originCountry,
+          'origin_region': '',
+          'quantity': 1,
+          'cost_price': item.allocatedCost,
+          'is_unsorted_lot': false,
+          'lot_remaining_count': null,
+        };
+      } else if (item.lineType == 'multiple') {
+        row = {
+          'title': item.itemName.isNotEmpty ? item.itemName : 'Unnamed Item',
+          'gem_type': item.gemType,
+          'variety': '',
+          'weight_value': 0.0,
+          'weight_unit': 'ct',
+          'origin_country': '',
+          'origin_region': '',
+          'quantity': item.quantity,
+          'cost_price':
+              item.quantity > 0 ? item.allocatedCost / item.quantity : 0.0,
+          'is_unsorted_lot': false,
+          'lot_remaining_count': null,
+        };
+      } else {
+        // lot
+        final title = item.itemName.isNotEmpty
+            ? item.itemName
+            : (item.gemType.isNotEmpty
+                ? 'Mixed ${item.gemType} Lot'
+                : 'Unsorted Lot');
+        row = {
+          'title': title,
+          'gem_type': item.gemType,
+          'variety': '',
+          'weight_value': 0.0,
+          'weight_unit': 'ct',
+          'origin_country': '',
+          'origin_region': '',
+          'quantity': 1,
+          'cost_price': item.allocatedCost,
+          'is_unsorted_lot': true,
+          'lot_remaining_count': item.approxCount,
+        };
+      }
+
+      final insertedRow = await _supabase
+          .from('inventory_items')
+          .insert({
+            ...row,
+            'status': 'draft',
+            'supplier_id': supplierId,
+            'purchase_id': purchaseId,
+            'seller_id': sellerId,
+            'location_id': destinationLocationId,
+            'sku': '',
+            'shape': '',
+            'cut_type': '',
+            'sale_price': 0.0,
+            'barcode': '',
+            'qr_code': '',
+            'notes': item.notes,
+            'image_urls': [],
+          })
+          .select('id')
+          .single();
+
+      if (destinationLocationId != null) {
+        await _supabase.from('item_movements').insert({
+          'inventory_item_id': insertedRow['id'],
+          'from_location_id': null,
+          'to_location_id': destinationLocationId,
+          'reason': 'Initial placement from purchase',
+        });
       }
     }
   }

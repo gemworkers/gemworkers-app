@@ -49,6 +49,11 @@ class InventoryItem {
   final double? sellingPrice;
   final DateTime? listedAt;
 
+  // Unsorted lot tracking — set when created from a 'lot' purchase line.
+  final bool isUnsortedLot;
+  final int? lotRemainingCount;
+  final String? parentLotId;
+
   final DateTime? createdAt;
 
   const InventoryItem({
@@ -78,6 +83,9 @@ class InventoryItem {
     this.isListed = false,
     this.sellingPrice,
     this.listedAt,
+    this.isUnsortedLot = false,
+    this.lotRemainingCount,
+    this.parentLotId,
     this.createdAt,
   });
 
@@ -121,6 +129,9 @@ class InventoryItem {
       listedAt: map['listed_at'] != null
           ? DateTime.parse(map['listed_at'].toString())
           : null,
+      isUnsortedLot: map['is_unsorted_lot'] == true,
+      lotRemainingCount: map['lot_remaining_count'] as int?,
+      parentLotId: map['parent_lot_id']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -153,6 +164,9 @@ class InventoryItem {
       'is_listed': isListed,
       'selling_price': sellingPrice,
       'listed_at': listedAt?.toIso8601String(),
+      'is_unsorted_lot': isUnsortedLot,
+      'lot_remaining_count': lotRemainingCount,
+      'parent_lot_id': parentLotId,
     };
   }
 
@@ -184,6 +198,9 @@ class InventoryItem {
     bool? isListed,
     Object? sellingPrice = _omitted,
     Object? listedAt = _omitted,
+    bool? isUnsortedLot,
+    Object? lotRemainingCount = _omitted,
+    Object? parentLotId = _omitted,
     DateTime? createdAt,
   }) {
     return InventoryItem(
@@ -220,6 +237,13 @@ class InventoryItem {
       listedAt: identical(listedAt, _omitted)
           ? this.listedAt
           : listedAt as DateTime?,
+      isUnsortedLot: isUnsortedLot ?? this.isUnsortedLot,
+      lotRemainingCount: identical(lotRemainingCount, _omitted)
+          ? this.lotRemainingCount
+          : lotRemainingCount as int?,
+      parentLotId: identical(parentLotId, _omitted)
+          ? this.parentLotId
+          : parentLotId as String?,
       createdAt: createdAt ?? this.createdAt,
     );
   }
