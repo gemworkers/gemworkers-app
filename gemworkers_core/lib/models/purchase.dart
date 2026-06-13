@@ -24,8 +24,20 @@ class PurchaseItem {
   /// Used for cost allocation: 1 for individual, count for multiple, approxCount for lot.
   final int quantity;
 
-  /// This line's share of the purchase's total landed cost.
-  /// Computed by the repository as: quantity × (totalLandedCost / totalQty).
+  /// Price entered by the user. Not stored in DB — used for Method B cost allocation.
+  /// In 'per_piece' mode: price per unit. In 'total' mode: total price for the line.
+  final double unitPrice;
+
+  /// How the price was entered: 'per_piece' or 'total'. Not stored in DB.
+  /// Ignored for individual lines (qty is always 1, so both modes are equivalent).
+  final String priceMode;
+
+  /// Total gem value for this line. Used by the repository for overhead distribution.
+  double get lineValue =>
+      priceMode == 'per_piece' ? unitPrice * quantity : unitPrice;
+
+  /// This line's share of the total landed cost (gem value + proportional overhead).
+  /// Computed by the repository.
   final double allocatedCost;
 
   final String notes;
@@ -42,11 +54,12 @@ class PurchaseItem {
     this.itemName = '',
     this.approxCount,
     this.quantity = 1,
+    this.unitPrice = 0,
+    this.priceMode = 'total',
     required this.allocatedCost,
     this.notes = '',
   });
 
-  /// Per-unit cost for display purposes.
   double get costPerUnit => quantity > 0 ? allocatedCost / quantity : 0;
   double get costPerGem => costPerUnit;
 
@@ -68,9 +81,11 @@ class PurchaseItem {
       // approxCount is only meaningful for lots; multiples store their count
       // in approx_count in the DB but expose it via quantity in the model.
       approxCount: lineType == 'lot' ? approxCount : null,
-      // quantity is a derived, in-memory-only field — not stored in the DB.
-      // For individual it is always 1; for multiple/lot it comes from approx_count.
+      // quantity is derived, not stored in DB.
       quantity: lineType == 'individual' ? 1 : (approxCount ?? 1),
+      // unitPrice and priceMode are UI-only, not stored in DB.
+      unitPrice: 0,
+      priceMode: 'total',
       allocatedCost: (map['allocated_cost'] ?? 0).toDouble(),
       notes: map['notes'] ?? '',
     );
@@ -104,6 +119,8 @@ class PurchaseItem {
     String? itemName,
     int? approxCount,
     int? quantity,
+    double? unitPrice,
+    String? priceMode,
     double? allocatedCost,
     String? notes,
   }) {
@@ -119,6 +136,8 @@ class PurchaseItem {
       itemName: itemName ?? this.itemName,
       approxCount: approxCount ?? this.approxCount,
       quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
+      priceMode: priceMode ?? this.priceMode,
       allocatedCost: allocatedCost ?? this.allocatedCost,
       notes: notes ?? this.notes,
     );

@@ -92,25 +92,36 @@ class PurchaseRepository {
     await _supabase.from('purchases').delete().eq('id', id);
   }
 
-  // ── Landed-cost allocation ────────────────────────────────────────────────
+  // ── Landed-cost allocation (Method B — value-based overhead split) ───────
 
-  /// Divides the total landed cost equally across every unit in the purchase.
-  /// Each line's allocatedCost = line.quantity × costPerUnit.
-  /// For lots, quantity = approxCount — so stones share the cost proportionally.
+  /// Each line's gem value (unitPrice × qty or unitPrice total) is kept exactly.
+  /// Only the overhead (shipping + customs + other fees) is distributed
+  /// proportionally by each line's share of total gem value.
+  /// Falls back to equal-per-stone split when total gem value is zero.
   List<PurchaseItem> _allocateCosts(Purchase purchase) {
     final items = purchase.items;
     if (items.isEmpty) return [];
 
-    final totalQty = items.fold(0, (sum, i) => sum + i.quantity);
-    if (totalQty == 0) {
-      return items.map((i) => i.copyWith(allocatedCost: 0)).toList();
+    final overhead =
+        purchase.shippingCost + purchase.customsCost + purchase.otherFees;
+    final totalGemValue = items.fold(0.0, (sum, i) => sum + i.lineValue);
+
+    if (totalGemValue == 0) {
+      final totalQty = items.fold(0, (sum, i) => sum + i.quantity);
+      if (totalQty == 0) {
+        return items.map((i) => i.copyWith(allocatedCost: 0)).toList();
+      }
+      final overheadPerUnit = overhead / totalQty;
+      return items
+          .map((item) =>
+              item.copyWith(allocatedCost: item.quantity * overheadPerUnit))
+          .toList();
     }
 
-    final costPerUnit = purchase.totalCost / totalQty;
-    return items
-        .map((item) =>
-            item.copyWith(allocatedCost: item.quantity * costPerUnit))
-        .toList();
+    return items.map((item) {
+      final overheadShare = (item.lineValue / totalGemValue) * overhead;
+      return item.copyWith(allocatedCost: item.lineValue + overheadShare);
+    }).toList();
   }
 
   // ── Auto-create inventory ─────────────────────────────────────────────────

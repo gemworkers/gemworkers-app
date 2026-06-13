@@ -12,6 +12,29 @@ import '../../shared/form_widgets.dart';
 import '../inventory/widgets/gem_and_variety_fields.dart';
 import '../locations/location_picker_dialog.dart';
 
+// ── Per-line cost breakdown (computed from Method B in the page) ──────────────
+
+class _LineSummary {
+  final double lineValue;
+  final double overheadShare;
+  final double landedCost;
+  final double perItemCost;
+
+  const _LineSummary({
+    required this.lineValue,
+    required this.overheadShare,
+    required this.landedCost,
+    required this.perItemCost,
+  });
+
+  static const zero = _LineSummary(
+    lineValue: 0,
+    overheadShare: 0,
+    landedCost: 0,
+    perItemCost: 0,
+  );
+}
+
 // ── Line type enum ────────────────────────────────────────────────────────────
 
 enum PurchaseLineType {
@@ -25,7 +48,7 @@ enum PurchaseLineType {
         PurchaseLineType.lot => 'Unsorted Lot',
       };
 
-  String get dbValue => name; // 'individual' | 'multiple' | 'lot'
+  String get dbValue => name;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -51,7 +74,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
   DateTime _purchaseDate = DateTime.now();
   Location? _destinationLocation;
 
-  final _gemCostCtrl = TextEditingController();
+  // Gem cost is auto-calculated from line item prices — no controller needed.
   final _shippingCtrl = TextEditingController();
   final _customsCtrl = TextEditingController();
   final _otherFeesCtrl = TextEditingController();
@@ -64,14 +87,49 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
 
   // ── Computed totals ───────────────────────────────────────────────────────
 
-  double get _gemCost => double.tryParse(_gemCostCtrl.text) ?? 0;
+  double get _gemCost => _items.fold(0.0, (sum, i) => sum + i.lineValue);
   double get _shipping => double.tryParse(_shippingCtrl.text) ?? 0;
   double get _customs => double.tryParse(_customsCtrl.text) ?? 0;
   double get _otherFees => double.tryParse(_otherFeesCtrl.text) ?? 0;
-  double get _totalLanded => _gemCost + _shipping + _customs + _otherFees;
+  double get _overhead => _shipping + _customs + _otherFees;
 
-  int get _totalQty => _items.fold(0, (sum, i) => sum + i.quantity);
-  double get _costPerUnit => _totalQty > 0 ? _totalLanded / _totalQty : 0;
+  /// Method B: each line keeps its gem value; only overhead is split
+  /// proportionally by line value. Falls back to equal-per-stone when
+  /// no prices have been entered.
+  List<_LineSummary> get _lineSummaries {
+    if (_items.isEmpty) return [];
+    final overhead = _overhead;
+    final totalGemValue = _gemCost;
+
+    if (totalGemValue == 0) {
+      final totalQty = _items.fold(0, (sum, i) => sum + i.quantity);
+      return _items.map((item) {
+        final overheadShare =
+            totalQty > 0 ? (item.quantity / totalQty) * overhead : 0.0;
+        final landed = item.lineValue + overheadShare;
+        final qty = item.quantity > 0 ? item.quantity : 1;
+        return _LineSummary(
+          lineValue: item.lineValue,
+          overheadShare: overheadShare,
+          landedCost: landed,
+          perItemCost: landed / qty,
+        );
+      }).toList();
+    }
+
+    return _items.map((item) {
+      final lv = item.lineValue;
+      final overheadShare = (lv / totalGemValue) * overhead;
+      final landed = lv + overheadShare;
+      final qty = item.quantity > 0 ? item.quantity : 1;
+      return _LineSummary(
+        lineValue: lv,
+        overheadShare: overheadShare,
+        landedCost: landed,
+        perItemCost: landed / qty,
+      );
+    }).toList();
+  }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -84,7 +142,6 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
     if (p != null) {
       _supplierId = p.supplierId;
       _purchaseDate = p.purchaseDate;
-      _gemCostCtrl.text = p.gemCost.toStringAsFixed(2);
       _shippingCtrl.text = p.shippingCost.toStringAsFixed(2);
       _customsCtrl.text = p.customsCost.toStringAsFixed(2);
       _otherFeesCtrl.text = p.otherFees.toStringAsFixed(2);
@@ -92,25 +149,18 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
       _items.addAll(p.items.map((i) => _DraftLineItem.fromPurchaseItem(i)));
       _createInventoryItems = false;
     } else {
-      _gemCostCtrl.text = '0.00';
       _shippingCtrl.text = '0.00';
       _customsCtrl.text = '0.00';
       _otherFeesCtrl.text = '0.00';
     }
 
-    for (final ctrl in [
-      _gemCostCtrl,
-      _shippingCtrl,
-      _customsCtrl,
-      _otherFeesCtrl,
-    ]) {
+    for (final ctrl in [_shippingCtrl, _customsCtrl, _otherFeesCtrl]) {
       ctrl.addListener(() => setState(() {}));
     }
   }
 
   @override
   void dispose() {
-    _gemCostCtrl.dispose();
     _shippingCtrl.dispose();
     _customsCtrl.dispose();
     _otherFeesCtrl.dispose();
@@ -204,10 +254,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
       ),
     );
     if (type != null && mounted) {
-      setState(() => _items.add(_DraftLineItem(
-            lineType: type,
-            quantity: type == PurchaseLineType.individual ? 1 : 1,
-          )));
+      setState(() => _items.add(_DraftLineItem(lineType: type, quantity: 1)));
     }
   }
 
@@ -238,6 +285,8 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                   itemName: i.itemName,
                   approxCount: i.approxCount,
                   quantity: i.quantity,
+                  unitPrice: i.unitPrice,
+                  priceMode: i.priceMode,
                   allocatedCost: 0, // computed by repository
                   notes: i.notes,
                 ))
@@ -268,6 +317,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
 
   @override
   Widget build(BuildContext context) {
+    final summaries = _lineSummaries;
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEdit ? 'Edit Purchase' : 'New Purchase'),
@@ -297,8 +347,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                   FormTextField('Notes', _notesCtrl, maxLines: 2),
 
                   const FormSection('Costs'),
-                  _CostField(
-                      label: 'Gem Cost (€)', controller: _gemCostCtrl),
+                  _GemCostDisplay(gemCost: _gemCost),
                   _CostField(
                       label: 'Shipping Cost (€)',
                       controller: _shippingCtrl),
@@ -309,9 +358,8 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                       label: 'Other Fees (€)',
                       controller: _otherFeesCtrl),
                   _TotalBanner(
-                    total: _totalLanded,
-                    totalQty: _totalQty,
-                    costPerUnit: _costPerUnit,
+                    gemValue: _gemCost,
+                    overhead: _overhead,
                   ),
 
                   const FormSection('Line Items'),
@@ -327,14 +375,16 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
                       ),
                     )
                   else ...[
-                    if (_totalQty == 0)
+                    if (_items.isNotEmpty && _gemCost == 0)
                       _WarningBanner(
-                          'Enter quantities or stone counts to calculate cost shares'),
+                          'Enter prices on each line to distribute overhead by value'),
                     ..._items.asMap().entries.map(
                           (e) => _LineItemCard(
                             key: ValueKey(e.key),
                             item: e.value,
-                            costPerUnit: _costPerUnit,
+                            summary: e.key < summaries.length
+                                ? summaries[e.key]
+                                : _LineSummary.zero,
                             onRemove: () => _removeItem(e.key),
                             onChanged: (updated) =>
                                 setState(() => _items[e.key] = updated),
@@ -430,7 +480,7 @@ class _AddEditPurchasePageState extends State<AddEditPurchasePage> {
   }
 }
 
-// ── Draft line item ───────────────────────────────────────────────────────────
+// ── Draft line item (form state — not persisted directly) ─────────────────────
 
 class _DraftLineItem {
   final String? purchaseItemId;
@@ -451,7 +501,15 @@ class _DraftLineItem {
 
   // all — drives cost allocation (individual=1, multiple=count, lot=approxCount)
   final int quantity;
+
+  // price — UI only, not stored in DB
+  final double unitPrice;
+  final String priceMode; // 'per_piece' | 'total'
+
   final String notes;
+
+  double get lineValue =>
+      priceMode == 'per_piece' ? unitPrice * quantity : unitPrice;
 
   const _DraftLineItem({
     this.purchaseItemId,
@@ -464,6 +522,8 @@ class _DraftLineItem {
     this.itemName = '',
     this.approxCount,
     required this.quantity,
+    this.unitPrice = 0,
+    this.priceMode = 'total',
     this.notes = '',
   });
 
@@ -484,6 +544,8 @@ class _DraftLineItem {
       itemName: item.itemName,
       approxCount: item.approxCount,
       quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      priceMode: item.priceMode,
       notes: item.notes,
     );
   }
@@ -515,8 +577,7 @@ class _TypeOption extends StatelessWidget {
         child: Icon(icon, color: color, size: 18),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle:
-          Text(subtitle, style: const TextStyle(fontSize: 12)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       onTap: onTap,
     );
   }
@@ -550,6 +611,31 @@ class _DatePickerRow extends StatelessWidget {
   }
 }
 
+class _GemCostDisplay extends StatelessWidget {
+  final double gemCost;
+  const _GemCostDisplay({required this.gemCost});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Gem Cost (€)',
+          border: OutlineInputBorder(),
+          helperText: 'Auto-calculated — sum of all line item prices',
+          suffixIcon: Icon(Icons.lock_outline, size: 16),
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        child: Text(
+          '€ ${gemCost.toStringAsFixed(2)}',
+          style: const TextStyle(fontSize: 16),
+        ),
+      ),
+    );
+  }
+}
+
 class _CostField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
@@ -576,18 +662,14 @@ class _CostField extends StatelessWidget {
 }
 
 class _TotalBanner extends StatelessWidget {
-  final double total;
-  final int totalQty;
-  final double costPerUnit;
+  final double gemValue;
+  final double overhead;
 
-  const _TotalBanner({
-    required this.total,
-    required this.totalQty,
-    required this.costPerUnit,
-  });
+  const _TotalBanner({required this.gemValue, required this.overhead});
 
   @override
   Widget build(BuildContext context) {
+    final total = gemValue + overhead;
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -607,13 +689,12 @@ class _TotalBanner extends StatelessWidget {
                 const Text('Total Landed Cost',
                     style: TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 15)),
-                if (totalQty > 0)
-                  Text(
-                    '$totalQty unit${totalQty == 1 ? '' : 's'} · '
-                    '€${costPerUnit.toStringAsFixed(2)} each',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade700),
-                  ),
+                Text(
+                  'Gems €${gemValue.toStringAsFixed(2)}'
+                  ' · Overhead €${overhead.toStringAsFixed(2)}',
+                  style:
+                      TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
               ],
             ),
           ),
@@ -662,14 +743,14 @@ class _WarningBanner extends StatelessWidget {
 
 class _LineItemCard extends StatefulWidget {
   final _DraftLineItem item;
-  final double costPerUnit;
+  final _LineSummary summary;
   final VoidCallback onRemove;
   final ValueChanged<_DraftLineItem> onChanged;
 
   const _LineItemCard({
     super.key,
     required this.item,
-    required this.costPerUnit,
+    required this.summary,
     required this.onRemove,
     required this.onChanged,
   });
@@ -685,8 +766,10 @@ class _LineItemCardState extends State<_LineItemCard> {
   late final TextEditingController _origin;
   late final TextEditingController _itemName;
   late final TextEditingController _approxCount;
+  late final TextEditingController _price;
   late final TextEditingController _notes;
   late String _weightUnit;
+  late String _priceMode;
 
   @override
   void initState() {
@@ -700,14 +783,17 @@ class _LineItemCardState extends State<_LineItemCard> {
             : '');
     _origin = TextEditingController(text: i.originCountry);
     _itemName = TextEditingController(text: i.itemName);
-    _approxCount = TextEditingController(
-        text: i.approxCount?.toString() ?? '');
+    _approxCount =
+        TextEditingController(text: i.approxCount?.toString() ?? '');
+    _price = TextEditingController(
+        text: i.unitPrice > 0 ? i.unitPrice.toStringAsFixed(2) : '');
     _notes = TextEditingController(text: i.notes);
     _weightUnit = i.weightUnit;
+    _priceMode = i.priceMode;
 
     for (final c in [
       _gemType, _variety, _weight, _origin,
-      _itemName, _approxCount, _notes,
+      _itemName, _approxCount, _price, _notes,
     ]) {
       c.addListener(_notify);
     }
@@ -717,7 +803,7 @@ class _LineItemCardState extends State<_LineItemCard> {
   void dispose() {
     for (final c in [
       _gemType, _variety, _weight, _origin,
-      _itemName, _approxCount, _notes,
+      _itemName, _approxCount, _price, _notes,
     ]) {
       c.removeListener(_notify);
       c.dispose();
@@ -729,8 +815,7 @@ class _LineItemCardState extends State<_LineItemCard> {
 
   int _computeQty() => switch (widget.item.lineType) {
         PurchaseLineType.individual => 1,
-        PurchaseLineType.lot =>
-          int.tryParse(_approxCount.text) ?? 1,
+        PurchaseLineType.lot => int.tryParse(_approxCount.text) ?? 1,
         PurchaseLineType.multiple => widget.item.quantity,
       };
 
@@ -745,6 +830,8 @@ class _LineItemCardState extends State<_LineItemCard> {
         itemName: _itemName.text.trim(),
         approxCount: int.tryParse(_approxCount.text),
         quantity: _computeQty(),
+        unitPrice: double.tryParse(_price.text) ?? 0,
+        priceMode: _priceMode,
         notes: _notes.text.trim(),
       );
 
@@ -756,15 +843,118 @@ class _LineItemCardState extends State<_LineItemCard> {
       variety: _variety.text.trim(),
       itemName: _itemName.text.trim(),
       quantity: qty,
+      unitPrice: double.tryParse(_price.text) ?? 0,
+      priceMode: _priceMode,
       notes: _notes.text.trim(),
     ));
   }
 
-  double get _lineTotal => widget.item.quantity * widget.costPerUnit;
+  // ── Price field helpers ───────────────────────────────────────────────────
+
+  String get _priceFieldLabel {
+    final type = widget.item.lineType;
+    if (type == PurchaseLineType.individual) return 'Price (€)';
+    if (type == PurchaseLineType.multiple) {
+      return _priceMode == 'per_piece'
+          ? 'Price per piece (€)'
+          : 'Total price (€)';
+    }
+    return _priceMode == 'per_piece'
+        ? 'Price per stone (€)'
+        : 'Total lot price (€)';
+  }
+
+  String? get _priceHelperText {
+    if (widget.item.lineType == PurchaseLineType.individual) return null;
+    if (_priceMode != 'per_piece') return null;
+    final price = double.tryParse(_price.text) ?? 0;
+    final qty = widget.item.quantity;
+    final total = price * qty;
+    final unit = widget.item.lineType == PurchaseLineType.lot ? 'stone' : 'piece';
+    return '€${price.toStringAsFixed(2)} × $qty ${unit}s = €${total.toStringAsFixed(2)} total';
+  }
+
+  Widget _buildPriceModeToggle() {
+    final isLot = widget.item.lineType == PurchaseLineType.lot;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SegmentedButton<String>(
+        segments: [
+          ButtonSegment(
+            value: 'per_piece',
+            label: Text(isLot ? 'Per stone' : 'Per piece',
+                style: const TextStyle(fontSize: 12)),
+          ),
+          const ButtonSegment(
+            value: 'total',
+            label: Text('Total', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+        selected: {_priceMode},
+        onSelectionChanged: (s) {
+          setState(() => _priceMode = s.first);
+          _notify();
+        },
+        style: const ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: _price,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+        ],
+        decoration: InputDecoration(
+          labelText: _priceFieldLabel,
+          prefixText: '€ ',
+          isDense: true,
+          border: const OutlineInputBorder(),
+          helperText: _priceHelperText,
+        ),
+      ),
+    );
+  }
+
+  // ── Cost footer ───────────────────────────────────────────────────────────
+
+  String get _perItemLabel => switch (widget.item.lineType) {
+        PurchaseLineType.individual => 'per gem',
+        PurchaseLineType.multiple => 'per piece',
+        PurchaseLineType.lot => 'per stone est.',
+      };
+
+  Widget _buildCostFooter(BuildContext context) {
+    final s = widget.summary;
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          _CostStat('gem value', '€${s.lineValue.toStringAsFixed(2)}'),
+          _CostStat('+ overhead', '+€${s.overheadShare.toStringAsFixed(2)}'),
+          _CostStat('landed', '€${s.landedCost.toStringAsFixed(2)}',
+              highlight: true, color: cs.primary),
+          _CostStat(_perItemLabel, '€${s.perItemCost.toStringAsFixed(2)}',
+              highlight: true, color: cs.primary),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final type = widget.item.lineType;
 
     return Card(
@@ -774,7 +964,7 @@ class _LineItemCardState extends State<_LineItemCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header: type chip + remove ──────────────────────────────
+            // ── Header ─────────────────────────────────────────────────
             Row(
               children: [
                 _LineTypeChip(type),
@@ -804,8 +994,8 @@ class _LineItemCardState extends State<_LineItemCard> {
                       padding: const EdgeInsets.only(bottom: 14),
                       child: TextField(
                         controller: _weight,
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         decoration: const InputDecoration(
                           labelText: 'Weight',
                           isDense: true,
@@ -932,6 +1122,10 @@ class _LineItemCardState extends State<_LineItemCard> {
               const SizedBox(height: 10),
             ],
 
+            // ── Price entry ─────────────────────────────────────────────
+            if (type != PurchaseLineType.individual) _buildPriceModeToggle(),
+            _buildPriceField(),
+
             // ── Notes ───────────────────────────────────────────────────
             TextField(
               controller: _notes,
@@ -944,55 +1138,49 @@ class _LineItemCardState extends State<_LineItemCard> {
             ),
             const SizedBox(height: 10),
 
-            // ── Cost footer ─────────────────────────────────────────────
-            Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _perUnitLabel(type),
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey.shade600),
-                    ),
-                    Text(
-                      '€${widget.costPerUnit.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'landed share',
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey.shade600),
-                    ),
-                    Text(
-                      '€${_lineTotal.toStringAsFixed(2)}',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: cs.primary),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            // ── Cost breakdown ──────────────────────────────────────────
+            _buildCostFooter(context),
           ],
         ),
       ),
     );
   }
+}
 
-  static String _perUnitLabel(PurchaseLineType type) => switch (type) {
-        PurchaseLineType.individual => 'per gem',
-        PurchaseLineType.multiple => 'per item',
-        PurchaseLineType.lot => 'per stone (est.)',
-      };
+// ── Cost stat cell ────────────────────────────────────────────────────────────
+
+class _CostStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool highlight;
+  final Color? color;
+
+  const _CostStat(this.label, this.value,
+      {this.highlight = false, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              textAlign: TextAlign.center),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight:
+                  highlight ? FontWeight.bold : FontWeight.w500,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Line type chip ────────────────────────────────────────────────────────────
@@ -1004,12 +1192,10 @@ class _LineTypeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, icon) = switch (type) {
-      PurchaseLineType.individual =>
-        (Colors.blue, Icons.diamond_outlined),
+      PurchaseLineType.individual => (Colors.blue, Icons.diamond_outlined),
       PurchaseLineType.multiple =>
         (Colors.green, Icons.inventory_2_outlined),
-      PurchaseLineType.lot =>
-        (Colors.orange, Icons.category_outlined),
+      PurchaseLineType.lot => (Colors.orange, Icons.category_outlined),
     };
     return Chip(
       avatar: Icon(icon, size: 14, color: color),
