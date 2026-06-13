@@ -1158,6 +1158,25 @@ class _ItemCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (item.isUnsortedLot) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Lot · ${item.lotRemainingCount ?? 0} · €${item.costPrice.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.deepOrange,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
                 if (item.isListed) ...[
                   const SizedBox(width: 6),
                   Container(

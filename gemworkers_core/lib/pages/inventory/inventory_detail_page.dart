@@ -9,6 +9,7 @@ import '../../repositories/inventory_repository.dart';
 import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
 import 'edit_inventory_page.dart';
+import 'lot_sort_page.dart';
 
 class InventoryDetailPage extends StatefulWidget {
   final InventoryItem item;
@@ -146,6 +147,25 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
+    }
+  }
+
+  // ── Lot sorting ───────────────────────────────────────────────────────────
+
+  Future<void> _openLotSort() async {
+    if (_item.id == null) return;
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => LotSortPage(lot: _item)),
+    );
+    if (updated == true && mounted) {
+      try {
+        final fresh = await _repository.getItem(_item.id!);
+        if (mounted) {
+          setState(() => _item = fresh);
+          _loadLocationAndMovements();
+        }
+      } catch (_) {}
     }
   }
 
@@ -605,6 +625,24 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           _sectionLabel('Pricing'),
           _row('Cost Price', '€${_item.costPrice.toStringAsFixed(2)}'),
           _row('Sale Price', '€${_item.salePrice.toStringAsFixed(2)}'),
+
+          if (_item.isUnsortedLot) ...[
+            _sectionLabel('Lot'),
+            _row('Stones remaining', '~${_item.lotRemainingCount ?? 0}'),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openLotSort,
+                icon: const Icon(Icons.sort, size: 18),
+                label: const Text('Sort this lot'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
 
           _sectionLabel('Supplier'),
           _row(

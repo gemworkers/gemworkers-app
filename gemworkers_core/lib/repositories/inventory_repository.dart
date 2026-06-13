@@ -93,6 +93,66 @@ class InventoryRepository {
     await supabase.from('inventory_items').delete().eq('id', id);
   }
 
+  // ── Lot sorting ───────────────────────────────────────────────────────────
+
+  /// All stones sorted from a given lot, oldest first.
+  Future<List<InventoryItem>> getLotChildren(String lotId) async {
+    final response = await supabase
+        .from('inventory_items')
+        .select('*, suppliers(name)')
+        .eq('parent_lot_id', lotId)
+        .order('created_at');
+    return response
+        .map<InventoryItem>((r) => InventoryItem.fromMap(r))
+        .toList();
+  }
+
+  /// Creates a child stone from a lot and decrements the lot's stone count by 1.
+  Future<InventoryItem> addLotStone({
+    required InventoryItem stone,
+    required String lotId,
+    required int lotRemainingCount,
+  }) async {
+    final created = await addItem(stone);
+    await supabase
+        .from('inventory_items')
+        .update({
+          'lot_remaining_count':
+              (lotRemainingCount - 1).clamp(0, lotRemainingCount),
+        })
+        .eq('id', lotId);
+    return created;
+  }
+
+  /// Deletes a child stone and restores one stone to the lot's remaining count.
+  Future<void> removeLotStone({
+    required String stoneId,
+    required String lotId,
+    required int lotRemainingCount,
+  }) async {
+    await deleteItem(stoneId);
+    await supabase
+        .from('inventory_items')
+        .update({'lot_remaining_count': lotRemainingCount + 1})
+        .eq('id', lotId);
+  }
+
+  /// Patches only the cost_price field of an item.
+  Future<void> updateItemCost(String id, double costPrice) async {
+    await supabase
+        .from('inventory_items')
+        .update({'cost_price': costPrice})
+        .eq('id', id);
+  }
+
+  /// Marks an unsorted lot as fully sorted (status = 'sorted').
+  Future<void> markLotSorted(String lotId) async {
+    await supabase
+        .from('inventory_items')
+        .update({'status': 'sorted'})
+        .eq('id', lotId);
+  }
+
   /// Batch-assigns a new location (or clears it) for a list of item IDs.
   Future<void> batchSetLocation(
       List<String> itemIds, String? locationId) async {
