@@ -9,6 +9,7 @@ import '../../repositories/inventory_repository.dart';
 import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
 import 'edit_inventory_page.dart';
+import 'listing_sheet.dart';
 import 'lot_sort_page.dart';
 
 class InventoryDetailPage extends StatefulWidget {
@@ -68,85 +69,23 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
   // ── List / Unlist ─────────────────────────────────────────────────────────
 
-  Future<void> _showListDialog() async {
-    final priceController = TextEditingController(
-      text: _item.sellingPrice != null
-          ? _item.sellingPrice!.toStringAsFixed(2)
-          : '',
-    );
-    try {
-      final price = await showDialog<double>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('List on Marketplace'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Selling price for "${_item.title}":'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Selling Price',
-                  prefixText: '€ ',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final p = double.tryParse(
-                    priceController.text.replaceAll(',', '.'));
-                if (p == null || p <= 0) return;
-                Navigator.pop(ctx, p);
-              },
-              child: const Text('List'),
-            ),
-          ],
-        ),
-      );
-      if (price == null || !mounted) return;
-      await _repository.listItem(_item.id!, price);
-      if (mounted) {
-        setState(() {
-          _item = _item.copyWith(
+  Future<void> _openListingSheet() async {
+    if (_item.id == null) return;
+    final result = await showListingSheet(context, _item);
+    if (result == null || !mounted) return;
+    if (result.listed && result.price != null) {
+      setState(() => _item = _item.copyWith(
             isListed: true,
-            sellingPrice: price,
+            sellingPrice: result.price,
             listedAt: DateTime.now(),
-          );
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
-    } finally {
-      priceController.dispose();
-    }
-  }
-
-  Future<void> _unlistItem() async {
-    try {
-      await _repository.unlistItem(_item.id!);
-      if (mounted) {
-        setState(() => _item = _item.copyWith(isListed: false, listedAt: null));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
+          ));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Item listed at €${result.price!.toStringAsFixed(2)}')));
+    } else if (!result.listed) {
+      setState(() => _item = _item.copyWith(isListed: false, listedAt: null));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Removed from marketplace')));
     }
   }
 
@@ -674,7 +613,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
               if (_item.status != 'sold')
                 _item.isListed
                     ? OutlinedButton(
-                        onPressed: _unlistItem,
+                        onPressed: _openListingSheet,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.orange,
                           padding:
@@ -683,7 +622,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                         child: const Text('Unlist'),
                       )
                     : FilledButton(
-                        onPressed: _showListDialog,
+                        onPressed: _openListingSheet,
                         style: FilledButton.styleFrom(
                           padding:
                               const EdgeInsets.symmetric(horizontal: 12),

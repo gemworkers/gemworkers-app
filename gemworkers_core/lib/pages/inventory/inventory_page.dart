@@ -8,6 +8,7 @@ import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
 import 'add_inventory_page.dart';
 import 'inventory_detail_page.dart';
+import 'listing_sheet.dart';
 import 'widgets/cascading_location_picker.dart';
 
 // ── Sort options ──────────────────────────────────────────────────────────────
@@ -301,75 +302,17 @@ class _InventoryPageState extends State<InventoryPage>
 
   // ── Listing actions ───────────────────────────────────────────────────────
 
-  Future<void> _showListDialog(InventoryItem item) async {
-    final priceController = TextEditingController(
-      text: item.sellingPrice != null
-          ? item.sellingPrice!.toStringAsFixed(2)
-          : '',
-    );
-    try {
-      final price = await showDialog<double>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('List on Marketplace'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Selling price for "${item.title}":'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Selling Price',
-                  prefixText: '€ ',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final p = double.tryParse(
-                    priceController.text.replaceAll(',', '.'));
-                if (p == null || p <= 0) return;
-                Navigator.pop(ctx, p);
-              },
-              child: const Text('List'),
-            ),
-          ],
-        ),
-      );
-      if (price == null || !mounted) return;
-      await _repository.listItem(item.id!, price);
-      _loadItems();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
-    } finally {
-      priceController.dispose();
-    }
-  }
-
-  Future<void> _unlistItem(InventoryItem item) async {
-    try {
-      await _repository.unlistItem(item.id!);
-      _loadItems();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
+  Future<void> _openListingSheet(InventoryItem item) async {
+    final result = await showListingSheet(context, item);
+    if (result == null || !mounted) return;
+    _loadItems();
+    if (result.listed && result.price != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Item listed at €${result.price!.toStringAsFixed(2)}')));
+    } else if (!result.listed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Removed from marketplace')));
     }
   }
 
@@ -779,10 +722,10 @@ class _InventoryPageState extends State<InventoryPage>
                                     : null,
                                 onTap: _openDetail,
                                 onList: item.status != 'sold'
-                                    ? () => _showListDialog(item)
+                                    ? () => _openListingSheet(item)
                                     : null,
                                 onUnlist: item.status != 'sold'
-                                    ? () => _unlistItem(item)
+                                    ? () => _openListingSheet(item)
                                     : null,
                               );
                             },
@@ -1261,42 +1204,42 @@ class _ItemCard extends StatelessWidget {
                           style: const TextStyle(
                               fontWeight: FontWeight.w600),
                         ),
-                      const SizedBox(height: 4),
-                      _StatusChip(item.status),
                     ],
                   ),
           ),
-          if (!selectionMode && (onList != null || onUnlist != null))
+          if (!selectionMode)
             Padding(
-              padding: const EdgeInsets.only(right: 8, bottom: 4),
+              padding: const EdgeInsets.only(left: 12, right: 8, bottom: 6),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (item.isListed)
-                    TextButton(
-                      onPressed: onUnlist,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.orange,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  _StatusChip(item.status),
+                  const Spacer(),
+                  if (onList != null || onUnlist != null)
+                    if (item.isListed)
+                      TextButton(
+                        onPressed: onUnlist,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Unlist',
+                            style: TextStyle(fontSize: 12)),
+                      )
+                    else
+                      TextButton(
+                        onPressed: onList,
+                        style: TextButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('List',
+                            style: TextStyle(fontSize: 12)),
                       ),
-                      child: const Text('Unlist',
-                          style: TextStyle(fontSize: 12)),
-                    )
-                  else
-                    TextButton(
-                      onPressed: onList,
-                      style: TextButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text('List',
-                          style: TextStyle(fontSize: 12)),
-                    ),
                 ],
               ),
             ),
