@@ -180,6 +180,15 @@ class InventoryRepository {
     }).eq('id', id);
   }
 
+  /// Marks a batch of items as sold and removes them from the marketplace.
+  Future<void> markSold(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await supabase
+        .from('inventory_items')
+        .update({'status': 'sold', 'is_listed': false})
+        .inFilter('id', ids);
+  }
+
   // ── Image management ──────────────────────────────────────────────────────
 
   Future<String> uploadImage(

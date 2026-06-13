@@ -1,8 +1,8 @@
-/// Tier thresholds in one place — change here to affect the whole app.
+/// Tier thresholds matching the sell-engine auto_tier computation.
 class CustomerTiers {
-  static const double silverThreshold = 250.0;
-  static const double goldThreshold = 1000.0;
-  static const double premiumThreshold = 5000.0;
+  static const double goldThreshold      = 5000.0;
+  static const double premiumThreshold   = 15000.0;
+  static const double collectorThreshold = 50000.0;
 
   static const List<String?> manualOptions = [
     null,
@@ -12,20 +12,20 @@ class CustomerTiers {
     'Collector',
   ];
 
-  /// Computes the tier from total spend. Collector is only assignable manually.
+  /// Silver < 5 000 · Gold 5 000–14 999.99 · Premium 15 000–49 999.99
+  /// · Collector >= 50 000
   static String compute(double totalSpent) {
-    if (totalSpent >= premiumThreshold) return 'Premium';
-    if (totalSpent >= goldThreshold) return 'Gold';
-    if (totalSpent >= silverThreshold) return 'Silver';
-    return 'Bronze';
+    if (totalSpent >= collectorThreshold) return 'Collector';
+    if (totalSpent >= premiumThreshold)   return 'Premium';
+    if (totalSpent >= goldThreshold)      return 'Gold';
+    return 'Silver';
   }
 
   static const Map<String, int> _tierOrder = {
-    'Bronze': 0,
-    'Silver': 1,
-    'Gold': 2,
-    'Premium': 3,
-    'Collector': 4,
+    'Silver':    0,
+    'Gold':      1,
+    'Premium':   2,
+    'Collector': 3,
   };
 
   static int rank(String tier) => _tierOrder[tier] ?? 0;
@@ -47,6 +47,15 @@ class Customer {
   final String notes;
   final DateTime? createdAt;
 
+  // ── Owner-side intelligence (auto-populated by sell engine) ──────────────
+  final double totalSpent;
+  final int orderCount;
+  final DateTime? firstOrderDate;
+  final DateTime? lastOrderDate;
+
+  /// Computed by sell engine and stored in DB. Reflects thresholds above.
+  final String? autoTier;
+
   const Customer({
     this.id,
     required this.name,
@@ -57,11 +66,16 @@ class Customer {
     this.manualTier,
     required this.notes,
     this.createdAt,
+    this.totalSpent = 0,
+    this.orderCount = 0,
+    this.firstOrderDate,
+    this.lastOrderDate,
+    this.autoTier,
   });
 
-  /// Effective display tier: manual override wins, otherwise computed from spend.
-  String effectiveTier(double totalSpent) =>
-      manualTier ?? CustomerTiers.compute(totalSpent);
+  /// Manual tier wins → auto_tier from DB → computed from stored spend.
+  String get effectiveTier =>
+      manualTier ?? autoTier ?? CustomerTiers.compute(totalSpent);
 
   factory Customer.fromMap(Map<String, dynamic> map) {
     return Customer(
@@ -76,17 +90,26 @@ class Customer {
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
+      totalSpent: (map['total_spent'] as num?)?.toDouble() ?? 0,
+      orderCount: (map['order_count'] as num?)?.toInt() ?? 0,
+      firstOrderDate: map['first_order_date'] != null
+          ? DateTime.parse(map['first_order_date'].toString())
+          : null,
+      lastOrderDate: map['last_order_date'] != null
+          ? DateTime.parse(map['last_order_date'].toString())
+          : null,
+      autoTier: map['auto_tier']?.toString(),
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'name': name,
-        'email': email,
-        'phone': phone,
-        'country': country,
-        'type': type,
+        'name':       name,
+        'email':      email,
+        'phone':      phone,
+        'country':    country,
+        'type':       type,
         'manual_tier': manualTier,
-        'notes': notes,
+        'notes':      notes,
       };
 
   Customer copyWith({
@@ -99,19 +122,35 @@ class Customer {
     Object? manualTier = _omitted,
     String? notes,
     DateTime? createdAt,
+    double? totalSpent,
+    int? orderCount,
+    Object? firstOrderDate = _omitted,
+    Object? lastOrderDate  = _omitted,
+    Object? autoTier       = _omitted,
   }) {
     return Customer(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      email: email ?? this.email,
-      phone: phone ?? this.phone,
-      country: country ?? this.country,
-      type: type ?? this.type,
+      id:       id       ?? this.id,
+      name:     name     ?? this.name,
+      email:    email    ?? this.email,
+      phone:    phone    ?? this.phone,
+      country:  country  ?? this.country,
+      type:     type     ?? this.type,
       manualTier: identical(manualTier, _omitted)
           ? this.manualTier
           : manualTier as String?,
-      notes: notes ?? this.notes,
+      notes:    notes    ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      totalSpent:  totalSpent  ?? this.totalSpent,
+      orderCount:  orderCount  ?? this.orderCount,
+      firstOrderDate: identical(firstOrderDate, _omitted)
+          ? this.firstOrderDate
+          : firstOrderDate as DateTime?,
+      lastOrderDate: identical(lastOrderDate, _omitted)
+          ? this.lastOrderDate
+          : lastOrderDate as DateTime?,
+      autoTier: identical(autoTier, _omitted)
+          ? this.autoTier
+          : autoTier as String?,
     );
   }
 }

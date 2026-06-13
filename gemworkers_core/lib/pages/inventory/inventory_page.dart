@@ -9,6 +9,7 @@ import '../../repositories/location_repository.dart';
 import 'add_inventory_page.dart';
 import 'inventory_detail_page.dart';
 import 'listing_sheet.dart';
+import 'record_sale_sheet.dart';
 import 'widgets/cascading_location_picker.dart';
 
 // ── Sort options ──────────────────────────────────────────────────────────────
@@ -298,6 +299,42 @@ class _InventoryPageState extends State<InventoryPage>
     }
 
     if (mounted) _exitSelectionMode();
+  }
+
+  // ── Record sale ───────────────────────────────────────────────────────────
+
+  Future<void> _showRecordSaleSheet() async {
+    final sellable = _all
+        .where((i) =>
+            i.id != null &&
+            _selectedIds.contains(i.id) &&
+            i.status != 'sold')
+        .toList();
+
+    if (sellable.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No sellable items selected')),
+      );
+      return;
+    }
+
+    final result = await showRecordSaleSheet(context, sellable);
+    if (result == null || !mounted) return;
+
+    _exitSelectionMode();
+    await _loadItems();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Sale recorded · ${result.orderNumber} · '
+            'payout €${result.sellerPayout.toStringAsFixed(2)}',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   // ── Listing actions ───────────────────────────────────────────────────────
@@ -762,11 +799,16 @@ class _InventoryPageState extends State<InventoryPage>
                 child: const Text('Cancel'),
               ),
               const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed:
-                    count > 0 ? _showBulkAssignSheet : null,
+              OutlinedButton.icon(
+                onPressed: count > 0 ? _showBulkAssignSheet : null,
                 icon: const Icon(Icons.location_on_outlined, size: 18),
                 label: const Text('Assign Location'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: count > 0 ? _showRecordSaleSheet : null,
+                icon: const Icon(Icons.sell_outlined, size: 18),
+                label: const Text('Record Sale'),
               ),
             ],
           ),

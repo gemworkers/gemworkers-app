@@ -175,6 +175,7 @@ class _CustomerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tier = customer.effectiveTier;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -195,23 +196,40 @@ class _CustomerCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(
-          customer.email.isNotEmpty ? customer.email : customer.country,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              customer.email.isNotEmpty ? customer.email : customer.country,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+            if (customer.orderCount > 0)
+              Text(
+                '${customer.orderCount} order${customer.orderCount == 1 ? '' : 's'}'
+                '  ·  €${_fmt(customer.totalSpent)}',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+          ],
         ),
+        isThreeLine: customer.orderCount > 0,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _TypeBadge(customer.type),
             const SizedBox(width: 6),
-            if (customer.manualTier != null)
-              _TierChip(customer.manualTier!),
+            _TierChip(tier),
           ],
         ),
       ),
     );
+  }
+
+  static String _fmt(double v) {
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+    return v.toStringAsFixed(0);
   }
 }
 
@@ -248,11 +266,11 @@ class _TierChip extends StatelessWidget {
   const _TierChip(this.tier);
 
   Color get _color => switch (tier) {
-        'Silver' => const Color(0xFF9E9E9E),
-        'Gold' => const Color(0xFFF9A825),
-        'Premium' => const Color(0xFF7B1FA2),
+        'Silver'    => const Color(0xFF9E9E9E),
+        'Gold'      => const Color(0xFFF9A825),
+        'Premium'   => const Color(0xFF7B1FA2),
         'Collector' => const Color(0xFF00897B),
-        _ => const Color(0xFF8B5E3C),
+        _           => const Color(0xFF9E9E9E),
       };
 
   @override

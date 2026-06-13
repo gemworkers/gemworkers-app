@@ -23,10 +23,6 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   List<Order> _orders = [];
   bool _loading = true;
 
-  double get _totalSpent => _orders
-      .where((o) => o.status == 'paid')
-      .fold(0.0, (sum, o) => sum + o.total);
-
   @override
   void initState() {
     super.initState();
@@ -37,8 +33,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final orders =
-          await _orderRepo.getOrdersForCustomer(_customer.id!);
+      final orders = await _orderRepo.getOrdersForCustomer(_customer.id!);
       if (mounted) setState(() { _orders = orders; _loading = false; });
     } catch (e) {
       debugPrint(e.toString());
@@ -53,14 +48,9 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
           builder: (_) => AddEditCustomerPage(customer: _customer)),
     );
     if (saved == true && mounted) {
-      // Reload customer from DB to pick up changes.
       final customers = await _customerRepo.getCustomers();
-      final updated = customers
-          .where((c) => c.id == _customer.id)
-          .firstOrNull;
-      if (updated != null && mounted) {
-        setState(() => _customer = updated);
-      }
+      final updated = customers.where((c) => c.id == _customer.id).firstOrNull;
+      if (updated != null && mounted) setState(() => _customer = updated);
     }
   }
 
@@ -69,16 +59,14 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Customer'),
-        content: Text(
-            'Delete "${_customer.name}"? This cannot be undone.'),
+        content: Text('Delete "${_customer.name}"? This cannot be undone.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
           ),
         ],
@@ -106,8 +94,15 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final total = _totalSpent;
-    final tier = _customer.effectiveTier(total);
+    // Use DB-stored totalSpent; fall back to summing loaded orders for
+    // customers who pre-date the sell engine (totalSpent will be 0).
+    final totalSpent = _customer.totalSpent > 0
+        ? _customer.totalSpent
+        : _orders
+            .where((o) => o.status == 'paid')
+            .fold(0.0, (s, o) => s + o.total);
+
+    final tier = _customer.effectiveTier;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -131,7 +126,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildHeader(tier, total, cs),
+                _buildHeader(tier, totalSpent, cs),
                 const SizedBox(height: 16),
                 _buildDetails(),
                 const SizedBox(height: 16),
@@ -141,9 +136,10 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     );
   }
 
-  Widget _buildHeader(String tier, double total, ColorScheme cs) {
-    final paidOrders =
-        _orders.where((o) => o.status == 'paid').length;
+  Widget _buildHeader(String tier, double totalSpent, ColorScheme cs) {
+    final paidCount = _customer.orderCount > 0
+        ? _customer.orderCount
+        : _orders.where((o) => o.status == 'paid').length;
 
     return Card(
       child: Padding(
@@ -169,17 +165,28 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             ),
             const SizedBox(height: 4),
             _TierBadge(tier),
+            if (_customer.manualTier != null &&
+                _customer.autoTier != null &&
+                _customer.manualTier != _customer.autoTier) ...[
+              const SizedBox(height: 2),
+              Text(
+                'auto: ${_customer.autoTier}',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+            ],
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                _StatCell(label: 'Orders', value: '$paidCount'),
                 _StatCell(
-                    label: 'Orders', value: '${_orders.length}'),
-                _StatCell(
-                    label: 'Paid', value: '$paidOrders'),
-                _StatCell(
-                    label: 'Revenue',
-                    value: '€${total.toStringAsFixed(0)}'),
+                    label: 'Spent',
+                    value: '€${_fmtSpend(totalSpent)}'),
+                if (_customer.firstOrderDate != null)
+                  _StatCell(
+                    label: 'Since',
+                    value: _fmtDate(_customer.firstOrderDate!),
+                  ),
               ],
             ),
           ],
@@ -195,19 +202,17 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Details',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text('Details', style: Theme.of(context).textTheme.titleMedium),
             const Divider(height: 24),
-            if (_customer.email.isNotEmpty)
-              _row('Email', _customer.email),
-            if (_customer.phone.isNotEmpty)
-              _row('Phone', _customer.phone),
-            if (_customer.country.isNotEmpty)
-              _row('Country', _customer.country),
+            if (_customer.email.isNotEmpty) _row('Email', _customer.email),
+            if (_customer.phone.isNotEmpty) _row('Phone', _customer.phone),
+            if (_customer.country.isNotEmpty) _row('Country', _customer.country),
             _row('Type',
                 _customer.type == 'business' ? 'Business' : 'Individual'),
             if (_customer.manualTier != null)
               _row('Tier Override', _customer.manualTier!),
+            if (_customer.lastOrderDate != null)
+              _row('Last order', _fmtDate(_customer.lastOrderDate!)),
             if (_customer.notes.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Notes',
@@ -242,31 +247,34 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                 ),
               )
             else
-              ..._orders.map((o) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () => _openOrder(o),
-                    title: Text(o.orderNumber.isNotEmpty
-                        ? o.orderNumber
-                        : 'Order'),
-                    subtitle: Text(
-                      '${o.orderDate.day.toString().padLeft(2, '0')}/'
-                      '${o.orderDate.month.toString().padLeft(2, '0')}/'
-                      '${o.orderDate.year}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '€${o.total.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusChip(o.status),
-                      ],
-                    ),
-                  )),
+              ..._orders.map((o) {
+                final amount =
+                    o.orderTotal > 0 ? o.orderTotal : o.total;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () => _openOrder(o),
+                  title: Text(
+                      o.orderNumber.isNotEmpty ? o.orderNumber : 'Order'),
+                  subtitle: Text(
+                    '${o.orderDate.day.toString().padLeft(2, '0')}/'
+                    '${o.orderDate.month.toString().padLeft(2, '0')}/'
+                    '${o.orderDate.year}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '€${amount.toStringAsFixed(2)}',
+                        style:
+                            const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusChip(o.status),
+                    ],
+                  ),
+                );
+              }),
           ],
         ),
       ),
@@ -281,14 +289,23 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
           SizedBox(
             width: 110,
             child: Text(label,
-                style: const TextStyle(
-                    color: Colors.grey, fontSize: 13)),
+                style: const TextStyle(color: Colors.grey, fontSize: 13)),
           ),
           Expanded(child: Text(value)),
         ],
       ),
     );
   }
+
+  static String _fmtSpend(double v) {
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+    return v.toStringAsFixed(0);
+  }
+
+  static String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/'
+      '${d.year}';
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
@@ -303,12 +320,11 @@ class _StatCell extends StatelessWidget {
     return Column(
       children: [
         Text(value,
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold)),
+            style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
         Text(label,
-            style:
-                const TextStyle(fontSize: 12, color: Colors.grey)),
+            style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }
@@ -319,11 +335,11 @@ class _TierBadge extends StatelessWidget {
   const _TierBadge(this.tier);
 
   Color get _color => switch (tier) {
-        'Silver' => const Color(0xFF9E9E9E),
-        'Gold' => const Color(0xFFF9A825),
-        'Premium' => const Color(0xFF7B1FA2),
+        'Silver'    => const Color(0xFF9E9E9E),
+        'Gold'      => const Color(0xFFF9A825),
+        'Premium'   => const Color(0xFF7B1FA2),
         'Collector' => const Color(0xFF00897B),
-        _ => const Color(0xFF8B5E3C),
+        _           => const Color(0xFF9E9E9E),
       };
 
   @override
@@ -338,9 +354,7 @@ class _TierBadge extends StatelessWidget {
       child: Text(
         tier,
         style: TextStyle(
-            color: _color,
-            fontWeight: FontWeight.w700,
-            fontSize: 13),
+            color: _color, fontWeight: FontWeight.w700, fontSize: 13),
       ),
     );
   }
@@ -351,10 +365,10 @@ class _StatusChip extends StatelessWidget {
   const _StatusChip(this.status);
 
   Color get _color => switch (status) {
-        'paid' => Colors.green,
+        'paid'      => Colors.green,
         'confirmed' => Colors.blue,
         'cancelled' => Colors.red,
-        _ => Colors.grey,
+        _           => Colors.grey,
       };
 
   @override
@@ -369,9 +383,7 @@ class _StatusChip extends StatelessWidget {
       child: Text(
         status,
         style: TextStyle(
-            fontSize: 11,
-            color: _color,
-            fontWeight: FontWeight.w600),
+            fontSize: 11, color: _color, fontWeight: FontWeight.w600),
       ),
     );
   }

@@ -11,6 +11,7 @@ import '../../repositories/location_repository.dart';
 import 'edit_inventory_page.dart';
 import 'listing_sheet.dart';
 import 'lot_sort_page.dart';
+import 'record_sale_sheet.dart';
 
 class InventoryDetailPage extends StatefulWidget {
   final InventoryItem item;
@@ -65,6 +66,26 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     } catch (_) {
       if (mounted) setState(() => _movementsLoading = false);
     }
+  }
+
+  // ── Record sale ───────────────────────────────────────────────────────────
+
+  Future<void> _recordSale() async {
+    if (_item.id == null || _item.status == 'sold') return;
+    final result = await showRecordSaleSheet(context, [_item]);
+    if (result == null || !mounted) return;
+
+    setState(() => _item = _item.copyWith(status: 'sold', isListed: false));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Sale recorded · ${result.orderNumber} · '
+          'payout €${result.sellerPayout.toStringAsFixed(2)}',
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   // ── List / Unlist ─────────────────────────────────────────────────────────
@@ -653,6 +674,20 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           if (_item.notes.isNotEmpty) ...[
             _sectionLabel('Notes'),
             Text(_item.notes),
+          ],
+
+          if (_item.status != 'sold') ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _recordSale,
+                icon: const Icon(Icons.sell_outlined, size: 18),
+                label: const Text('Record Sale'),
+                style: FilledButton.styleFrom(
+                    backgroundColor: Colors.green.shade700),
+              ),
+            ),
           ],
 
           const SizedBox(height: 24),
