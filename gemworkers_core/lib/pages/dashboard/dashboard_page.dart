@@ -5,12 +5,14 @@ import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../models/seller.dart';
 import '../../repositories/customer_repository.dart';
+import '../../repositories/dashboard_intelligence_repository.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/location_repository.dart';
 import '../../repositories/order_repository.dart';
 import '../../repositories/purchase_repository.dart';
 import '../../repositories/seller_repository.dart';
 import '../inventory/inventory_detail_page.dart';
+import 'dashboard_intelligence.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -31,6 +33,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Seller> _sellers = [];
   List<Location> _statusZones = [];
   Seller? _selectedSeller;
+  DashboardTimeRange _timeRange = DashboardTimeRange.thisMonth;
   int _orderCount = 0;
   int _customerCount = 0;
   double _revenue = 0.0;
@@ -175,6 +178,29 @@ class _DashboardPageState extends State<DashboardPage> {
       _filteredItems.where((e) => e.locationId == zone.id).length;
 
   // ── Build sections ────────────────────────────────────────────────────────
+
+  Widget _buildTimeRangeSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: DashboardTimeRange.values.map((range) {
+          final selected = _timeRange == range;
+          final color = Theme.of(context).colorScheme.primary;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(range.label),
+              selected: selected,
+              onSelected: (_) => setState(() => _timeRange = range),
+              selectedColor: color.withValues(alpha: 0.15),
+              checkmarkColor: color,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
   Widget _buildSellerFilter() {
     // Seller users are always locked to their own seller — no picker shown.
@@ -495,6 +521,7 @@ class _DashboardPageState extends State<DashboardPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  _buildTimeRangeSelector(),
                   _buildSellerFilter(),
                   _buildStatsGrid(),
                   const SizedBox(height: 16),
@@ -503,6 +530,14 @@ class _DashboardPageState extends State<DashboardPage> {
                   _buildZoneBreakdown(),
                   const SizedBox(height: 16),
                   _buildRecentItems(),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  DashboardIntelligenceSections(
+                    timeRange: _timeRange,
+                    sellerId: _selectedSeller?.id,
+                    isOwner: !UserProfileService.instance.isSeller,
+                  ),
                   const SizedBox(height: 24),
                 ],
               ),
