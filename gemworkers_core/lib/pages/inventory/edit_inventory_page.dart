@@ -9,6 +9,7 @@ import '../../repositories/supplier_repository.dart';
 import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
+import 'widgets/origin_country_field.dart';
 
 class EditInventoryPage extends StatefulWidget {
   final InventoryItem item;
@@ -339,7 +340,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             _weightGrams,
             keyboardType: TextInputType.number,
           ),
-          FormTextField('Origin Country', _originCountry),
+          OriginCountryField(controller: _originCountry, label: 'Origin Country'),
         ];
       case 'jewelry':
         return [
@@ -368,7 +369,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Cut (finish)', _cut),
           FormTextField('Clarity', _clarity),
           const FormSection('Origin'),
-          FormTextField('Country', _originCountry),
+          OriginCountryField(controller: _originCountry),
           FormTextField('Region', _originRegion),
           const FormSection('Weight'),
           FormTextField('Weight *', _weightValue, keyboardType: TextInputType.number),

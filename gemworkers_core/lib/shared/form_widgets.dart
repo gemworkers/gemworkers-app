@@ -102,3 +102,180 @@ class FormDropdownField<T> extends StatelessWidget {
     );
   }
 }
+
+/// Outlined field, styled like the other form fields, that opens a
+/// searchable bottom sheet to pick a value from a (possibly long) list of
+/// String options. Type a few letters to filter — matches anywhere in the
+/// option text, case-insensitive.
+///
+/// This is the single shared component behind every searchable picker in
+/// the inventory forms (gem type, variety, origin country) so the
+/// filtering UI stays consistent everywhere it's used.
+class SearchableDropdownField extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<String> options;
+  final ValueChanged<String?> onChanged;
+  final String hintText;
+
+  const SearchableDropdownField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    this.hintText = 'Tap to select',
+  });
+
+  Future<void> _open(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => _SearchableOptionsSheet(
+        title: label,
+        options: options,
+        selectedValue: value,
+      ),
+    );
+    if (selected != null) onChanged(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value != null && value!.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InkWell(
+        onTap: () => _open(context),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+            suffixIcon: const Icon(Icons.arrow_drop_down),
+          ),
+          child: Text(
+            hasValue ? value! : hintText,
+            style: TextStyle(
+              fontSize: 14,
+              color: hasValue
+                  ? null
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchableOptionsSheet extends StatefulWidget {
+  final String title;
+  final List<String> options;
+  final String? selectedValue;
+
+  const _SearchableOptionsSheet({
+    required this.title,
+    required this.options,
+    required this.selectedValue,
+  });
+
+  @override
+  State<_SearchableOptionsSheet> createState() =>
+      _SearchableOptionsSheetState();
+}
+
+class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<String> get _filtered {
+    if (_query.isEmpty) return widget.options;
+    return widget.options
+        .where((o) => o.toLowerCase().contains(_query))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filtered;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 4,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _searchController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search…',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: _searchController.clear,
+                    )
+                  : null,
+              isDense: true,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: filtered.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'No matches',
+                        style: TextStyle(color: Colors.grey.shade500),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final option = filtered[i];
+                      final isSelected = option == widget.selectedValue;
+                      return ListTile(
+                        title: Text(option),
+                        trailing: isSelected
+                            ? Icon(Icons.check,
+                                color: Theme.of(context).colorScheme.primary)
+                            : null,
+                        onTap: () => Navigator.pop(context, option),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}

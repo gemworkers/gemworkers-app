@@ -120,11 +120,11 @@ class _GemAndVarietyFieldsState extends State<GemAndVarietyFields> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Gem Type dropdown ─────────────────────────────────────────────
-        _OutlinedDropdown(
+        SearchableDropdownField(
           label: 'Gem Type',
-          hint: 'Select gem type',
+          hintText: 'Select gem type',
           value: _gemDropdown,
-          items: _kGemTypes,
+          options: _kGemTypes,
           onChanged: _onGemTypeSelected,
         ),
 
@@ -135,11 +135,11 @@ class _GemAndVarietyFieldsState extends State<GemAndVarietyFields> {
         // ── Variety ───────────────────────────────────────────────────────
         if (_gemDropdown != null) ...[
           if (varieties != null) ...[
-            _OutlinedDropdown(
+            SearchableDropdownField(
               label: 'Variety',
-              hint: 'Select variety',
+              hintText: 'Select variety',
               value: _varietyDropdown,
-              items: varieties,
+              options: varieties,
               onChanged: _onVarietySelected,
             ),
             if (_varietyDropdown == 'Other')
@@ -148,52 +148,6 @@ class _GemAndVarietyFieldsState extends State<GemAndVarietyFields> {
             FormTextField('Variety', widget.varietyController),
         ],
       ],
-    );
-  }
-}
-
-// ── Private helper ────────────────────────────────────────────────────────────
-
-class _OutlinedDropdown extends StatelessWidget {
-  final String label;
-  final String hint;
-  final String? value;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-
-  const _OutlinedDropdown({
-    required this.label,
-    required this.hint,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        ),
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          underline: const SizedBox(),
-          hint: Text(hint,
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 14)),
-          items: items
-              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
     );
   }
 }
