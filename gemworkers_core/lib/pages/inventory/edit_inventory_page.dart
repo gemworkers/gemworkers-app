@@ -41,6 +41,36 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
   late String _weightUnit;
   late String _status;
+  late final String _productType;
+
+  // ── Shared product-detail controllers ───────────────────────────────────
+
+  late final TextEditingController _description;
+  late final TextEditingController _certificationLab;
+  late final TextEditingController _certificationNumber;
+  late final TextEditingController _treatment;
+  late final TextEditingController _dimensionsMm;
+
+  // ── Loose stone specific ─────────────────────────────────────────────────
+
+  late final TextEditingController _cut;
+  late final TextEditingController _clarity;
+
+  // ── Specimen specific ────────────────────────────────────────────────────
+
+  late final TextEditingController _species;
+  late final TextEditingController _locality;
+  late final TextEditingController _matrix;
+  late final TextEditingController _weightGrams;
+
+  // ── Jewelry specific ─────────────────────────────────────────────────────
+
+  late final TextEditingController _jewelryType;
+  late final TextEditingController _metal;
+  late final TextEditingController _metalPurity;
+  late final TextEditingController _sizeOrLength;
+  late final TextEditingController _gemstonesUsed;
+  late final TextEditingController _totalWeightGrams;
 
   // ── Supplier ──────────────────────────────────────────────────────────────
 
@@ -75,6 +105,27 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _notes = TextEditingController(text: i.notes);
     _weightUnit = i.weightUnit;
     _status = i.status;
+    _productType = i.productType;
+    _description = TextEditingController(text: i.description ?? '');
+    _certificationLab = TextEditingController(text: i.certificationLab ?? '');
+    _certificationNumber =
+        TextEditingController(text: i.certificationNumber ?? '');
+    _treatment = TextEditingController(text: i.treatment ?? '');
+    _dimensionsMm = TextEditingController(text: i.dimensionsMm ?? '');
+    _cut = TextEditingController(text: i.cut ?? '');
+    _clarity = TextEditingController(text: i.clarity ?? '');
+    _species = TextEditingController(text: i.species ?? '');
+    _locality = TextEditingController(text: i.locality ?? '');
+    _matrix = TextEditingController(text: i.matrix ?? '');
+    _weightGrams =
+        TextEditingController(text: i.weightGrams?.toString() ?? '');
+    _jewelryType = TextEditingController(text: i.jewelryType ?? '');
+    _metal = TextEditingController(text: i.metal ?? '');
+    _metalPurity = TextEditingController(text: i.metalPurity ?? '');
+    _sizeOrLength = TextEditingController(text: i.sizeOrLength ?? '');
+    _gemstonesUsed = TextEditingController(text: i.gemstonesUsed ?? '');
+    _totalWeightGrams =
+        TextEditingController(text: i.totalWeightGrams?.toString() ?? '');
     _supplierId = i.supplierId;
     _locationId = i.locationId;
     _originalLocationId = i.locationId;
@@ -87,6 +138,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       _sku, _title, _gemType, _variety, _originCountry, _originRegion,
       _shape, _cutType, _weightValue, _quantity, _costPrice, _salePrice,
       _barcode, _notes,
+      _description, _certificationLab, _certificationNumber, _treatment,
+      _dimensionsMm, _cut, _clarity, _species, _locality, _matrix,
+      _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
+      _gemstonesUsed, _totalWeightGrams,
     ]) {
       c.dispose();
     }
@@ -110,8 +165,19 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   String? _validate() {
     if (_sku.text.trim().isEmpty) return 'SKU is required.';
     if (_title.text.trim().isEmpty) return 'Title is required.';
-    if (double.tryParse(_weightValue.text) == null) {
+    if (_productType == 'loose_stone' &&
+        double.tryParse(_weightValue.text) == null) {
       return 'Weight must be a number.';
+    }
+    if (_productType == 'specimen' &&
+        _weightGrams.text.isNotEmpty &&
+        double.tryParse(_weightGrams.text) == null) {
+      return 'Weight (grams) must be a number.';
+    }
+    if (_productType == 'jewelry' &&
+        _totalWeightGrams.text.isNotEmpty &&
+        double.tryParse(_totalWeightGrams.text) == null) {
+      return 'Total weight (grams) must be a number.';
     }
     if (double.tryParse(_costPrice.text) == null) {
       return 'Cost price must be a number.';
@@ -123,6 +189,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       return 'Quantity must be a whole number.';
     }
     return null;
+  }
+
+  String? _orNull(TextEditingController c) {
+    final t = c.text.trim();
+    return t.isEmpty ? null : t;
   }
 
   Future<void> _save() async {
@@ -143,18 +214,26 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
               .firstOrNull ?? widget.item.supplierName
           : '';
 
+      final isLooseStone = _productType == 'loose_stone';
+      final isSpecimen = _productType == 'specimen';
+      final isJewelry = _productType == 'jewelry';
+
       final updated = InventoryItem(
         id: widget.item.id,
         sku: _sku.text.trim(),
         title: _title.text.trim(),
-        gemType: _gemType.text.trim(),
-        variety: _variety.text.trim(),
-        originCountry: _originCountry.text.trim(),
-        originRegion: _originRegion.text.trim(),
-        shape: _shape.text.trim(),
-        cutType: _cutType.text.trim(),
-        weightValue: double.parse(_weightValue.text),
-        weightUnit: _weightUnit,
+        gemType: isLooseStone ? _gemType.text.trim() : widget.item.gemType,
+        variety: isLooseStone ? _variety.text.trim() : widget.item.variety,
+        originCountry: (isLooseStone || isSpecimen)
+            ? _originCountry.text.trim()
+            : widget.item.originCountry,
+        originRegion:
+            isLooseStone ? _originRegion.text.trim() : widget.item.originRegion,
+        shape: isLooseStone ? _shape.text.trim() : widget.item.shape,
+        cutType: isLooseStone ? _cutType.text.trim() : widget.item.cutType,
+        weightValue:
+            isLooseStone ? double.parse(_weightValue.text) : widget.item.weightValue,
+        weightUnit: isLooseStone ? _weightUnit : widget.item.weightUnit,
         quantity: int.parse(_quantity.text),
         costPrice: double.parse(_costPrice.text),
         salePrice: double.parse(_salePrice.text),
@@ -170,6 +249,33 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         sellingPrice: widget.item.sellingPrice,
         listedAt: widget.item.listedAt,
         createdAt: widget.item.createdAt,
+        productType: _productType,
+        certificationLab: _orNull(_certificationLab),
+        certificationNumber: _orNull(_certificationNumber),
+        treatment: _orNull(_treatment),
+        dimensionsMm: _orNull(_dimensionsMm),
+        description: _orNull(_description),
+        videoUrl: widget.item.videoUrl,
+        cut: isLooseStone ? _orNull(_cut) : widget.item.cut,
+        clarity: isLooseStone ? _orNull(_clarity) : widget.item.clarity,
+        species: isSpecimen ? _orNull(_species) : widget.item.species,
+        locality: isSpecimen ? _orNull(_locality) : widget.item.locality,
+        matrix: isSpecimen ? _orNull(_matrix) : widget.item.matrix,
+        weightGrams: isSpecimen
+            ? double.tryParse(_weightGrams.text)
+            : widget.item.weightGrams,
+        jewelryType:
+            isJewelry ? _orNull(_jewelryType) : widget.item.jewelryType,
+        metal: isJewelry ? _orNull(_metal) : widget.item.metal,
+        metalPurity:
+            isJewelry ? _orNull(_metalPurity) : widget.item.metalPurity,
+        sizeOrLength:
+            isJewelry ? _orNull(_sizeOrLength) : widget.item.sizeOrLength,
+        gemstonesUsed:
+            isJewelry ? _orNull(_gemstonesUsed) : widget.item.gemstonesUsed,
+        totalWeightGrams: isJewelry
+            ? double.tryParse(_totalWeightGrams.text)
+            : widget.item.totalWeightGrams,
       );
 
       await _repository.updateItem(widget.item.id!, updated);
@@ -218,6 +324,64 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     );
   }
 
+  // ── Type-specific fields ──────────────────────────────────────────────────
+
+  List<Widget> _buildTypeSpecificFields() {
+    switch (_productType) {
+      case 'specimen':
+        return [
+          const FormSection('Specimen Details'),
+          FormTextField('Species', _species),
+          FormTextField('Locality', _locality),
+          FormTextField('Matrix', _matrix),
+          FormTextField(
+            'Weight (grams)',
+            _weightGrams,
+            keyboardType: TextInputType.number,
+          ),
+          FormTextField('Origin Country', _originCountry),
+        ];
+      case 'jewelry':
+        return [
+          const FormSection('Jewelry Details'),
+          FormTextField('Jewelry Type', _jewelryType),
+          FormTextField('Metal', _metal),
+          FormTextField('Metal Purity', _metalPurity),
+          FormTextField('Size / Length', _sizeOrLength),
+          FormTextField('Gemstones Used', _gemstonesUsed),
+          FormTextField(
+            'Total Weight (grams)',
+            _totalWeightGrams,
+            keyboardType: TextInputType.number,
+          ),
+        ];
+      case 'loose_stone':
+      default:
+        return [
+          const FormSection('Gem Details'),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
+          FormTextField('Shape', _shape),
+          FormTextField('Cut Type', _cutType),
+          FormTextField('Cut (finish)', _cut),
+          FormTextField('Clarity', _clarity),
+          const FormSection('Origin'),
+          FormTextField('Country', _originCountry),
+          FormTextField('Region', _originRegion),
+          const FormSection('Weight'),
+          FormTextField('Weight *', _weightValue, keyboardType: TextInputType.number),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _weightUnit,
+            items: const ['ct', 'g', 'kg'],
+            onChanged: (v) => setState(() => _weightUnit = v!),
+          ),
+        ];
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -250,27 +414,14 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('SKU *', _sku),
           FormTextField('Title *', _title),
 
-          const FormSection('Gem Details'),
-          GemAndVarietyFields(
-            gemTypeController: _gemType,
-            varietyController: _variety,
-          ),
-          FormTextField('Shape', _shape),
-          FormTextField('Cut Type', _cutType),
+          ..._buildTypeSpecificFields(),
 
-          const FormSection('Origin'),
-          FormTextField('Country', _originCountry),
-          FormTextField('Region', _originRegion),
-
-          const FormSection('Weight & Quantity'),
-          FormTextField('Weight *', _weightValue, keyboardType: TextInputType.number),
-          FormDropdownField<String>(
-            label: 'Unit',
-            value: _weightUnit,
-            items: const ['ct', 'g', 'kg'],
-            onChanged: (v) => setState(() => _weightUnit = v!),
-          ),
-          FormTextField('Quantity *', _quantity, keyboardType: TextInputType.number),
+          const FormSection('Description & Certification'),
+          FormTextField('Description', _description, maxLines: 3),
+          FormTextField('Certification Lab', _certificationLab),
+          FormTextField('Certification Number', _certificationNumber),
+          FormTextField('Treatment', _treatment),
+          FormTextField('Dimensions (mm)', _dimensionsMm),
 
           const FormSection('Pricing'),
           FormTextField('Cost Price *', _costPrice, keyboardType: TextInputType.number),
@@ -291,6 +442,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           ),
 
           const FormSection('Other'),
+          FormTextField('Quantity *', _quantity, keyboardType: TextInputType.number),
           FormTextField('Barcode', _barcode),
           FormDropdownField<String>(
             label: 'Status',

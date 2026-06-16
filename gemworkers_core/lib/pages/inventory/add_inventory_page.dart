@@ -13,7 +13,9 @@ import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 
 class AddInventoryPage extends StatefulWidget {
-  const AddInventoryPage({super.key});
+  final String productType;
+
+  const AddInventoryPage({super.key, required this.productType});
 
   @override
   State<AddInventoryPage> createState() => _AddInventoryPageState();
@@ -47,6 +49,35 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   bool _listOnMarketplace = false;
   final _sellingPrice = TextEditingController();
 
+  // ── Shared product-detail controllers ───────────────────────────────────
+
+  final _description = TextEditingController();
+  final _certificationLab = TextEditingController();
+  final _certificationNumber = TextEditingController();
+  final _treatment = TextEditingController();
+  final _dimensionsMm = TextEditingController();
+
+  // ── Loose stone specific ─────────────────────────────────────────────────
+
+  final _cut = TextEditingController();
+  final _clarity = TextEditingController();
+
+  // ── Specimen specific ────────────────────────────────────────────────────
+
+  final _species = TextEditingController();
+  final _locality = TextEditingController();
+  final _matrix = TextEditingController();
+  final _weightGrams = TextEditingController();
+
+  // ── Jewelry specific ─────────────────────────────────────────────────────
+
+  final _jewelryType = TextEditingController();
+  final _metal = TextEditingController();
+  final _metalPurity = TextEditingController();
+  final _sizeOrLength = TextEditingController();
+  final _gemstonesUsed = TextEditingController();
+  final _totalWeightGrams = TextEditingController();
+
   // ── Supplier ──────────────────────────────────────────────────────────────
 
   List<Supplier> _suppliers = [];
@@ -79,6 +110,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       _sku, _title, _gemType, _variety, _originCountry, _originRegion,
       _shape, _cutType, _weightValue, _quantity, _costPrice, _salePrice,
       _barcode, _notes, _sellingPrice,
+      _description, _certificationLab, _certificationNumber, _treatment,
+      _dimensionsMm, _cut, _clarity, _species, _locality, _matrix,
+      _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
+      _gemstonesUsed, _totalWeightGrams,
     ]) {
       c.dispose();
     }
@@ -125,9 +160,20 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   String? _validate() {
     if (_sku.text.trim().isEmpty) return 'SKU is required.';
     if (_title.text.trim().isEmpty) return 'Title is required.';
-    if (_weightValue.text.isNotEmpty &&
+    if (widget.productType == 'loose_stone' &&
+        _weightValue.text.isNotEmpty &&
         double.tryParse(_weightValue.text) == null) {
       return 'Weight must be a number.';
+    }
+    if (widget.productType == 'specimen' &&
+        _weightGrams.text.isNotEmpty &&
+        double.tryParse(_weightGrams.text) == null) {
+      return 'Weight (grams) must be a number.';
+    }
+    if (widget.productType == 'jewelry' &&
+        _totalWeightGrams.text.isNotEmpty &&
+        double.tryParse(_totalWeightGrams.text) == null) {
+      return 'Total weight (grams) must be a number.';
     }
     if (_costPrice.text.isNotEmpty &&
         double.tryParse(_costPrice.text) == null) {
@@ -145,6 +191,11 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       if (sp == null || sp <= 0) return 'Enter a selling price to list on marketplace.';
     }
     return null;
+  }
+
+  String? _orNull(TextEditingController c) {
+    final t = c.text.trim();
+    return t.isEmpty ? null : t;
   }
 
   Future<void> _save() async {
@@ -168,17 +219,23 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               .firstOrNull ?? ''
           : '';
 
+      final isLooseStone = widget.productType == 'loose_stone';
+      final isSpecimen = widget.productType == 'specimen';
+      final isJewelry = widget.productType == 'jewelry';
+
       final item = InventoryItem(
         sku: _sku.text.trim(),
         title: _title.text.trim(),
-        gemType: _gemType.text.trim(),
-        variety: _variety.text.trim(),
-        originCountry: _originCountry.text.trim(),
-        originRegion: _originRegion.text.trim(),
-        shape: _shape.text.trim(),
-        cutType: _cutType.text.trim(),
-        weightValue: double.tryParse(_weightValue.text) ?? 0,
-        weightUnit: _weightUnit,
+        gemType: isLooseStone ? _gemType.text.trim() : '',
+        variety: isLooseStone ? _variety.text.trim() : '',
+        originCountry: (isLooseStone || isSpecimen)
+            ? _originCountry.text.trim()
+            : '',
+        originRegion: isLooseStone ? _originRegion.text.trim() : '',
+        shape: isLooseStone ? _shape.text.trim() : '',
+        cutType: isLooseStone ? _cutType.text.trim() : '',
+        weightValue: isLooseStone ? (double.tryParse(_weightValue.text) ?? 0) : 0,
+        weightUnit: isLooseStone ? _weightUnit : 'ct',
         quantity: int.tryParse(_quantity.text) ?? 1,
         costPrice: double.tryParse(_costPrice.text) ?? 0,
         salePrice: double.tryParse(_salePrice.text) ?? 0,
@@ -195,6 +252,25 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             ? double.tryParse(_sellingPrice.text)
             : null,
         listedAt: _listOnMarketplace ? DateTime.now() : null,
+        productType: widget.productType,
+        certificationLab: _orNull(_certificationLab),
+        certificationNumber: _orNull(_certificationNumber),
+        treatment: _orNull(_treatment),
+        dimensionsMm: _orNull(_dimensionsMm),
+        description: _orNull(_description),
+        cut: isLooseStone ? _orNull(_cut) : null,
+        clarity: isLooseStone ? _orNull(_clarity) : null,
+        species: isSpecimen ? _orNull(_species) : null,
+        locality: isSpecimen ? _orNull(_locality) : null,
+        matrix: isSpecimen ? _orNull(_matrix) : null,
+        weightGrams: isSpecimen ? double.tryParse(_weightGrams.text) : null,
+        jewelryType: isJewelry ? _orNull(_jewelryType) : null,
+        metal: isJewelry ? _orNull(_metal) : null,
+        metalPurity: isJewelry ? _orNull(_metalPurity) : null,
+        sizeOrLength: isJewelry ? _orNull(_sizeOrLength) : null,
+        gemstonesUsed: isJewelry ? _orNull(_gemstonesUsed) : null,
+        totalWeightGrams:
+            isJewelry ? double.tryParse(_totalWeightGrams.text) : null,
       );
 
       final created = await _repository.addItem(item);
@@ -332,6 +408,68 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
     );
   }
 
+  // ── Type-specific fields ──────────────────────────────────────────────────
+
+  List<Widget> _buildTypeSpecificFields() {
+    switch (widget.productType) {
+      case 'specimen':
+        return [
+          const FormSection('Specimen Details'),
+          FormTextField('Species', _species),
+          FormTextField('Locality', _locality),
+          FormTextField('Matrix', _matrix),
+          FormTextField(
+            'Weight (grams)',
+            _weightGrams,
+            keyboardType: TextInputType.number,
+          ),
+          FormTextField('Origin Country', _originCountry),
+        ];
+      case 'jewelry':
+        return [
+          const FormSection('Jewelry Details'),
+          FormTextField('Jewelry Type', _jewelryType),
+          FormTextField('Metal', _metal),
+          FormTextField('Metal Purity', _metalPurity),
+          FormTextField('Size / Length', _sizeOrLength),
+          FormTextField('Gemstones Used', _gemstonesUsed),
+          FormTextField(
+            'Total Weight (grams)',
+            _totalWeightGrams,
+            keyboardType: TextInputType.number,
+          ),
+        ];
+      case 'loose_stone':
+      default:
+        return [
+          const FormSection('Gem Details'),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
+          FormTextField('Shape', _shape),
+          FormTextField('Cut Type', _cutType),
+          FormTextField('Cut (finish)', _cut),
+          FormTextField('Clarity', _clarity),
+          const FormSection('Origin'),
+          FormTextField('Country', _originCountry),
+          FormTextField('Region', _originRegion),
+          const FormSection('Weight'),
+          FormTextField(
+            'Weight',
+            _weightValue,
+            keyboardType: TextInputType.number,
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _weightUnit,
+            items: const ['ct', 'g', 'kg'],
+            onChanged: (v) => setState(() => _weightUnit = v!),
+          ),
+        ];
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -368,35 +506,14 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               FormTextField('SKU *', _sku),
               FormTextField('Title *', _title),
 
-              const FormSection('Gem Details'),
-              GemAndVarietyFields(
-                gemTypeController: _gemType,
-                varietyController: _variety,
-              ),
-              FormTextField('Shape', _shape),
-              FormTextField('Cut Type', _cutType),
+              ..._buildTypeSpecificFields(),
 
-              const FormSection('Origin'),
-              FormTextField('Country', _originCountry),
-              FormTextField('Region', _originRegion),
-
-              const FormSection('Weight & Quantity'),
-              FormTextField(
-                'Weight',
-                _weightValue,
-                keyboardType: TextInputType.number,
-              ),
-              FormDropdownField<String>(
-                label: 'Unit',
-                value: _weightUnit,
-                items: const ['ct', 'g', 'kg'],
-                onChanged: (v) => setState(() => _weightUnit = v!),
-              ),
-              FormTextField(
-                'Quantity',
-                _quantity,
-                keyboardType: TextInputType.number,
-              ),
+              const FormSection('Description & Certification'),
+              FormTextField('Description', _description, maxLines: 3),
+              FormTextField('Certification Lab', _certificationLab),
+              FormTextField('Certification Number', _certificationNumber),
+              FormTextField('Treatment', _treatment),
+              FormTextField('Dimensions (mm)', _dimensionsMm),
 
               const FormSection('Pricing'),
               FormTextField(
@@ -442,6 +559,11 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                 ),
 
               const FormSection('Other'),
+              FormTextField(
+                'Quantity',
+                _quantity,
+                keyboardType: TextInputType.number,
+              ),
               FormTextField('Barcode', _barcode),
               FormDropdownField<String>(
                 label: 'Status',

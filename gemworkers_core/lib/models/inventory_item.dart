@@ -56,6 +56,35 @@ class InventoryItem {
 
   final DateTime? createdAt;
 
+  // ── Product type (loose_stone | specimen | jewelry) ─────────────────────
+  final String productType;
+
+  // Shared/common fields across all product types.
+  final String? certificationLab;
+  final String? certificationNumber;
+  final String? treatment;
+  final String? dimensionsMm;
+  final String? description;
+  final String? videoUrl;
+
+  // Loose stone specific.
+  final String? cut;
+  final String? clarity;
+
+  // Specimen specific.
+  final String? species;
+  final String? locality;
+  final String? matrix;
+  final double? weightGrams;
+
+  // Jewelry specific.
+  final String? jewelryType;
+  final String? metal;
+  final String? metalPurity;
+  final String? sizeOrLength;
+  final String? gemstonesUsed;
+  final double? totalWeightGrams;
+
   const InventoryItem({
     this.id,
     required this.sku,
@@ -87,6 +116,25 @@ class InventoryItem {
     this.lotRemainingCount,
     this.parentLotId,
     this.createdAt,
+    this.productType = 'loose_stone',
+    this.certificationLab,
+    this.certificationNumber,
+    this.treatment,
+    this.dimensionsMm,
+    this.description,
+    this.videoUrl,
+    this.cut,
+    this.clarity,
+    this.species,
+    this.locality,
+    this.matrix,
+    this.weightGrams,
+    this.jewelryType,
+    this.metal,
+    this.metalPurity,
+    this.sizeOrLength,
+    this.gemstonesUsed,
+    this.totalWeightGrams,
   });
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
@@ -135,6 +183,29 @@ class InventoryItem {
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
+      productType: map['product_type']?.toString() ?? 'loose_stone',
+      certificationLab: map['certification_lab']?.toString(),
+      certificationNumber: map['certification_number']?.toString(),
+      treatment: map['treatment']?.toString(),
+      dimensionsMm: map['dimensions_mm']?.toString(),
+      description: map['description']?.toString(),
+      videoUrl: map['video_url']?.toString(),
+      cut: map['cut']?.toString(),
+      clarity: map['clarity']?.toString(),
+      species: map['species']?.toString(),
+      locality: map['locality']?.toString(),
+      matrix: map['matrix']?.toString(),
+      weightGrams: map['weight_grams'] != null
+          ? (map['weight_grams'] as num).toDouble()
+          : null,
+      jewelryType: map['jewelry_type']?.toString(),
+      metal: map['metal']?.toString(),
+      metalPurity: map['metal_purity']?.toString(),
+      sizeOrLength: map['size_or_length']?.toString(),
+      gemstonesUsed: map['gemstones_used']?.toString(),
+      totalWeightGrams: map['total_weight_grams'] != null
+          ? (map['total_weight_grams'] as num).toDouble()
+          : null,
     );
   }
 
@@ -167,6 +238,25 @@ class InventoryItem {
       'is_unsorted_lot': isUnsortedLot,
       'lot_remaining_count': lotRemainingCount,
       'parent_lot_id': parentLotId,
+      'product_type': productType,
+      'certification_lab': certificationLab,
+      'certification_number': certificationNumber,
+      'treatment': treatment,
+      'dimensions_mm': dimensionsMm,
+      'description': description,
+      'video_url': videoUrl,
+      'cut': cut,
+      'clarity': clarity,
+      'species': species,
+      'locality': locality,
+      'matrix': matrix,
+      'weight_grams': weightGrams,
+      'jewelry_type': jewelryType,
+      'metal': metal,
+      'metal_purity': metalPurity,
+      'size_or_length': sizeOrLength,
+      'gemstones_used': gemstonesUsed,
+      'total_weight_grams': totalWeightGrams,
     };
   }
 
@@ -202,6 +292,25 @@ class InventoryItem {
     Object? lotRemainingCount = _omitted,
     Object? parentLotId = _omitted,
     DateTime? createdAt,
+    String? productType,
+    Object? certificationLab = _omitted,
+    Object? certificationNumber = _omitted,
+    Object? treatment = _omitted,
+    Object? dimensionsMm = _omitted,
+    Object? description = _omitted,
+    Object? videoUrl = _omitted,
+    Object? cut = _omitted,
+    Object? clarity = _omitted,
+    Object? species = _omitted,
+    Object? locality = _omitted,
+    Object? matrix = _omitted,
+    Object? weightGrams = _omitted,
+    Object? jewelryType = _omitted,
+    Object? metal = _omitted,
+    Object? metalPurity = _omitted,
+    Object? sizeOrLength = _omitted,
+    Object? gemstonesUsed = _omitted,
+    Object? totalWeightGrams = _omitted,
   }) {
     return InventoryItem(
       id: id ?? this.id,
@@ -245,6 +354,49 @@ class InventoryItem {
           ? this.parentLotId
           : parentLotId as String?,
       createdAt: createdAt ?? this.createdAt,
+      productType: productType ?? this.productType,
+      certificationLab: identical(certificationLab, _omitted)
+          ? this.certificationLab
+          : certificationLab as String?,
+      certificationNumber: identical(certificationNumber, _omitted)
+          ? this.certificationNumber
+          : certificationNumber as String?,
+      treatment: identical(treatment, _omitted)
+          ? this.treatment
+          : treatment as String?,
+      dimensionsMm: identical(dimensionsMm, _omitted)
+          ? this.dimensionsMm
+          : dimensionsMm as String?,
+      description: identical(description, _omitted)
+          ? this.description
+          : description as String?,
+      videoUrl:
+          identical(videoUrl, _omitted) ? this.videoUrl : videoUrl as String?,
+      cut: identical(cut, _omitted) ? this.cut : cut as String?,
+      clarity: identical(clarity, _omitted) ? this.clarity : clarity as String?,
+      species: identical(species, _omitted) ? this.species : species as String?,
+      locality:
+          identical(locality, _omitted) ? this.locality : locality as String?,
+      matrix: identical(matrix, _omitted) ? this.matrix : matrix as String?,
+      weightGrams: identical(weightGrams, _omitted)
+          ? this.weightGrams
+          : weightGrams as double?,
+      jewelryType: identical(jewelryType, _omitted)
+          ? this.jewelryType
+          : jewelryType as String?,
+      metal: identical(metal, _omitted) ? this.metal : metal as String?,
+      metalPurity: identical(metalPurity, _omitted)
+          ? this.metalPurity
+          : metalPurity as String?,
+      sizeOrLength: identical(sizeOrLength, _omitted)
+          ? this.sizeOrLength
+          : sizeOrLength as String?,
+      gemstonesUsed: identical(gemstonesUsed, _omitted)
+          ? this.gemstonesUsed
+          : gemstonesUsed as String?,
+      totalWeightGrams: identical(totalWeightGrams, _omitted)
+          ? this.totalWeightGrams
+          : totalWeightGrams as double?,
     );
   }
 }

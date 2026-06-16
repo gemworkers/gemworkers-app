@@ -6,7 +6,7 @@ import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
-import 'add_inventory_page.dart';
+import 'add_item_type_picker_page.dart';
 import 'inventory_detail_page.dart';
 import 'listing_sheet.dart';
 import 'record_sale_sheet.dart';
@@ -568,7 +568,7 @@ class _InventoryPageState extends State<InventoryPage>
   Future<void> _openAdd() async {
     final added = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const AddInventoryPage()),
+      MaterialPageRoute(builder: (_) => const AddItemTypePickerPage()),
     );
     if (added == true) _loadItems();
   }
