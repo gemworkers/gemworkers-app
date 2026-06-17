@@ -1,7 +1,4 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../models/supplier.dart';
@@ -11,6 +8,7 @@ import '../../models/inventory_item.dart';
 import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
+import 'widgets/item_photo_manager.dart';
 import 'widgets/origin_country_field.dart';
 
 class AddInventoryPage extends StatefulWidget {
@@ -25,7 +23,6 @@ class AddInventoryPage extends StatefulWidget {
 class _AddInventoryPageState extends State<AddInventoryPage> {
   final _repository = InventoryRepository();
   final _supplierRepository = SupplierRepository();
-  final _picker = ImagePicker();
 
   // ── Controllers ───────────────────────────────────────────────────────────
 
@@ -91,8 +88,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
   // ── Photo selection ───────────────────────────────────────────────────────
 
-  final List<XFile> _photos = [];
-  final List<Uint8List> _photoBytes = [];
+  List<PhotoItem> _photos = [];
 
   // ── Save state ────────────────────────────────────────────────────────────
 
@@ -134,26 +130,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
     } catch (_) {
       if (mounted) setState(() => _loadingSuppliers = false);
     }
-  }
-
-  // ── Photos ────────────────────────────────────────────────────────────────
-
-  Future<void> _pickPhotos() async {
-    final picked = await _picker.pickMultiImage(imageQuality: 85);
-    if (picked.isEmpty) return;
-
-    final bytes = await Future.wait(picked.map((f) => f.readAsBytes()));
-    setState(() {
-      _photos.addAll(picked);
-      _photoBytes.addAll(bytes);
-    });
-  }
-
-  void _removePhoto(int index) {
-    setState(() {
-      _photos.removeAt(index);
-      _photoBytes.removeAt(index);
-    });
   }
 
   // ── Validation & save ─────────────────────────────────────────────────────
@@ -278,17 +254,23 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
       if (_photos.isNotEmpty && created.id != null) {
         final urls = <String>[];
-        for (int i = 0; i < _photos.length; i++) {
-          if (mounted) {
-            setState(() =>
-                _savingStatus = 'Uploading photo ${i + 1} of ${_photos.length}…');
+        int uploadNum = 0;
+        for (final photo in _photos) {
+          if (photo.isExisting) {
+            urls.add(photo.url!);
+          } else {
+            uploadNum++;
+            if (mounted) {
+              setState(() =>
+                  _savingStatus = 'Uploading photo $uploadNum…');
+            }
+            final url = await _repository.uploadImage(
+              created.id!,
+              photo.bytes!,
+              photo.file!.name,
+            );
+            urls.add(url);
           }
-          final url = await _repository.uploadImage(
-            created.id!,
-            _photoBytes[i],
-            _photos[i].name,
-          );
-          urls.add(url);
         }
         await _repository.updateItemImages(created.id!, urls);
       }
@@ -307,82 +289,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   // ── Photo selector widget ─────────────────────────────────────────────────
 
   Widget _buildPhotoSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Photos',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.primary),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _saving ? null : _pickPhotos,
-              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-              label: const Text('Add Photos'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-          ],
-        ),
-        if (_photos.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              'Optional — photos can also be added after saving.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey),
-            ),
-          )
-        else
-          SizedBox(
-            height: 100,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _photos.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, index) => Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      _photoBytes[index],
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () => _removePhoto(index),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: 8),
-      ],
+    return ItemPhotoManager(
+      photos: _photos,
+      onChanged: (updated) => setState(() => _photos = updated),
+      enabled: !_saving,
     );
   }
 

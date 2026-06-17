@@ -9,6 +9,7 @@ import '../../repositories/supplier_repository.dart';
 import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
+import 'widgets/item_photo_manager.dart';
 import 'widgets/origin_country_field.dart';
 
 class EditInventoryPage extends StatefulWidget {
@@ -84,6 +85,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   String? _locationId;
   String? _originalLocationId;
 
+  // ── Photo selection ───────────────────────────────────────────────────────
+
+  List<PhotoItem> _photos = [];
+
   bool _saving = false;
 
   @override
@@ -130,6 +135,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _supplierId = i.supplierId;
     _locationId = i.locationId;
     _originalLocationId = i.locationId;
+    _photos = i.imageUrls.map(PhotoItem.existing).toList();
     _loadSuppliers();
   }
 
@@ -208,6 +214,20 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     setState(() => _saving = true);
 
     try {
+      final finalImageUrls = <String>[];
+      for (final photo in _photos) {
+        if (photo.isExisting) {
+          finalImageUrls.add(photo.url!);
+        } else {
+          final url = await _repository.uploadImage(
+            widget.item.id!,
+            photo.bytes!,
+            photo.file!.name,
+          );
+          finalImageUrls.add(url);
+        }
+      }
+
       final supplierName = _supplierId != null
           ? _suppliers
               .where((s) => s.id == _supplierId)
@@ -242,7 +262,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         qrCode: widget.item.qrCode,
         status: _status,
         notes: _notes.text.trim(),
-        imageUrls: widget.item.imageUrls,
+        imageUrls: finalImageUrls,
         supplierId: _supplierId,
         supplierName: supplierName,
         locationId: _locationId,
@@ -300,6 +320,16 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  // ── Photo selector widget ─────────────────────────────────────────────────
+
+  Widget _buildPhotoSelector() {
+    return ItemPhotoManager(
+      photos: _photos,
+      onChanged: (updated) => setState(() => _photos = updated),
+      enabled: !_saving,
+    );
   }
 
   // ── Supplier picker ───────────────────────────────────────────────────────
@@ -411,6 +441,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          _buildPhotoSelector(),
+
           const FormSection('Identification'),
           FormTextField('SKU *', _sku),
           FormTextField('Title *', _title),

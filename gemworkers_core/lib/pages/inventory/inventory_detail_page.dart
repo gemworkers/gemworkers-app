@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/services/seller_service.dart';
@@ -10,6 +9,7 @@ import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
 import 'edit_inventory_page.dart';
 import 'listing_sheet.dart';
+import 'widgets/item_photo_manager.dart';
 import 'lot_sort_page.dart';
 import 'record_sale_sheet.dart';
 
@@ -26,9 +26,9 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   final _repository = InventoryRepository();
   final _movementRepo = ItemMovementRepository();
   final _locationRepo = LocationRepository();
-  final _picker = ImagePicker();
 
   late InventoryItem _item;
+  List<PhotoItem> _photoItems = [];
   bool _uploadingImage = false;
   bool _deleting = false;
 
@@ -40,6 +40,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   void initState() {
     super.initState();
     _item = widget.item;
+    _photoItems = _item.imageUrls.map(PhotoItem.existing).toList();
     _loadLocationAndMovements();
   }
 
@@ -224,72 +225,36 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     );
   }
 
-  // ── Photo upload ──────────────────────────────────────────────────────────
+  // ── Photo sync (upload new picks, persist order/removals immediately) ────────
 
-  Future<void> _pickAndUpload() async {
+  Future<void> _syncPhotos(List<PhotoItem> updated) async {
     if (_item.id == null) return;
-
-    final file = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (file == null || !mounted) return;
-
     setState(() => _uploadingImage = true);
     try {
-      final bytes = await file.readAsBytes();
-      final url = await _repository.uploadImage(_item.id!, bytes, file.name);
-      final updatedUrls = [..._item.imageUrls, url];
-      await _repository.updateItemImages(_item.id!, updatedUrls);
-      if (mounted) setState(() => _item = _item.copyWith(imageUrls: updatedUrls));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
-        );
+      final finalUrls = <String>[];
+      for (final photo in updated) {
+        if (photo.isExisting) {
+          finalUrls.add(photo.url!);
+        } else {
+          final url = await _repository.uploadImage(
+              _item.id!, photo.bytes!, photo.file!.name);
+          finalUrls.add(url);
+        }
       }
-    } finally {
-      if (mounted) setState(() => _uploadingImage = false);
-    }
-  }
-
-  // ── Photo deletion ────────────────────────────────────────────────────────
-
-  Future<void> _confirmDeletePhoto(int index) async {
-    final url = _item.imageUrls[index];
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove Photo'),
-        content: const Text('Remove this photo from the item?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    try {
-      await _repository.deleteImageByUrl(_item.id!, url, _item.imageUrls);
-      final updatedUrls = [..._item.imageUrls]..removeAt(index);
-      if (mounted) setState(() => _item = _item.copyWith(imageUrls: updatedUrls));
+      await _repository.updateItemImages(_item.id!, finalUrls);
+      if (mounted) {
+        setState(() {
+          _item = _item.copyWith(imageUrls: finalUrls);
+          _photoItems = finalUrls.map(PhotoItem.existing).toList();
+          _uploadingImage = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Remove failed: $e')),
+          SnackBar(content: Text('Photo update failed: $e')),
         );
+        setState(() => _uploadingImage = false);
       }
     }
   }
@@ -350,103 +315,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Photos',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.primary,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _uploadingImage ? null : _pickAndUpload,
-              icon: _uploadingImage
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add_a_photo_outlined, size: 18),
-              label: Text(_uploadingImage ? 'Uploading…' : 'Add Photo'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_item.imageUrls.isEmpty)
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Center(
-              child: Text('No photos yet', style: TextStyle(color: Colors.grey)),
-            ),
-          )
-        else
-          SizedBox(
-            height: 120,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _item.imageUrls.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, index) => GestureDetector(
-                onTap: () => _openGallery(index),
-                onLongPress: () => _confirmDeletePhoto(index),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        _item.imageUrls[index],
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          width: 120,
-                          height: 120,
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          color: Colors.black45,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.touch_app,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 4),
-          child: Text(
-            'Tap to view · Long press to remove',
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: Colors.grey),
-          ),
+        ItemPhotoManager(
+          photos: _photoItems,
+          onChanged: _syncPhotos,
+          enabled: !_uploadingImage,
+          onPhotoTap: _item.imageUrls.isNotEmpty ? _openGallery : null,
         ),
         const Divider(height: 24),
       ],
