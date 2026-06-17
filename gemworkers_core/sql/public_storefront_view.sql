@@ -37,7 +37,9 @@ SELECT
     (i.image_urls ->> 0) AS image_url
 FROM  public.inventory_items i
 JOIN  public.sellers         s ON s.id = i.seller_id
-WHERE i.is_listed = true;
+WHERE i.is_listed = true
+  AND i.status   <> 'sold'
+  AND s.status    = 'active';
 
 -- 2. Grant read access to the VIEW only — not to the underlying table.
 --    authenticated is included so logged-in users can also browse the storefront.
