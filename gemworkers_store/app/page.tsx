@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { StoreHeader } from "@/app/components/StoreHeader";
 
 type ListedItem = {
   id: string;
@@ -35,58 +36,13 @@ export default async function HomePage() {
         body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
         .stone-card { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
         .stone-card:hover { border-color: #9ca3af !important; box-shadow: 0 2px 14px rgba(0,0,0,0.07); }
-        .nav-link { transition: color 0.1s ease; }
-        .nav-link:hover { color: #111 !important; }
         .stones-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         @media (max-width: 480px) {
           .stones-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
         }
       `}</style>
 
-      {/* ── Header ── */}
-      <header style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 32px", height: 60,
-        borderBottom: "1px solid #e5e7eb",
-        background: "#fff", position: "sticky", top: 0, zIndex: 10,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{
-            fontSize: 18, fontWeight: 700, letterSpacing: "0.13em",
-            fontFamily: "Georgia, 'Times New Roman', serif", color: "#111",
-          }}>
-            GEMWORKERS
-          </span>
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: "0.15em", color: "#9ca3af",
-            border: "1px solid #e5e7eb", borderRadius: 3, padding: "2px 7px",
-          }}>
-            MARKETPLACE
-          </span>
-        </div>
-
-        <nav style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          <a href="#" className="nav-link"
-            style={{ fontSize: 13, color: "#374151", textDecoration: "none", letterSpacing: "0.02em" }}>
-            Browse
-          </a>
-          <a href="#" className="nav-link"
-            style={{ fontSize: 13, color: "#6b7280", textDecoration: "none", letterSpacing: "0.02em" }}>
-            Sellers
-          </a>
-          {/* Search */}
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-            stroke="#9ca3af" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="7" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          {/* Favourites */}
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-            stroke="#9ca3af" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
-        </nav>
-      </header>
+      <StoreHeader />
 
       {/* ── Main ── */}
       <main style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 32px 80px" }}>

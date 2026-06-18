@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { PhotoGallery } from './PhotoGallery';
+import { StoreHeader } from '@/app/components/StoreHeader';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -93,41 +94,6 @@ function SpecSection({ title, children }: { title: string; children: React.React
       </p>
       <div>{children}</div>
     </div>
-  );
-}
-
-// ── Shared header (same mark-up as browse page) ───────────────────────────────
-
-function StoreHeader() {
-  return (
-    <header style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 32px', height: 60,
-      borderBottom: '1px solid #e5e7eb',
-      background: '#fff', position: 'sticky', top: 0, zIndex: 10,
-    }}>
-      <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{
-          fontSize: 18, fontWeight: 700, letterSpacing: '0.13em',
-          fontFamily: "Georgia, 'Times New Roman', serif", color: '#111',
-        }}>
-          GEMWORKERS
-        </span>
-        <span style={{
-          fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#9ca3af',
-          border: '1px solid #e5e7eb', borderRadius: 3, padding: '2px 7px',
-        }}>
-          MARKETPLACE
-        </span>
-      </Link>
-
-      <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-        <Link href="/"
-          style={{ fontSize: 13, color: '#374151', textDecoration: 'none', letterSpacing: '0.02em' }}>
-          Browse
-        </Link>
-      </nav>
-    </header>
   );
 }
 
