@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { PhotoGallery } from './PhotoGallery';
 import { StoreHeader } from '@/app/components/StoreHeader';
+import { BuyButton } from './BuyButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -137,13 +138,16 @@ export default async function StoneDetailPage({
 }) {
   const { id } = await params;
 
-  // Step 2 — fetch via public_listing_details view (same security as browse)
+  // Fetch user and listing in parallel; same client uses the buyer's session cookie.
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('public_listing_details')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();          // null if not found / filtered out by WHERE — no error thrown
+  const [{ data: { user } }, { data, error }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('public_listing_details')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle(),        // null if not found / filtered out by WHERE — no error thrown
+  ]);
 
   // Any error or no row → not available (don't distinguish between "doesn't exist"
   // and "exists but unlisted/sold" — both render identically)
@@ -249,15 +253,25 @@ export default async function StoneDetailPage({
             {item.selling_price != null ? (
               <p style={{
                 fontSize: 32, fontWeight: 700, color: '#111',
-                letterSpacing: '-0.02em', marginBottom: 22,
+                letterSpacing: '-0.02em', marginBottom: 16,
               }}>
                 {eur.format(Number(item.selling_price))}
               </p>
             ) : (
-              <p style={{ fontSize: 18, color: '#d1d5db', marginBottom: 22 }}>
+              <p style={{ fontSize: 18, color: '#d1d5db', marginBottom: 16 }}>
                 Price on request
               </p>
             )}
+
+            {/* Buy action */}
+            <div style={{ marginBottom: 22 }}>
+              <BuyButton
+                itemId={item.id}
+                itemTitle={item.title}
+                sellingPrice={item.selling_price}
+                isLoggedIn={!!user}
+              />
+            </div>
 
             <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', marginBottom: 24 }} />
 
