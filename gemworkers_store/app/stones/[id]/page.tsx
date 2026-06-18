@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { PhotoGallery } from './PhotoGallery';
 import { StoreHeader } from '@/app/components/StoreHeader';
 import { BuyButton } from './BuyButton';
+import { CartButton } from './CartButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -138,15 +139,22 @@ export default async function StoneDetailPage({
 }) {
   const { id } = await params;
 
-  // Fetch user and listing in parallel; same client uses the buyer's session cookie.
+  // Fetch user, listing, and cart membership in parallel.
+  // All three share one cookie-based client (buyer's session).
+  // cartRow is null for anon users (RLS blocks) and for buyers who haven't added this item.
   const supabase = await createClient();
-  const [{ data: { user } }, { data, error }] = await Promise.all([
+  const [{ data: { user } }, { data, error }, { data: cartRow }] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from('public_listing_details')
       .select('*')
       .eq('id', id)
       .maybeSingle(),        // null if not found / filtered out by WHERE — no error thrown
+    supabase
+      .from('storefront_cart')
+      .select('id')
+      .eq('inventory_item_id', id)
+      .maybeSingle(),        // null if not in cart or if anon (RLS returns 0 rows)
   ]);
 
   // Any error or no row → not available (don't distinguish between "doesn't exist"
@@ -263,13 +271,18 @@ export default async function StoneDetailPage({
               </p>
             )}
 
-            {/* Buy action */}
-            <div style={{ marginBottom: 22 }}>
+            {/* Buy + cart actions */}
+            <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <BuyButton
                 itemId={item.id}
                 itemTitle={item.title}
                 sellingPrice={item.selling_price}
                 isLoggedIn={!!user}
+              />
+              <CartButton
+                itemId={item.id}
+                isLoggedIn={!!user}
+                initialInCart={!!cartRow}
               />
             </div>
 

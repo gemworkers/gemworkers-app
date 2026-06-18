@@ -52,6 +52,15 @@ export async function StoreHeader() {
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
 
+        {/* Cart link — only visible when logged in */}
+        {user && (
+          <Link href="/cart" style={{
+            fontSize: 13, color: '#374151', textDecoration: 'none', letterSpacing: '0.02em',
+          }}>
+            Cart
+          </Link>
+        )}
+
         {/* ── Auth state ───────────────────────────────────────────────────── */}
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginLeft: 4 }}>
