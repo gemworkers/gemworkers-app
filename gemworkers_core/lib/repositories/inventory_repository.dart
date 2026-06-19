@@ -163,14 +163,29 @@ class InventoryRepository {
         .inFilter('id', itemIds);
   }
 
-  /// Sets is_listed=true and records the sale method, selling price, and listed_at.
-  /// sellingPrice may be null for accept_offers-only stones (no fixed price).
-  Future<void> listItem(String id, double? sellingPrice, String saleMethod) async {
+  /// Sets is_listed=true and records the sale method, selling price, listed_at,
+  /// and optional shipping details. sellingPrice may be null for accept_offers stones.
+  /// Shipping params are named optional — caller passes only what the user filled in.
+  Future<void> listItem(
+    String id,
+    double? sellingPrice,
+    String saleMethod, {
+    String? courier,
+    double? shippingCost,
+    int? deliveryDaysMin,
+    int? deliveryDaysMax,
+    int? prepDays,
+  }) async {
     await supabase.from('inventory_items').update({
       'is_listed': true,
       'selling_price': sellingPrice,
       'sale_method': saleMethod,
       'listed_at': DateTime.now().toIso8601String(),
+      'courier': courier,
+      'shipping_cost': shippingCost,
+      'delivery_days_min': deliveryDaysMin,
+      'delivery_days_max': deliveryDaysMax,
+      'prep_days': prepDays,
     }).eq('id', id);
   }
 

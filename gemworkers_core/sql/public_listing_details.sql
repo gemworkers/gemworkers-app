@@ -83,7 +83,12 @@ SELECT
     i.size_or_length,
     i.gemstones_used,
     i.total_weight_grams,
-    i.sale_method
+    i.sale_method,
+    i.courier,
+    i.shipping_cost,
+    i.delivery_days_min,
+    i.delivery_days_max,
+    i.prep_days
 
 FROM  public.inventory_items i
 JOIN  public.sellers         s ON s.id = i.seller_id

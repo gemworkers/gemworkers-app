@@ -52,6 +52,13 @@ type ListingDetail = {
   size_or_length: string | null;
   gemstones_used: string | null;
   total_weight_grams: number | null;
+
+  // shipping
+  courier: string | null;
+  shipping_cost: number | null;
+  delivery_days_min: number | null;
+  delivery_days_max: number | null;
+  prep_days: number | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -206,6 +213,25 @@ export default async function StoneDetailPage({
   const metalLine = [item.metal, item.metal_purity]
     .filter((v) => v && v.trim())
     .join(' ') || null;
+
+  // Shipping derived values — normalize once, branch on typed number
+  const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
+  const shippingCostDisplay =
+    cost === null ? null : cost === 0 ? 'Free' : `€${cost.toFixed(0)}`;
+
+  const deliveryRange =
+    item.delivery_days_min != null && item.delivery_days_max != null
+      ? `${item.delivery_days_min}–${item.delivery_days_max} days`
+      : item.delivery_days_min != null
+        ? `From ${item.delivery_days_min} days`
+        : null;
+
+  const hasShipping =
+    item.courier != null ||
+    item.shipping_cost != null ||
+    item.delivery_days_min != null ||
+    item.delivery_days_max != null ||
+    item.prep_days != null;
 
   return (
     <>
@@ -372,6 +398,18 @@ export default async function StoneDetailPage({
                 <SpecRow label="Treatment"     value={item.treatment} />
                 <SpecRow label="Dimensions"    value={item.dimensions_mm} />
                 <SpecRow label="Certification" value={certificationLine} />
+              </SpecSection>
+            )}
+
+            {/* Shipping — omit entire section when all five fields are null */}
+            {hasShipping && (
+              <SpecSection title="Shipping">
+                <SpecRow label="Courier"  value={item.courier} />
+                <SpecRow label="Cost"     value={shippingCostDisplay} />
+                <SpecRow label="Delivery" value={deliveryRange} />
+                {item.prep_days != null && (
+                  <SpecRow label="Handling" value={`Ready in ${item.prep_days} days`} />
+                )}
               </SpecSection>
             )}
 

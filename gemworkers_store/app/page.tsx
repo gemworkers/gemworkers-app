@@ -12,6 +12,7 @@ type ListedItem = {
   origin_country: string;
   selling_price: number | null;
   sale_method: string;
+  shipping_cost: number | null;
   seller_id: string;
   seller_name: string | null;
   image_url: string | null;
@@ -69,6 +70,8 @@ export default async function HomePage() {
               const subtitle = [gemLabel, originLabel].filter(Boolean).join(" · ");
               const initial = gemLabel ? gemLabel.charAt(0).toUpperCase() : "◇";
               const hasWeight = item.weight_value != null && Number(item.weight_value) > 0;
+              // Normalize once: null → omit, 0 → free, >0 → cost
+              const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
 
               return (
                 <Link
@@ -161,6 +164,15 @@ export default async function HomePage() {
                         </span>
                       )}
                     </div>
+                    {/* cost: null → omit, 0 → "Free shipping", >0 → price */}
+                    {cost !== null && (
+                      <p style={{
+                        fontSize: 11, marginTop: 5,
+                        color: cost === 0 ? "#16a34a" : "#6b7280",
+                      }}>
+                        {cost === 0 ? "Free shipping" : `+ €${cost.toFixed(0)} shipping`}
+                      </p>
+                    )}
                   </div>
                 </Link>
               );

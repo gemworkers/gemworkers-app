@@ -87,6 +87,13 @@ class InventoryItem {
   final String? gemstonesUsed;
   final double? totalWeightGrams;
 
+  // Shipping — set at listing time, persists when unlisted for relisting.
+  final String? courier;
+  final double? shippingCost;   // 0 = free, null = not specified
+  final int? deliveryDaysMin;
+  final int? deliveryDaysMax;
+  final int? prepDays;
+
   const InventoryItem({
     this.id,
     required this.sku,
@@ -138,6 +145,11 @@ class InventoryItem {
     this.sizeOrLength,
     this.gemstonesUsed,
     this.totalWeightGrams,
+    this.courier,
+    this.shippingCost,
+    this.deliveryDaysMin,
+    this.deliveryDaysMax,
+    this.prepDays,
   });
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
@@ -210,6 +222,13 @@ class InventoryItem {
       totalWeightGrams: map['total_weight_grams'] != null
           ? (map['total_weight_grams'] as num).toDouble()
           : null,
+      courier: map['courier']?.toString(),
+      shippingCost: map['shipping_cost'] != null
+          ? (map['shipping_cost'] as num).toDouble()
+          : null,
+      deliveryDaysMin: map['delivery_days_min'] as int?,
+      deliveryDaysMax: map['delivery_days_max'] as int?,
+      prepDays: map['prep_days'] as int?,
     );
   }
 
@@ -262,6 +281,11 @@ class InventoryItem {
       'size_or_length': sizeOrLength,
       'gemstones_used': gemstonesUsed,
       'total_weight_grams': totalWeightGrams,
+      'courier': courier,
+      'shipping_cost': shippingCost,
+      'delivery_days_min': deliveryDaysMin,
+      'delivery_days_max': deliveryDaysMax,
+      'prep_days': prepDays,
     };
   }
 
@@ -317,6 +341,11 @@ class InventoryItem {
     Object? sizeOrLength = _omitted,
     Object? gemstonesUsed = _omitted,
     Object? totalWeightGrams = _omitted,
+    Object? courier = _omitted,
+    Object? shippingCost = _omitted,
+    Object? deliveryDaysMin = _omitted,
+    Object? deliveryDaysMax = _omitted,
+    Object? prepDays = _omitted,
   }) {
     return InventoryItem(
       id: id ?? this.id,
@@ -404,6 +433,19 @@ class InventoryItem {
       totalWeightGrams: identical(totalWeightGrams, _omitted)
           ? this.totalWeightGrams
           : totalWeightGrams as double?,
+      courier:
+          identical(courier, _omitted) ? this.courier : courier as String?,
+      shippingCost: identical(shippingCost, _omitted)
+          ? this.shippingCost
+          : shippingCost as double?,
+      deliveryDaysMin: identical(deliveryDaysMin, _omitted)
+          ? this.deliveryDaysMin
+          : deliveryDaysMin as int?,
+      deliveryDaysMax: identical(deliveryDaysMax, _omitted)
+          ? this.deliveryDaysMax
+          : deliveryDaysMax as int?,
+      prepDays:
+          identical(prepDays, _omitted) ? this.prepDays : prepDays as int?,
     );
   }
 }

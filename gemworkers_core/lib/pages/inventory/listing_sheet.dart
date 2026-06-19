@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/inventory_item.dart';
 import '../../repositories/inventory_repository.dart';
@@ -47,6 +48,11 @@ class _ListingSheet extends StatefulWidget {
 class _ListingSheetState extends State<_ListingSheet> {
   final _priceCtrl = TextEditingController();
   final _targetMarginCtrl = TextEditingController(text: '40');
+  final _courierCtrl = TextEditingController();
+  final _shippingCostCtrl = TextEditingController();
+  final _deliveryMinCtrl = TextEditingController();
+  final _deliveryMaxCtrl = TextEditingController();
+  final _prepDaysCtrl = TextEditingController();
 
   double? _commissionRate; // null = still loading
   bool _saving = false;
@@ -63,12 +69,18 @@ class _ListingSheetState extends State<_ListingSheet> {
     }
     _priceCtrl.addListener(() => setState(() {}));
     _loadCommissionRate();
+    _loadShippingDefaults();
   }
 
   @override
   void dispose() {
     _priceCtrl.dispose();
     _targetMarginCtrl.dispose();
+    _courierCtrl.dispose();
+    _shippingCostCtrl.dispose();
+    _deliveryMinCtrl.dispose();
+    _deliveryMaxCtrl.dispose();
+    _prepDaysCtrl.dispose();
     super.dispose();
   }
 
@@ -87,6 +99,70 @@ class _ListingSheetState extends State<_ListingSheet> {
       }
     } catch (_) {
       if (mounted) setState(() => _commissionRate = _kDefaultCommission);
+    }
+  }
+
+  Future<void> _loadShippingDefaults() async {
+    final item = widget.item;
+    // Prefer the item's own values when relisting.
+    if (item.courier != null ||
+        item.shippingCost != null ||
+        item.deliveryDaysMin != null ||
+        item.deliveryDaysMax != null ||
+        item.prepDays != null) {
+      if (!mounted) return;
+      setState(() {
+        if (item.courier != null) _courierCtrl.text = item.courier!;
+        if (item.shippingCost != null) {
+          _shippingCostCtrl.text = item.shippingCost!.toStringAsFixed(2);
+        }
+        if (item.deliveryDaysMin != null) {
+          _deliveryMinCtrl.text = item.deliveryDaysMin!.toString();
+        }
+        if (item.deliveryDaysMax != null) {
+          _deliveryMaxCtrl.text = item.deliveryDaysMax!.toString();
+        }
+        if (item.prepDays != null) {
+          _prepDaysCtrl.text = item.prepDays!.toString();
+        }
+      });
+      return;
+    }
+    // Fall back to the seller's most recently listed stone with shipping set.
+    final sellerId = item.sellerId;
+    if (sellerId == null) return;
+    try {
+      final rows = await Supabase.instance.client
+          .from('inventory_items')
+          .select(
+              'courier, shipping_cost, delivery_days_min, delivery_days_max, prep_days')
+          .eq('seller_id', sellerId)
+          .eq('is_listed', true)
+          .not('courier', 'is', null)
+          .order('listed_at', ascending: false)
+          .limit(1);
+      if (!mounted || rows.isEmpty) return;
+      final row = rows.first;
+      setState(() {
+        if (row['courier'] != null) {
+          _courierCtrl.text = row['courier'] as String;
+        }
+        if (row['shipping_cost'] != null) {
+          _shippingCostCtrl.text =
+              (row['shipping_cost'] as num).toDouble().toStringAsFixed(2);
+        }
+        if (row['delivery_days_min'] != null) {
+          _deliveryMinCtrl.text = row['delivery_days_min'].toString();
+        }
+        if (row['delivery_days_max'] != null) {
+          _deliveryMaxCtrl.text = row['delivery_days_max'].toString();
+        }
+        if (row['prep_days'] != null) {
+          _prepDaysCtrl.text = row['prep_days'].toString();
+        }
+      });
+    } catch (_) {
+      // Pre-fill is best-effort — fail silently.
     }
   }
 
@@ -137,7 +213,19 @@ class _ListingSheetState extends State<_ListingSheet> {
     if (method != 'accept_offers' && _salePrice <= 0) return;
     setState(() => _saving = true);
     try {
-      await InventoryRepository().listItem(widget.item.id!, price, method);
+      await InventoryRepository().listItem(
+        widget.item.id!,
+        price,
+        method,
+        courier: _courierCtrl.text.trim().isEmpty
+            ? null
+            : _courierCtrl.text.trim(),
+        shippingCost: double.tryParse(
+            _shippingCostCtrl.text.replaceAll(',', '.')),
+        deliveryDaysMin: int.tryParse(_deliveryMinCtrl.text.trim()),
+        deliveryDaysMax: int.tryParse(_deliveryMaxCtrl.text.trim()),
+        prepDays: int.tryParse(_prepDaysCtrl.text.trim()),
+      );
       if (mounted) {
         Navigator.pop(
             context, ListingResult.listed(price, saleMethod: method));
@@ -343,6 +431,92 @@ class _ListingSheetState extends State<_ListingSheet> {
                 ),
               ),
             ],
+
+            // ── Shipping ───────────────────────────────────────────────
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            Text(
+              'Shipping',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _courierCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Courier (optional)',
+                hintText: 'e.g. DHL, Royal Mail',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _shippingCostCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Shipping cost',
+                prefixText: '€ ',
+                hintText: '0 for free',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _deliveryMinCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Min delivery',
+                      suffixText: 'days',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _deliveryMaxCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Max delivery',
+                      suffixText: 'days',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _prepDaysCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Handling time (optional)',
+                suffixText: 'days',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // ── Primary action ─────────────────────────────────────────
             SizedBox(
