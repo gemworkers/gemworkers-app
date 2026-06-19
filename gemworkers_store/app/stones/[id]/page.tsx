@@ -4,6 +4,7 @@ import { PhotoGallery } from './PhotoGallery';
 import { StoreHeader } from '@/app/components/StoreHeader';
 import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
+import { OfferPanel, type BuyerOffer } from './OfferPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -140,23 +141,34 @@ export default async function StoneDetailPage({
 }) {
   const { id } = await params;
 
-  // Fetch user, listing, and cart membership in parallel.
-  // All three share one cookie-based client (buyer's session).
-  // cartRow is null for anon users (RLS blocks) and for buyers who haven't added this item.
+  // Fetch user, listing, cart membership, and buyer's offer in parallel.
+  // All four share one cookie-based client (buyer's session).
+  // cartRow and offerRow are null for anon users (RLS returns 0 rows).
   const supabase = await createClient();
-  const [{ data: { user } }, { data, error }, { data: cartRow }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase
-      .from('public_listing_details')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle(),        // null if not found / filtered out by WHERE — no error thrown
-    supabase
-      .from('storefront_cart')
-      .select('id')
-      .eq('inventory_item_id', id)
-      .maybeSingle(),        // null if not in cart or if anon (RLS returns 0 rows)
-  ]);
+  const [{ data: { user } }, { data, error }, { data: cartRow }, { data: offerRow }] =
+    await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('public_listing_details')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle(),
+      supabase
+        .from('storefront_cart')
+        .select('id')
+        .eq('inventory_item_id', id)
+        .maybeSingle(),
+      // Fetch the buyer's most recent non-withdrawn offer so OfferPanel opens
+      // in the correct state (pending/accepted/declined) on first load.
+      supabase
+        .from('storefront_offers')
+        .select('id, offered_price, status')
+        .eq('inventory_item_id', id)
+        .in('status', ['pending', 'accepted', 'declined', 'expired'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
   // Any error or no row → not available (don't distinguish between "doesn't exist"
   // and "exists but unlisted/sold" — both render identically)
@@ -276,9 +288,9 @@ export default async function StoneDetailPage({
               </p>
             )}
 
-            {/* Buy + cart actions */}
+            {/* Buy + cart + offer actions */}
             <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* BuyButton: shown for buy_now and both; hidden for accept_offers */}
+              {/* BuyButton: buy_now + both only */}
               {item.sale_method !== 'accept_offers' && (
                 <BuyButton
                   itemId={item.id}
@@ -292,7 +304,14 @@ export default async function StoneDetailPage({
                 isLoggedIn={!!user}
                 initialInCart={!!cartRow}
               />
-              {/* OFFER ACTION: placeholder — offer submit UI is a follow-up step */}
+              {/* OfferPanel: accept_offers + both only */}
+              {item.sale_method !== 'buy_now' && (
+                <OfferPanel
+                  itemId={item.id}
+                  isLoggedIn={!!user}
+                  initialOffer={offerRow as BuyerOffer | null}
+                />
+              )}
             </div>
 
             <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', marginBottom: 24 }} />
