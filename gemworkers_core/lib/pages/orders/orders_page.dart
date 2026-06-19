@@ -20,7 +20,7 @@ class _OrdersPageState extends State<OrdersPage> {
   bool _loading = true;
   String? _statusFilter;
 
-  static const _statuses = ['draft', 'confirmed', 'paid', 'cancelled'];
+  static const _statuses = ['draft', 'confirmed', 'shipped', 'received', 'paid', 'cancelled'];
 
   @override
   void initState() {
@@ -132,10 +132,12 @@ class _OrdersPageState extends State<OrdersPage> {
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   static Color _statusColor(String s) => switch (s) {
-        'paid' => Colors.green,
+        'paid'      => Colors.green,
         'confirmed' => Colors.blue,
+        'shipped'   => Colors.orange,
+        'received'  => Colors.teal,
         'cancelled' => Colors.red,
-        _ => Colors.grey,
+        _           => Colors.grey,
       };
 }
 

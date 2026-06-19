@@ -86,6 +86,56 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     });
   }
 
+  Future<void> _markShipped() async {
+    final trackingCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as Shipped'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Confirm shipment. Add a tracking number so the buyer '
+              'can check delivery status.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: trackingCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Tracking number (optional)',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Mark as Shipped'),
+          ),
+        ],
+      ),
+    );
+    final tracking =
+        trackingCtrl.text.trim().isEmpty ? null : trackingCtrl.text.trim();
+    trackingCtrl.dispose();
+
+    if (confirmed != true || !mounted) return;
+    await _runAction(() async {
+      await _repository.markShipped(widget.orderId, trackingNumber: tracking);
+      await _load();
+    });
+  }
+
   Future<void> _deleteOrder() async {
     final confirmed = await _confirmDialog(
       title: 'Delete Order',
@@ -225,6 +275,12 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                     '${order.orderDate.month.toString().padLeft(2, '0')}/'
                     '${order.orderDate.year}'),
             _row('Items', '${order.items.length}'),
+            if (order.shippedAt != null)
+              _row('Shipped', _formatDateTime(order.shippedAt!)),
+            if (order.receivedAt != null)
+              _row('Received', _formatDateTime(order.receivedAt!)),
+            if (order.trackingNumber != null)
+              _row('Tracking', order.trackingNumber!),
             const Divider(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -360,6 +416,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Widget? _buildActionBar(Order order) {
     final status = order.status;
     if (status == 'cancelled') return null;
+    if (status == 'received') return null;
 
     return SafeArea(
       child: Padding(
@@ -377,26 +434,62 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 ),
               ),
             if (status == 'confirmed') ...[
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _actionInProgress ? null : _cancelOrder,
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Cancel'),
-                  style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red),
+              if (order.saleChannel == 'platform') ...[
+                // Platform order: seller marks shipped; Mark Paid belongs to
+                // the payments epic and is not available in this flow.
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _actionInProgress ? null : _cancelOrder,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Cancel'),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _actionInProgress ? null : _markPaid,
-                  icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Mark Paid'),
-                  style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _actionInProgress ? null : _markShipped,
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    label: const Text('Mark as Shipped'),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: Colors.orange),
+                  ),
                 ),
-              ),
+              ] else ...[
+                // Manual order: existing Cancel + Mark Paid unchanged.
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _actionInProgress ? null : _cancelOrder,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Cancel'),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _actionInProgress ? null : _markPaid,
+                    icon: const Icon(Icons.payments_outlined),
+                    label: const Text('Mark Paid'),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green),
+                  ),
+                ),
+              ],
             ],
+            if (status == 'shipped')
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Awaiting buyer confirmation',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                ),
+              ),
             if (status == 'paid')
               Expanded(
                 child: OutlinedButton.icon(
@@ -411,6 +504,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         ),
       ),
     );
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/'
+        '${local.month.toString().padLeft(2, '0')}/'
+        '${local.year}  '
+        '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _row(String label, String value) {
@@ -438,10 +540,12 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge(this.status);
 
   Color get _color => switch (status) {
-        'paid' => Colors.green,
+        'paid'      => Colors.green,
         'confirmed' => Colors.blue,
+        'shipped'   => Colors.orange,
+        'received'  => Colors.teal,
         'cancelled' => Colors.red,
-        _ => Colors.grey,
+        _           => Colors.grey,
       };
 
   @override

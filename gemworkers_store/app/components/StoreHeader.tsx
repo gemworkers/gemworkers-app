@@ -52,7 +52,14 @@ export async function StoreHeader() {
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
 
-        {/* Cart link — only visible when logged in */}
+        {/* My Orders + Cart — only visible when logged in */}
+        {user && (
+          <Link href="/orders" style={{
+            fontSize: 13, color: '#374151', textDecoration: 'none', letterSpacing: '0.02em',
+          }}>
+            My Orders
+          </Link>
+        )}
         {user && (
           <Link href="/cart" style={{
             fontSize: 13, color: '#374151', textDecoration: 'none', letterSpacing: '0.02em',

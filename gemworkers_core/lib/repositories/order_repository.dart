@@ -88,6 +88,15 @@ class OrderRepository {
 
   // ── Status transitions ────────────────────────────────────────────────────
 
+  /// Advances a confirmed platform order to 'shipped' via the SECURITY DEFINER
+  /// RPC. Throws PostgrestException on validation failure (surfaced via .message).
+  Future<void> markShipped(String orderId, {String? trackingNumber}) async {
+    await supabase.rpc('mark_order_shipped', params: {
+      'p_order_id': orderId,
+      'p_tracking_number': trackingNumber,
+    });
+  }
+
   /// Sets order → 'paid' and marks all its inventory items → 'sold'.
   Future<void> markPaid(String orderId) async {
     // Update order first; if this fails nothing else changes.

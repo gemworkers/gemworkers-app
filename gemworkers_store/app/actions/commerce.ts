@@ -97,6 +97,25 @@ export async function submitOffer(
   return { offerId: data as string }
 }
 
+// Calls mark_order_received as the logged-in buyer.
+// Buyers have no UPDATE policy on orders; this SECURITY DEFINER RPC is the
+// only write path. The RPC validates buyer_id = auth.uid() and status = 'shipped'.
+export async function markOrderReceived(
+  orderId: string
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'You must be logged in.' }
+
+  const { error } = await supabase.rpc('mark_order_received', {
+    p_order_id: orderId,
+  })
+
+  if (error) return { error: error.message }
+  return { ok: true }
+}
+
 // Sets status = 'withdrawn' on the buyer's own pending offer.
 // RLS offers_buyer_update enforces: row must be buyer's own AND currently pending;
 // the new row must have status = 'withdrawn' (no other change is permitted).
