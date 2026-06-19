@@ -9,6 +9,7 @@ import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
+import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
 import 'pages/purchases/purchases_page.dart';
 import 'pages/suppliers/suppliers_page.dart';
@@ -95,6 +96,7 @@ class _MainLayoutState extends State<MainLayout> {
         const DashboardPage(),
         const InventoryPage(),
         const OrdersPage(),
+        const OffersPage(),
         if (_isOwner) const CustomersPage(),
         const PurchasesPage(),
         const SuppliersPage(),
@@ -116,6 +118,11 @@ class _MainLayoutState extends State<MainLayout> {
           icon: Icon(Icons.receipt_long_outlined),
           selectedIcon: Icon(Icons.receipt_long),
           label: Text('Orders'),
+        ),
+        const NavigationRailDestination(
+          icon: Icon(Icons.local_offer_outlined),
+          selectedIcon: Icon(Icons.local_offer),
+          label: Text('Offers'),
         ),
         if (_isOwner)
           const NavigationRailDestination(
