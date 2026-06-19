@@ -12,6 +12,7 @@ type ListingDetail = {
   title: string;
   product_type: 'loose_stone' | 'specimen' | 'jewelry';
   selling_price: number | null;
+  sale_method: 'buy_now' | 'accept_offers' | 'both';
   description: string | null;
   image_urls: string[] | null;
   seller_name: string | null;
@@ -258,7 +259,11 @@ export default async function StoneDetailPage({
             )}
 
             {/* Price */}
-            {item.selling_price != null ? (
+            {item.sale_method === 'accept_offers' ? (
+              <p style={{ fontSize: 18, color: '#9ca3af', marginBottom: 16 }}>
+                Make an offer
+              </p>
+            ) : item.selling_price != null ? (
               <p style={{
                 fontSize: 32, fontWeight: 700, color: '#111',
                 letterSpacing: '-0.02em', marginBottom: 16,
@@ -273,17 +278,21 @@ export default async function StoneDetailPage({
 
             {/* Buy + cart actions */}
             <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <BuyButton
-                itemId={item.id}
-                itemTitle={item.title}
-                sellingPrice={item.selling_price}
-                isLoggedIn={!!user}
-              />
+              {/* BuyButton: shown for buy_now and both; hidden for accept_offers */}
+              {item.sale_method !== 'accept_offers' && (
+                <BuyButton
+                  itemId={item.id}
+                  itemTitle={item.title}
+                  sellingPrice={item.selling_price}
+                  isLoggedIn={!!user}
+                />
+              )}
               <CartButton
                 itemId={item.id}
                 isLoggedIn={!!user}
                 initialInCart={!!cartRow}
               />
+              {/* OFFER ACTION: placeholder — offer submit UI is a follow-up step */}
             </div>
 
             <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', marginBottom: 24 }} />

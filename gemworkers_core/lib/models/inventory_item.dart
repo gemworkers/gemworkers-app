@@ -48,6 +48,8 @@ class InventoryItem {
   final bool isListed;
   final double? sellingPrice;
   final DateTime? listedAt;
+  // 'buy_now' | 'accept_offers' | 'both' — mirrors CHECK constraint on inventory_items.
+  final String saleMethod;
 
   // Unsorted lot tracking — set when created from a 'lot' purchase line.
   final bool isUnsortedLot;
@@ -112,6 +114,7 @@ class InventoryItem {
     this.isListed = false,
     this.sellingPrice,
     this.listedAt,
+    this.saleMethod = 'buy_now',
     this.isUnsortedLot = false,
     this.lotRemainingCount,
     this.parentLotId,
@@ -177,6 +180,7 @@ class InventoryItem {
       listedAt: map['listed_at'] != null
           ? DateTime.parse(map['listed_at'].toString())
           : null,
+      saleMethod: map['sale_method']?.toString() ?? 'buy_now',
       isUnsortedLot: map['is_unsorted_lot'] == true,
       lotRemainingCount: map['lot_remaining_count'] as int?,
       parentLotId: map['parent_lot_id']?.toString(),
@@ -235,6 +239,7 @@ class InventoryItem {
       'is_listed': isListed,
       'selling_price': sellingPrice,
       'listed_at': listedAt?.toIso8601String(),
+      'sale_method': saleMethod,
       'is_unsorted_lot': isUnsortedLot,
       'lot_remaining_count': lotRemainingCount,
       'parent_lot_id': parentLotId,
@@ -288,6 +293,7 @@ class InventoryItem {
     bool? isListed,
     Object? sellingPrice = _omitted,
     Object? listedAt = _omitted,
+    String? saleMethod,
     bool? isUnsortedLot,
     Object? lotRemainingCount = _omitted,
     Object? parentLotId = _omitted,
@@ -346,6 +352,7 @@ class InventoryItem {
       listedAt: identical(listedAt, _omitted)
           ? this.listedAt
           : listedAt as DateTime?,
+      saleMethod: saleMethod ?? this.saleMethod,
       isUnsortedLot: isUnsortedLot ?? this.isUnsortedLot,
       lotRemainingCount: identical(lotRemainingCount, _omitted)
           ? this.lotRemainingCount

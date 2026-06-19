@@ -23,6 +23,7 @@
 --   cost_price, sale_price, margin, supplier_id, location_id, barcode,
 --   qr_code, quantity, notes (internal), status, sku, is_listed, listed_at,
 --   lot fields, seller_id, purchase_id, any other internal column.
+-- Exposed: sale_method — storefront needs it to decide which action buttons to show.
 --
 -- Idempotent: safe to run repeatedly (CREATE OR REPLACE).
 -- =============================================================================
@@ -81,7 +82,8 @@ SELECT
     i.metal_purity,
     i.size_or_length,
     i.gemstones_used,
-    i.total_weight_grams
+    i.total_weight_grams,
+    i.sale_method
 
 FROM  public.inventory_items i
 JOIN  public.sellers         s ON s.id = i.seller_id

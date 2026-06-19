@@ -10,10 +10,13 @@ const _kDefaultCommission = 0.10;
 /// Returned by [showListingSheet] when the user takes an action.
 class ListingResult {
   final bool listed;
-  final double? price; // null when the item was unlisted
+  final double? price;      // null when unlisted or sale_method = accept_offers
+  final String saleMethod;  // 'buy_now' | 'accept_offers' | 'both'
 
-  const ListingResult.listed(this.price) : listed = true;
-  const ListingResult.unlisted() : listed = false, price = null;
+  const ListingResult.listed(this.price, {this.saleMethod = 'buy_now'})
+      : listed = true;
+  const ListingResult.unlisted()
+      : listed = false, price = null, saleMethod = 'buy_now';
 }
 
 /// Opens a profit-calculator bottom sheet for [item].
@@ -48,10 +51,12 @@ class _ListingSheetState extends State<_ListingSheet> {
   double? _commissionRate; // null = still loading
   bool _saving = false;
   String? _suggestError;
+  late String _saleMethod;
 
   @override
   void initState() {
     super.initState();
+    _saleMethod = widget.item.saleMethod;
     final existing = widget.item.sellingPrice;
     if (existing != null && existing > 0) {
       _priceCtrl.text = existing.toStringAsFixed(2);
@@ -96,6 +101,7 @@ class _ListingSheetState extends State<_ListingSheet> {
   double get _margin => _salePrice > 0 ? _profit / _salePrice : 0;
   bool get _hasNoCost => widget.item.costPrice == 0;
   bool get _isLosing => !_hasNoCost && _salePrice > 0 && _profit < 0;
+  bool get _needsPrice => _saleMethod != 'accept_offers';
 
   String get _commissionLabel {
     final pct = _commission * 100;
@@ -126,13 +132,15 @@ class _ListingSheetState extends State<_ListingSheet> {
   }
 
   Future<void> _listItem() async {
-    final price = _salePrice;
-    if (price <= 0) return;
+    final method = _saleMethod;
+    final price = method == 'accept_offers' ? null : _salePrice;
+    if (method != 'accept_offers' && _salePrice <= 0) return;
     setState(() => _saving = true);
     try {
-      await InventoryRepository().listItem(widget.item.id!, price);
+      await InventoryRepository().listItem(widget.item.id!, price, method);
       if (mounted) {
-        Navigator.pop(context, ListingResult.listed(price));
+        Navigator.pop(
+            context, ListingResult.listed(price, saleMethod: method));
       }
     } catch (e) {
       if (mounted) {
@@ -165,7 +173,7 @@ class _ListingSheetState extends State<_ListingSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isListed = widget.item.isListed;
-    final canList = _salePrice > 0;
+    final canList = _saleMethod == 'accept_offers' || _salePrice > 0;
     final loading = _commissionRate == null;
 
     return SingleChildScrollView(
@@ -204,111 +212,137 @@ class _ListingSheetState extends State<_ListingSheet> {
           ),
           const SizedBox(height: 20),
 
+          // ── Sale method picker ─────────────────────────────────────────
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'buy_now', label: Text('Buy now')),
+              ButtonSegment(
+                  value: 'accept_offers', label: Text('Accept offers')),
+              ButtonSegment(value: 'both', label: Text('Both')),
+            ],
+            selected: {_saleMethod},
+            onSelectionChanged: (Set<String> selection) {
+              setState(() => _saleMethod = selection.first);
+            },
+          ),
+          const SizedBox(height: 20),
+
           if (loading) ...[
             const Center(child: CircularProgressIndicator()),
             const SizedBox(height: 20),
           ] else ...[
             // ── Cost ──────────────────────────────────────────────────────
-            _calcRow(
-              'Your cost',
-              _hasNoCost
-                  ? '—'
-                  : '€${widget.item.costPrice.toStringAsFixed(2)}',
-              muted: true,
-            ),
-            if (_hasNoCost) ...[
-              const SizedBox(height: 4),
-              Text(
-                "No cost recorded — profit can't be calculated",
-                style: TextStyle(
-                    fontSize: 11, color: Colors.grey.shade500),
-              ),
-            ],
-            const SizedBox(height: 14),
-
-            // ── Sale price input ───────────────────────────────────────
-            TextField(
-              controller: _priceCtrl,
-              autofocus: !isListed,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Sale price',
-                prefixText: '€ ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Live calculator (only when price entered) ──────────────
-            if (canList) ...[
-              const Divider(height: 1),
-              const SizedBox(height: 12),
+            if (_needsPrice) ...[
               _calcRow(
-                'Platform fee ($_commissionLabel)',
-                '−€${_fee.toStringAsFixed(2)}',
+                'Your cost',
+                _hasNoCost
+                    ? '—'
+                    : '€${widget.item.costPrice.toStringAsFixed(2)}',
                 muted: true,
               ),
-              _calcRow(
-                'You receive',
-                '€${_receive.toStringAsFixed(2)}',
-                bold: true,
+              if (_hasNoCost) ...[
+                const SizedBox(height: 4),
+                Text(
+                  "No cost recorded — profit can't be calculated",
+                  style: TextStyle(
+                      fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
+              const SizedBox(height: 14),
+
+              // ── Sale price input ───────────────────────────────────────
+              TextField(
+                controller: _priceCtrl,
+                autofocus: !isListed,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Sale price',
+                  prefixText: '€ ',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              if (!_hasNoCost) ...[
-                const SizedBox(height: 8),
+              const SizedBox(height: 16),
+
+              // ── Live calculator (only when price entered) ──────────────
+              if (canList) ...[
                 const Divider(height: 1),
                 const SizedBox(height: 12),
                 _calcRow(
-                  'Your profit',
-                  '${_profit >= 0 ? '+' : ''}€${_profit.toStringAsFixed(2)}',
-                  bold: true,
-                  color: _profit < 0
-                      ? cs.error
-                      : Colors.green.shade700,
+                  'Platform fee ($_commissionLabel)',
+                  '−€${_fee.toStringAsFixed(2)}',
+                  muted: true,
                 ),
                 _calcRow(
-                  'Your margin',
-                  '${(_margin * 100).toStringAsFixed(1)}%',
-                  color: _margin < 0 ? cs.error : null,
+                  'You receive',
+                  '€${_receive.toStringAsFixed(2)}',
+                  bold: true,
                 ),
-                if (_isLosing) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: cs.error.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded,
-                            size: 16, color: cs.error),
-                        const SizedBox(width: 8),
-                        Text(
-                          "You'll lose money at this price",
-                          style: TextStyle(
-                              fontSize: 13, color: cs.error),
-                        ),
-                      ],
-                    ),
+                if (!_hasNoCost) ...[
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  _calcRow(
+                    'Your profit',
+                    '${_profit >= 0 ? '+' : ''}€${_profit.toStringAsFixed(2)}',
+                    bold: true,
+                    color: _profit < 0
+                        ? cs.error
+                        : Colors.green.shade700,
                   ),
+                  _calcRow(
+                    'Your margin',
+                    '${(_margin * 100).toStringAsFixed(1)}%',
+                    color: _margin < 0 ? cs.error : null,
+                  ),
+                  if (_isLosing) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: cs.error.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded,
+                              size: 16, color: cs.error),
+                          const SizedBox(width: 8),
+                          Text(
+                            "You'll lose money at this price",
+                            style: TextStyle(
+                                fontSize: 13, color: cs.error),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
+                const SizedBox(height: 16),
               ],
-              const SizedBox(height: 16),
+
+              // ── Target margin helper ───────────────────────────────────
+              _TargetMarginSection(
+                targetCtrl: _targetMarginCtrl,
+                error: _suggestError,
+                onSuggest: _hasNoCost ? null : _suggestPrice,
+              ),
+              const SizedBox(height: 20),
+            ] else ...[
+              // accept_offers: no price needed
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Text(
+                  'Buyers will send you their price — no asking price needed.',
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.grey.shade500),
+                ),
+              ),
             ],
-
-            // ── Target margin helper ───────────────────────────────────
-            _TargetMarginSection(
-              targetCtrl: _targetMarginCtrl,
-              error: _suggestError,
-              onSuggest: _hasNoCost ? null : _suggestPrice,
-            ),
-
-            const SizedBox(height: 20),
 
             // ── Primary action ─────────────────────────────────────────
             SizedBox(

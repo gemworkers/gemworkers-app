@@ -11,6 +11,7 @@ type ListedItem = {
   weight_unit: string;
   origin_country: string;
   selling_price: number | null;
+  sale_method: string;
   seller_id: string;
   seller_name: string | null;
   image_url: string | null;
@@ -136,7 +137,9 @@ export default async function HomePage() {
                       </p>
                     )}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      {item.selling_price != null ? (
+                      {item.sale_method === 'accept_offers' ? (
+                        <span style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Offers</span>
+                      ) : item.selling_price != null ? (
                         <span style={{ fontSize: 15, fontWeight: 700, color: "#111", letterSpacing: "-0.01em" }}>
                           {eur.format(Number(item.selling_price))}
                         </span>

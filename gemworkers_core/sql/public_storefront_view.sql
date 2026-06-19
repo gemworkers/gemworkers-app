@@ -34,7 +34,8 @@ SELECT
     i.selling_price,
     i.seller_id,
     s.name          AS seller_name,
-    (i.image_urls ->> 0) AS image_url
+    (i.image_urls ->> 0) AS image_url,
+    i.sale_method
 FROM  public.inventory_items i
 JOIN  public.sellers         s ON s.id = i.seller_id
 WHERE i.is_listed = true

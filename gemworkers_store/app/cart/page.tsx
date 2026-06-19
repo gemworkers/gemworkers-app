@@ -11,6 +11,7 @@ type CartListing = {
   id: string
   title: string
   selling_price: number | null
+  sale_method: string
   image_url: string | null
   gem_type: string | null
   variety: string | null
@@ -123,7 +124,7 @@ export default async function CartPage() {
   const itemIds = cartRows.map(r => r.inventory_item_id)
   const { data: listings } = await supabase
     .from('public_listings')
-    .select('id, title, selling_price, image_url, gem_type, variety, seller_name')
+    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_name')
     .in('id', itemIds)
 
   const listingMap = new Map<string, CartListing>(
@@ -212,22 +213,27 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
           </p>
         )}
         <p style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 16, letterSpacing: '-0.01em' }}>
-          {listing.selling_price != null
-            ? eur.format(listing.selling_price)
-            : <span style={{ fontSize: 14, fontWeight: 400, color: '#d1d5db' }}>Price on request</span>
+          {listing.sale_method === 'accept_offers'
+            ? <span style={{ fontSize: 14, fontWeight: 400, color: '#9ca3af' }}>Accepting offers</span>
+            : listing.selling_price != null
+              ? eur.format(listing.selling_price)
+              : <span style={{ fontSize: 14, fontWeight: 400, color: '#d1d5db' }}>Price on request</span>
           }
         </p>
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <div style={{ flex: 1 }}>
-            <BuyButton
-              itemId={itemId}
-              itemTitle={listing.title}
-              sellingPrice={listing.selling_price}
-              isLoggedIn={true}
-            />
-          </div>
+          {/* BuyButton: shown for buy_now and both; hidden for accept_offers */}
+          {listing.sale_method !== 'accept_offers' && (
+            <div style={{ flex: 1 }}>
+              <BuyButton
+                itemId={itemId}
+                itemTitle={listing.title}
+                sellingPrice={listing.selling_price}
+                isLoggedIn={true}
+              />
+            </div>
+          )}
           <RemoveButton itemId={itemId} />
         </div>
       </div>
