@@ -12,6 +12,7 @@ type BuyerOrder = {
   status: string;
   order_date: string;
   order_total: number | null;
+  shipping_cost: number | null;
   tracking_number: string | null;
   shipped_at: string | null;
   received_at: string | null;
@@ -57,7 +58,7 @@ export default async function BuyerOrdersPage() {
   const { data } = await supabase
     .from('orders')
     .select(`
-      id, order_number, status, order_date, order_total,
+      id, order_number, status, order_date, order_total, shipping_cost,
       tracking_number, shipped_at, received_at,
       order_items (
         inventory_items ( title )
@@ -105,6 +106,10 @@ export default async function BuyerOrdersPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {orders.map(order => {
               const color = STATUS_COLOR[order.status] ?? '#9ca3af'
+              // Coerce numerics — Supabase returns numeric columns as strings.
+              const rawTotal    = order.order_total   == null ? null : Number(order.order_total)
+              const rawShipping = order.shipping_cost == null ? null : Number(order.shipping_cost)
+              const rawStone    = rawTotal != null ? rawTotal - (rawShipping ?? 0) : null
               const titles = order.order_items
                 .map(oi => oi.inventory_items?.title)
                 .filter(Boolean)
@@ -144,16 +149,25 @@ export default async function BuyerOrdersPage() {
                     </p>
                   )}
 
-                  {/* ── Date + total ── */}
+                  {/* ── Date + total breakdown ── */}
                   <div style={{
-                    display: 'flex', gap: 20,
+                    display: 'flex', justifyContent: 'space-between',
+                    alignItems: 'flex-start',
                     fontSize: 12, color: '#9ca3af', marginBottom: 12,
                   }}>
                     <span>{formatDate(order.order_date)}</span>
-                    {order.order_total != null && (
-                      <span style={{ fontWeight: 600, color: '#374151' }}>
-                        {eur.format(Number(order.order_total))}
-                      </span>
+                    {rawTotal != null && (
+                      <div style={{ textAlign: 'right' }}>
+                        {rawShipping != null && rawShipping > 0 && (
+                          <div style={{ fontSize: 11, color: '#b0b0b0' }}>
+                            {eur.format(rawStone!)} stone
+                            {' + '}{eur.format(rawShipping)} shipping
+                          </div>
+                        )}
+                        <span style={{ fontWeight: 600, color: '#374151' }}>
+                          {eur.format(rawTotal)}
+                        </span>
+                      </div>
                     )}
                   </div>
 

@@ -53,6 +53,7 @@ class _ListingSheetState extends State<_ListingSheet> {
   final _deliveryMinCtrl = TextEditingController();
   final _deliveryMaxCtrl = TextEditingController();
   final _prepDaysCtrl = TextEditingController();
+  final _videoUrlCtrl = TextEditingController();
 
   double? _commissionRate; // null = still loading
   bool _saving = false;
@@ -66,6 +67,9 @@ class _ListingSheetState extends State<_ListingSheet> {
     final existing = widget.item.sellingPrice;
     if (existing != null && existing > 0) {
       _priceCtrl.text = existing.toStringAsFixed(2);
+    }
+    if (widget.item.videoUrl != null) {
+      _videoUrlCtrl.text = widget.item.videoUrl!;
     }
     _priceCtrl.addListener(() => setState(() {}));
     _loadCommissionRate();
@@ -81,6 +85,7 @@ class _ListingSheetState extends State<_ListingSheet> {
     _deliveryMinCtrl.dispose();
     _deliveryMaxCtrl.dispose();
     _prepDaysCtrl.dispose();
+    _videoUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -225,6 +230,9 @@ class _ListingSheetState extends State<_ListingSheet> {
         deliveryDaysMin: int.tryParse(_deliveryMinCtrl.text.trim()),
         deliveryDaysMax: int.tryParse(_deliveryMaxCtrl.text.trim()),
         prepDays: int.tryParse(_prepDaysCtrl.text.trim()),
+        videoUrl: _videoUrlCtrl.text.trim().isEmpty
+            ? null
+            : _videoUrlCtrl.text.trim(),
       );
       if (mounted) {
         Navigator.pop(
@@ -512,6 +520,29 @@ class _ListingSheetState extends State<_ListingSheet> {
               decoration: const InputDecoration(
                 labelText: 'Handling time (optional)',
                 suffixText: 'days',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Video ──────────────────────────────────────────────────
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            Text(
+              'Video',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _videoUrlCtrl,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'Video URL (optional)',
+                hintText: 'YouTube, Vimeo, or direct .mp4 link',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),

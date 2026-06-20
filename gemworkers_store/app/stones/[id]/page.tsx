@@ -5,6 +5,7 @@ import { StoreHeader } from '@/app/components/StoreHeader';
 import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer } from './OfferPanel';
+import { VideoPlayer } from './VideoPlayer';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,6 @@ type ListingDetail = {
   image_urls: string[] | null;
   seller_name: string | null;
 
-  // video_url is fetched but NOT rendered — placeholder for next session
   video_url: string | null;
 
   // Shared / common
@@ -442,12 +442,7 @@ export default async function StoneDetailPage({
               </SpecSection>
             )}
 
-            {/*
-             * ── VIDEO SLOT ──────────────────────────────────────────────────
-             * video_url is present in `item.video_url` but video support is
-             * OUT OF SCOPE for this version. Wire up a player here next session.
-             * ────────────────────────────────────────────────────────────────
-             */}
+            {item.video_url && <VideoPlayer url={item.video_url} />}
           </div>
         </div>
       </main>

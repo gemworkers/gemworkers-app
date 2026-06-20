@@ -175,6 +175,7 @@ class InventoryRepository {
     int? deliveryDaysMin,
     int? deliveryDaysMax,
     int? prepDays,
+    String? videoUrl,
   }) async {
     await supabase.from('inventory_items').update({
       'is_listed': true,
@@ -186,6 +187,7 @@ class InventoryRepository {
       'delivery_days_min': deliveryDaysMin,
       'delivery_days_max': deliveryDaysMax,
       'prep_days': prepDays,
+      'video_url': videoUrl,
     }).eq('id', id);
   }
 
