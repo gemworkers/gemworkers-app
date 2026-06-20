@@ -12,7 +12,7 @@ class OrderRepository {
   Future<List<Order>> getOrders({String? statusFilter}) async {
     final query = supabase
         .from('orders')
-        .select('id, order_number, status, order_date, notes, customer_id, seller_id, created_at, customers(name)');
+        .select('id, order_number, status, order_date, notes, customer_id, seller_id, created_at, customers(name), sellers(name)');
 
     final response = statusFilter != null
         ? await query.eq('status', statusFilter).order('created_at', ascending: false)
@@ -25,7 +25,7 @@ class OrderRepository {
   Future<Order> getOrderDetail(String id) async {
     final response = await supabase
         .from('orders')
-        .select('*, customers(name), order_items(*, inventory_items(sku, title))')
+        .select('*, customers(name), sellers(name), order_items(*, inventory_items(sku, title))')
         .eq('id', id)
         .single();
     return Order.fromMap(response);

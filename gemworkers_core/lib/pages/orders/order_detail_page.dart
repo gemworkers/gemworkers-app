@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import 'add_edit_order_page.dart';
@@ -267,6 +268,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               ],
             ),
             const Divider(height: 24),
+            if (UserProfileService.instance.isOwner && order.sellerName != null)
+              _row('Shop', order.sellerName!),
             _row('Customer',
                 order.customerName.isNotEmpty ? order.customerName : '—'),
             _row(
@@ -276,12 +279,24 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                     '${order.orderDate.year}'),
             _row('Items', '${order.items.length}'),
             if (order.shippedAt != null)
-              _row('Shipped', _formatDateTime(order.shippedAt!)),
+              _row(
+                order.shippedByOwner ? 'Shipped (admin)' : 'Shipped',
+                _formatDateTime(order.shippedAt!),
+              ),
             if (order.receivedAt != null)
               _row('Received', _formatDateTime(order.receivedAt!)),
             if (order.trackingNumber != null)
               _row('Tracking', order.trackingNumber!),
             const Divider(height: 24),
+            if (order.saleChannel == 'platform') ...[
+              _moneyRow(
+                'Stone',
+                order.orderTotal - (order.shippingCost ?? 0),
+              ),
+              if (order.shippingCost != null && order.shippingCost! > 0)
+                _moneyRow('Shipping', order.shippingCost!),
+              const SizedBox(height: 4),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -289,12 +304,24 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                     style: TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 16)),
                 Text(
-                  '€${order.total.toStringAsFixed(2)}',
+                  order.saleChannel == 'platform'
+                      ? '€${order.orderTotal.toStringAsFixed(2)}'
+                      : '€${order.total.toStringAsFixed(2)}',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ],
             ),
+            if (order.saleChannel == 'platform' &&
+                order.commissionAmount > 0) ...[
+              const Divider(height: 16),
+              _moneyRow(
+                'Platform fee (${_pct(order.commissionRate)})',
+                order.commissionAmount,
+                prefix: '−',
+              ),
+              _moneyRow('Seller payout', order.sellerPayout, bold: true),
+            ],
           ],
         ),
       ),
@@ -451,7 +478,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                   child: FilledButton.icon(
                     onPressed: _actionInProgress ? null : _markShipped,
                     icon: const Icon(Icons.local_shipping_outlined),
-                    label: const Text('Mark as Shipped'),
+                    label: Text(UserProfileService.instance.isOwner
+                        ? 'Ship (Admin Override)'
+                        : 'Mark as Shipped'),
                     style: FilledButton.styleFrom(
                         backgroundColor: Colors.orange),
                   ),
@@ -530,6 +559,37 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         ],
       ),
     );
+  }
+
+  Widget _moneyRow(String label, double amount,
+      {String prefix = '', bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: bold ? null : Colors.grey.shade600,
+            ),
+          ),
+          Text(
+            '$prefix€${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _pct(double rate) {
+    final pct = rate * 100;
+    return pct % 1 == 0 ? '${pct.toInt()}%' : '${pct.toStringAsFixed(1)}%';
   }
 }
 

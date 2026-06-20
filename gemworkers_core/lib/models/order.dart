@@ -65,6 +65,10 @@ class Order {
   final List<OrderItem> items;
 
   final String? sellerId;
+
+  // Join-derived from sellers table — populated by getOrders / getOrderDetail.
+  final String? sellerName;
+
   final DateTime? createdAt;
 
   // ── Sell-engine fields ────────────────────────────────────────────────────
@@ -84,6 +88,9 @@ class Order {
   /// Denormalised sum of line-item prices; stored at sale time.
   final double orderTotal;
 
+  /// Snapshot of item.shipping_cost at the moment of sale; null for manual orders.
+  final double? shippingCost;
+
   // ── Order lifecycle fields (platform orders) ──────────────────────────────
 
   /// Free-text tracking reference set by seller when marking shipped.
@@ -95,6 +102,9 @@ class Order {
   /// Stamped server-side by mark_order_received(); null until received.
   final DateTime? receivedAt;
 
+  /// True when the owner used the admin override to ship on a seller's behalf.
+  final bool shippedByOwner;
+
   const Order({
     this.id,
     this.customerId,
@@ -105,15 +115,18 @@ class Order {
     required this.notes,
     this.items = const [],
     this.sellerId,
+    this.sellerName,
     this.createdAt,
     this.saleChannel = 'manual',
     this.commissionRate = 0,
     this.commissionAmount = 0,
     this.sellerPayout = 0,
     this.orderTotal = 0,
+    this.shippingCost,
     this.trackingNumber,
     this.shippedAt,
     this.receivedAt,
+    this.shippedByOwner = false,
   });
 
   /// Computed from loaded items — use orderTotal for the stored, authoritative value.
@@ -141,6 +154,7 @@ class Order {
       notes: map['notes'] ?? '',
       items: parseItems(map['order_items']),
       sellerId: map['seller_id']?.toString(),
+      sellerName: (map['sellers'] as Map<String, dynamic>?)?['name']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : null,
@@ -149,6 +163,7 @@ class Order {
       commissionAmount: (map['commission_amount'] as num?)?.toDouble() ?? 0,
       sellerPayout:     (map['seller_payout']     as num?)?.toDouble() ?? 0,
       orderTotal:       (map['order_total']        as num?)?.toDouble() ?? 0,
+      shippingCost:     (map['shipping_cost']      as num?)?.toDouble(),
       trackingNumber: map['tracking_number']?.toString(),
       shippedAt: map['shipped_at'] != null
           ? DateTime.parse(map['shipped_at'])
@@ -156,6 +171,7 @@ class Order {
       receivedAt: map['received_at'] != null
           ? DateTime.parse(map['received_at'])
           : null,
+      shippedByOwner: map['shipped_by_owner'] as bool? ?? false,
     );
   }
 
@@ -173,7 +189,9 @@ class Order {
         'commission_amount': commissionAmount,
         'seller_payout':    sellerPayout,
         'order_total':      orderTotal,
-        'tracking_number':  trackingNumber,
+        'shipping_cost':     shippingCost,
+        'tracking_number':   trackingNumber,
+        'shipped_by_owner':  shippedByOwner,
       };
 
   Order copyWith({
@@ -186,15 +204,18 @@ class Order {
     String? notes,
     List<OrderItem>? items,
     Object? sellerId = _omitted,
+    Object? sellerName = _omitted,
     DateTime? createdAt,
     String? saleChannel,
     double? commissionRate,
     double? commissionAmount,
     double? sellerPayout,
     double? orderTotal,
+    Object? shippingCost = _omitted,
     Object? trackingNumber = _omitted,
     Object? shippedAt = _omitted,
     Object? receivedAt = _omitted,
+    bool? shippedByOwner,
   }) {
     return Order(
       id: id ?? this.id,
@@ -209,12 +230,17 @@ class Order {
       items: items ?? this.items,
       sellerId:
           identical(sellerId, _omitted) ? this.sellerId : sellerId as String?,
+      sellerName:
+          identical(sellerName, _omitted) ? this.sellerName : sellerName as String?,
       createdAt: createdAt ?? this.createdAt,
       saleChannel:     saleChannel     ?? this.saleChannel,
       commissionRate:  commissionRate   ?? this.commissionRate,
       commissionAmount: commissionAmount ?? this.commissionAmount,
       sellerPayout:    sellerPayout     ?? this.sellerPayout,
       orderTotal:      orderTotal       ?? this.orderTotal,
+      shippingCost: identical(shippingCost, _omitted)
+          ? this.shippingCost
+          : shippingCost as double?,
       trackingNumber: identical(trackingNumber, _omitted)
           ? this.trackingNumber
           : trackingNumber as String?,
@@ -224,6 +250,7 @@ class Order {
       receivedAt: identical(receivedAt, _omitted)
           ? this.receivedAt
           : receivedAt as DateTime?,
+      shippedByOwner: shippedByOwner ?? this.shippedByOwner,
     );
   }
 }
