@@ -16,6 +16,7 @@ type CartListing = {
   gem_type: string | null
   variety: string | null
   seller_name: string | null
+  shipping_cost: number | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ export default async function CartPage() {
   const itemIds = cartRows.map(r => r.inventory_item_id)
   const { data: listings } = await supabase
     .from('public_listings')
-    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_name')
+    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_name, shipping_cost')
     .in('id', itemIds)
 
   const listingMap = new Map<string, CartListing>(
@@ -159,6 +160,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
   const subtitle = [listing.variety, listing.gem_type]
     .filter(Boolean)
     .join(' · ') || null
+  const cost = listing.shipping_cost == null ? null : Number(listing.shipping_cost)
 
   return (
     <div style={{
@@ -221,6 +223,34 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
           }
         </p>
 
+        {/* Stone / Shipping / Total — only when shipping is known and > 0 */}
+        {cost !== null && cost > 0 && listing.selling_price != null && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 12, color: '#9ca3af', marginBottom: 3,
+            }}>
+              <span>Stone</span>
+              <span>{eur.format(Number(listing.selling_price))}</span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 12, color: '#9ca3af', marginBottom: 5,
+            }}>
+              <span>Shipping</span>
+              <span>{eur.format(cost)}</span>
+            </div>
+            <div style={{ height: 1, background: '#f3f4f6', marginBottom: 5 }} />
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 13, fontWeight: 700, color: '#111',
+            }}>
+              <span>Total</span>
+              <span>{eur.format(Number(listing.selling_price) + cost)}</span>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           {/* BuyButton: shown for buy_now and both; hidden for accept_offers */}
@@ -230,6 +260,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
                 itemId={itemId}
                 itemTitle={listing.title}
                 sellingPrice={listing.selling_price}
+                shippingCost={cost}
                 isLoggedIn={true}
               />
             </div>

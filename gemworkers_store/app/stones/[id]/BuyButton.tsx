@@ -14,12 +14,13 @@ type Props = {
   itemId: string
   itemTitle: string
   sellingPrice: number | null
+  shippingCost?: number | null
   isLoggedIn: boolean
 }
 
 type State = 'idle' | 'confirm' | 'loading' | 'success' | 'error'
 
-export function BuyButton({ itemId, itemTitle, sellingPrice, isLoggedIn }: Props) {
+export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLoggedIn }: Props) {
   const [state, setState] = useState<State>('idle')
   const [orderId, setOrderId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -85,9 +86,36 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, isLoggedIn }: Props
         <p style={{ fontSize: 14, fontWeight: 600, color: '#111', marginBottom: 6 }}>
           Confirm purchase
         </p>
-        <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.55, marginBottom: 4 }}>
-          Buy <strong>{itemTitle}</strong> for <strong>{formatted}</strong>?
-        </p>
+        {shippingCost != null && shippingCost > 0 ? (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 13, color: '#6b7280', marginBottom: 3,
+            }}>
+              <span>Stone</span>
+              <span>{formatted}</span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 13, color: '#6b7280', marginBottom: 6,
+            }}>
+              <span>Shipping</span>
+              <span>{eur.format(shippingCost)}</span>
+            </div>
+            <div style={{ height: 1, background: '#e5e7eb', marginBottom: 6 }} />
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 14, fontWeight: 700, color: '#111',
+            }}>
+              <span>Total</span>
+              <span>{eur.format(sellingPrice! + shippingCost)}</span>
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.55, marginBottom: 4 }}>
+            Buy <strong>{itemTitle}</strong> for <strong>{formatted}</strong>?
+          </p>
+        )}
         <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 18 }}>
           This reserves the stone — it will no longer be available to other buyers.
         </p>

@@ -314,6 +314,34 @@ export default async function StoneDetailPage({
               </p>
             )}
 
+            {/* Stone / Shipping / Total — only when shipping is known and > 0 */}
+            {item.selling_price != null && cost !== null && cost > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: 13, color: '#9ca3af', marginBottom: 3,
+                }}>
+                  <span>Stone</span>
+                  <span>{eur.format(Number(item.selling_price))}</span>
+                </div>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: 13, color: '#9ca3af', marginBottom: 6,
+                }}>
+                  <span>Shipping</span>
+                  <span>{eur.format(cost)}</span>
+                </div>
+                <div style={{ height: 1, background: '#e5e7eb', marginBottom: 6 }} />
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: 14, fontWeight: 700, color: '#111',
+                }}>
+                  <span>Total</span>
+                  <span>{eur.format(Number(item.selling_price) + cost)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Buy + cart + offer actions */}
             <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* BuyButton: buy_now + both only */}
@@ -322,6 +350,7 @@ export default async function StoneDetailPage({
                   itemId={item.id}
                   itemTitle={item.title}
                   sellingPrice={item.selling_price}
+                  shippingCost={cost}
                   isLoggedIn={!!user}
                 />
               )}
