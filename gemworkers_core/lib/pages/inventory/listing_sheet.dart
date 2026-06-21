@@ -20,7 +20,7 @@ class ListingResult {
       : listed = false, price = null, saleMethod = 'buy_now';
 }
 
-/// Opens a profit-calculator bottom sheet for [item].
+/// Opens a payout-based listing bottom sheet for [item].
 /// Returns [ListingResult] when listed/unlisted, or null if dismissed.
 Future<ListingResult?> showListingSheet(
     BuildContext context, InventoryItem item) {
@@ -46,8 +46,7 @@ class _ListingSheet extends StatefulWidget {
 }
 
 class _ListingSheetState extends State<_ListingSheet> {
-  final _priceCtrl = TextEditingController();
-  final _targetMarginCtrl = TextEditingController(text: '40');
+  final _payoutCtrl = TextEditingController();
   final _courierCtrl = TextEditingController();
   final _shippingCostCtrl = TextEditingController();
   final _deliveryMinCtrl = TextEditingController();
@@ -57,29 +56,25 @@ class _ListingSheetState extends State<_ListingSheet> {
 
   double? _commissionRate; // null = still loading
   bool _saving = false;
-  String? _suggestError;
   late String _saleMethod;
 
   @override
   void initState() {
     super.initState();
     _saleMethod = widget.item.saleMethod;
-    final existing = widget.item.sellingPrice;
-    if (existing != null && existing > 0) {
-      _priceCtrl.text = existing.toStringAsFixed(2);
-    }
+    // Pre-fill is deferred to _loadCommissionRate so we can reverse-compute
+    // payout from selling_price using the actual per-seller rate.
+    _payoutCtrl.addListener(() => setState(() {}));
     if (widget.item.videoUrl != null) {
       _videoUrlCtrl.text = widget.item.videoUrl!;
     }
-    _priceCtrl.addListener(() => setState(() {}));
     _loadCommissionRate();
     _loadShippingDefaults();
   }
 
   @override
   void dispose() {
-    _priceCtrl.dispose();
-    _targetMarginCtrl.dispose();
+    _payoutCtrl.dispose();
     _courierCtrl.dispose();
     _shippingCostCtrl.dispose();
     _deliveryMinCtrl.dispose();
@@ -89,21 +84,39 @@ class _ListingSheetState extends State<_ListingSheet> {
     super.dispose();
   }
 
+  // Reverses selling_price → payout using the loaded rate and pre-fills the
+  // field. Only runs once (guards on the field being empty).
+  void _prefillPayout(double rate) {
+    if (_payoutCtrl.text.isNotEmpty) return;
+    final existing = widget.item.sellingPrice;
+    if (existing == null || existing <= 0) return;
+    final fee = double.parse((existing * rate).toStringAsFixed(2));
+    _payoutCtrl.text = (existing - fee).toStringAsFixed(2);
+  }
+
   Future<void> _loadCommissionRate() async {
     final sellerId = widget.item.sellerId;
     if (sellerId == null) {
-      setState(() => _commissionRate = _kDefaultCommission);
+      if (mounted) {
+        setState(() => _commissionRate = _kDefaultCommission);
+        _prefillPayout(_kDefaultCommission);
+      }
       return;
     }
     try {
       final seller = await SellerRepository().getSeller(sellerId);
       final rate = seller.commissionRate;
       if (mounted) {
-        setState(() => _commissionRate =
-            (rate == null || rate == 0) ? _kDefaultCommission : rate);
+        final resolved =
+            (rate == null || rate == 0) ? _kDefaultCommission : rate;
+        setState(() => _commissionRate = resolved);
+        _prefillPayout(resolved);
       }
     } catch (_) {
-      if (mounted) setState(() => _commissionRate = _kDefaultCommission);
+      if (mounted) {
+        setState(() => _commissionRate = _kDefaultCommission);
+        _prefillPayout(_kDefaultCommission);
+      }
     }
   }
 
@@ -174,14 +187,26 @@ class _ListingSheetState extends State<_ListingSheet> {
   // ── Computed ──────────────────────────────────────────────────────────────
 
   double get _commission => _commissionRate ?? _kDefaultCommission;
-  double get _salePrice =>
-      double.tryParse(_priceCtrl.text.replaceAll(',', '.')) ?? 0;
-  double get _fee => _salePrice * _commission;
-  double get _receive => _salePrice - _fee;
+
+  /// Seller's desired payout as typed.
+  double get _payout =>
+      double.tryParse(_payoutCtrl.text.replaceAll(',', '.')) ?? 0;
+
+  /// Buyer-facing price derived from the seller's desired payout.
+  /// Returns 0 when rate >= 1 (divide-by-zero guard).
+  double get _buyerPrice {
+    if (_commission >= 1) return 0;
+    return double.parse((_payout / (1 - _commission)).toStringAsFixed(2));
+  }
+
+  /// Platform fee the buyer's price carries (mirrors deployed order math).
+  double get _fee =>
+      double.parse((_buyerPrice * _commission).toStringAsFixed(2));
+
+  double get _receive => _buyerPrice - _fee;
   double get _profit => _receive - widget.item.costPrice;
-  double get _margin => _salePrice > 0 ? _profit / _salePrice : 0;
   bool get _hasNoCost => widget.item.costPrice == 0;
-  bool get _isLosing => !_hasNoCost && _salePrice > 0 && _profit < 0;
+  bool get _isLosing => !_hasNoCost && _payout > 0 && _profit < 0;
   bool get _needsPrice => _saleMethod != 'accept_offers';
 
   String get _commissionLabel {
@@ -193,29 +218,10 @@ class _ListingSheetState extends State<_ListingSheet> {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  void _suggestPrice() {
-    setState(() => _suggestError = null);
-    final targetPct = double.tryParse(
-        _targetMarginCtrl.text.replaceAll(',', '.'));
-    if (targetPct == null || targetPct < 0) {
-      setState(() => _suggestError = 'Enter a valid target margin');
-      return;
-    }
-    final targetM = targetPct / 100;
-    final denom = 1 - _commission - targetM;
-    if (denom <= 0) {
-      setState(() => _suggestError =
-          'Target margin too high for this commission rate');
-      return;
-    }
-    _priceCtrl.text =
-        (widget.item.costPrice / denom).toStringAsFixed(2);
-  }
-
   Future<void> _listItem() async {
     final method = _saleMethod;
-    final price = method == 'accept_offers' ? null : _salePrice;
-    if (method != 'accept_offers' && _salePrice <= 0) return;
+    final price = method == 'accept_offers' ? null : _buyerPrice;
+    if (method != 'accept_offers' && _buyerPrice <= 0) return;
     setState(() => _saving = true);
     try {
       await InventoryRepository().listItem(
@@ -269,7 +275,7 @@ class _ListingSheetState extends State<_ListingSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isListed = widget.item.isListed;
-    final canList = _saleMethod == 'accept_offers' || _salePrice > 0;
+    final canList = _saleMethod == 'accept_offers' || _buyerPrice > 0;
     final loading = _commissionRate == null;
 
     return SingleChildScrollView(
@@ -327,8 +333,8 @@ class _ListingSheetState extends State<_ListingSheet> {
             const Center(child: CircularProgressIndicator()),
             const SizedBox(height: 20),
           ] else ...[
-            // ── Cost ──────────────────────────────────────────────────────
             if (_needsPrice) ...[
+              // ── Cost ────────────────────────────────────────────────────
               _calcRow(
                 'Your cost',
                 _hasNoCost
@@ -346,9 +352,9 @@ class _ListingSheetState extends State<_ListingSheet> {
               ],
               const SizedBox(height: 14),
 
-              // ── Sale price input ───────────────────────────────────────
+              // ── Payout input ───────────────────────────────────────────
               TextField(
-                controller: _priceCtrl,
+                controller: _payoutCtrl,
                 autofocus: !isListed,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -356,17 +362,22 @@ class _ListingSheetState extends State<_ListingSheet> {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],
                 decoration: const InputDecoration(
-                  labelText: 'Sale price',
+                  labelText: 'Your payout (what you receive)',
                   prefixText: '€ ',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // ── Live calculator (only when price entered) ──────────────
+              // ── Live calculator (only when payout entered) ─────────────
               if (canList) ...[
                 const Divider(height: 1),
                 const SizedBox(height: 12),
+                _calcRow(
+                  'Buyer pays',
+                  '€${_buyerPrice.toStringAsFixed(2)}',
+                  muted: true,
+                ),
                 _calcRow(
                   'Platform fee ($_commissionLabel)',
                   '−€${_fee.toStringAsFixed(2)}',
@@ -388,11 +399,6 @@ class _ListingSheetState extends State<_ListingSheet> {
                     color: _profit < 0
                         ? cs.error
                         : Colors.green.shade700,
-                  ),
-                  _calcRow(
-                    'Your margin',
-                    '${(_margin * 100).toStringAsFixed(1)}%',
-                    color: _margin < 0 ? cs.error : null,
                   ),
                   if (_isLosing) ...[
                     const SizedBox(height: 10),
@@ -420,14 +426,7 @@ class _ListingSheetState extends State<_ListingSheet> {
                 ],
                 const SizedBox(height: 16),
               ],
-
-              // ── Target margin helper ───────────────────────────────────
-              _TargetMarginSection(
-                targetCtrl: _targetMarginCtrl,
-                error: _suggestError,
-                onSuggest: _hasNoCost ? null : _suggestPrice,
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 4),
             ] else ...[
               // accept_offers: no price needed
               Padding(
@@ -612,72 +611,6 @@ class _ListingSheetState extends State<_ListingSheet> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Target margin section ─────────────────────────────────────────────────────
-
-class _TargetMarginSection extends StatelessWidget {
-  final TextEditingController targetCtrl;
-  final String? error;
-  final VoidCallback? onSuggest; // null disables the button
-
-  const _TargetMarginSection({
-    required this.targetCtrl,
-    required this.error,
-    required this.onSuggest,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return ExpansionTile(
-      tilePadding: EdgeInsets.zero,
-      childrenPadding: EdgeInsets.zero,
-      title: Text(
-        'Suggest a price by target margin',
-        style: TextStyle(
-          fontSize: 13,
-          color: cs.primary,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      children: [
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: targetCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'Target margin',
-                  suffixText: '%',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            FilledButton.tonal(
-              onPressed: onSuggest,
-              child: const Text('Suggest price'),
-            ),
-          ],
-        ),
-        if (error != null) ...[
-          const SizedBox(height: 6),
-          Text(error!,
-              style: TextStyle(fontSize: 12, color: cs.error)),
-        ],
-        const SizedBox(height: 8),
-      ],
     );
   }
 }
