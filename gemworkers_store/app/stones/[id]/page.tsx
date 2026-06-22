@@ -6,6 +6,7 @@ import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
+import { cancelPendingOrder } from '@/app/actions/commerce';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -143,10 +144,22 @@ function NotAvailable() {
 
 export default async function StoneDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ canceled?: string; order?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { canceled, order: canceledOrderId }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+
+  // Fast cancel path: buyer returned from Stripe via cancel_url.
+  // Release the order and stone immediately rather than waiting for Stripe's
+  // ~24h session expiry. Guard: both params must be present.
+  if (canceled === '1' && canceledOrderId) {
+    await cancelPendingOrder(canceledOrderId);
+  }
 
   // Fetch user, listing, cart membership, and buyer's offer in parallel.
   // All four share one cookie-based client (buyer's session).
@@ -259,6 +272,21 @@ export default async function StoneDetailPage({
           </svg>
           Back to browse
         </Link>
+
+        {/* Cancel-return notice — only shown when buyer came back from Stripe */}
+        {canceled === '1' && (
+          <div style={{
+            marginBottom: 28,
+            padding: '12px 16px',
+            background: '#fefce8',
+            border: '1px solid #fde68a',
+            borderRadius: 8,
+            fontSize: 13,
+            color: '#92400e',
+          }}>
+            Payment canceled — this stone is available again.
+          </div>
+        )}
 
         {/* ── Two-column layout ── */}
         <div className="detail-grid" style={{
