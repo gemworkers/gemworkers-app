@@ -28,6 +28,13 @@ const eur = new Intl.NumberFormat('en-IE', {
   maximumFractionDigits: 0,
 })
 
+const eurDecimal = new Intl.NumberFormat('en-IE', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PageShell({ children }: { children: React.ReactNode }) {
@@ -146,6 +153,17 @@ export default async function CartPage() {
     listing.selling_price !== null
   ).length
 
+  // Display-only grand total. Number() coerces Supabase numeric strings.
+  // Authoritative amount comes from the DB at payment time in checkoutCart.
+  const grandTotal = cartItems.reduce((sum, { listing }) => {
+    if (
+      listing === null ||
+      listing.sale_method === 'accept_offers' ||
+      listing.selling_price === null
+    ) return sum
+    return sum + Number(listing.selling_price) + Number(listing.shipping_cost ?? 0)
+  }, 0)
+
   return (
     <PageShell>
       <PageTitle count={cartItems.length} />
@@ -162,6 +180,14 @@ export default async function CartPage() {
 
       {buyableCount > 0 && (
         <div style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid #f3f4f6' }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between',
+            fontSize: 13, fontWeight: 700, color: '#111',
+            marginBottom: 16,
+          }}>
+            <span>Total for all available items</span>
+            <span>{eurDecimal.format(grandTotal)}</span>
+          </div>
           <BuyAllButton />
         </div>
       )}
