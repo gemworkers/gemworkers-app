@@ -40,23 +40,55 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
+    const groupId = session.metadata?.checkout_group_id
     const orderId = session.metadata?.order_id
 
-    if (orderId) {
+    if (groupId) {
+      // Cart payment: confirm all orders in the group with one RPC call.
+      const { error } = await supabase.rpc('confirm_order_group', {
+        p_group_id: groupId,
+      })
+      if (error) {
+        console.error('[webhook] confirm_order_group failed for group', groupId, ':', error.message)
+        return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+      }
+    } else if (orderId) {
+      // Single-stone buy-now payment.
+      // confirm_order_paid is idempotent at the SQL level: it RETURN-s void
+      // (no throw) when the order is already 'confirmed', so a duplicate
+      // delivery normally produces no error. If an error does mention
+      // 'confirmed', treat it as success so Stripe stops retrying.
       const { error } = await supabase.rpc('confirm_order_paid', {
         p_order_id: orderId,
       })
       if (error) {
-        console.error('[webhook] confirm_order_paid failed for order', orderId, ':', error.message)
-        return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+        if (error.message.includes("found 'confirmed'")) {
+          // Order already confirmed — idempotent duplicate delivery, safe to ack.
+          console.error('[webhook] confirm_order_paid: order already confirmed (dup delivery), acking', orderId)
+        } else {
+          console.error('[webhook] confirm_order_paid failed for order', orderId, ':', error.message)
+          return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+        }
       }
     }
+    // Neither present: skip (malformed metadata — return 200 so Stripe doesn't retry).
 
   } else if (event.type === 'checkout.session.expired') {
     const session = event.data.object as Stripe.Checkout.Session
+    const groupId = session.metadata?.checkout_group_id
     const orderId = session.metadata?.order_id
 
-    if (orderId) {
+    if (groupId) {
+      // Cart payment: cancel all pending orders in the group and release their stones.
+      const { error } = await supabase.rpc('cancel_order_group', {
+        p_group_id: groupId,
+      })
+      if (error) {
+        console.error('[webhook] cancel_order_group failed for group', groupId, ':', error.message)
+        return NextResponse.json({ error: 'Order cancellation failed' }, { status: 500 })
+      }
+    } else if (orderId) {
+      // Single-stone path: unchanged.
       const { error } = await supabase.rpc('cancel_pending_payment_order', {
         p_order_id: orderId,
       })

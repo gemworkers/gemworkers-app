@@ -121,6 +121,180 @@ export async function cancelPendingOrder(
   }
 }
 
+// ── checkoutCart helpers ──────────────────────────────────────────────────────
+
+// Releases all pending_payment orders created during a failed checkoutCart.
+// If the grouping update already succeeded, tries cancel_order_group (the
+// group-aware RPC added alongside checkout_group_id). Falls back to individual
+// cancel_pending_payment_order calls if that RPC is not yet deployed or fails.
+// Service role required — anon lacks EXECUTE on both cancel RPCs.
+// Never throws: any inner failure is logged and swallowed.
+async function cleanupOrderGroup(
+  orderIds: string[],
+  groupId: string | null,
+): Promise<void> {
+  const admin = createAdminClient()
+  try {
+    if (groupId) {
+      const { error } = await admin.rpc('cancel_order_group', { p_group_id: groupId })
+      if (!error) return
+      // Group RPC unavailable or failed — fall through to per-order cancels.
+      console.error('[checkoutCart] cancel_order_group failed:', error.message)
+    }
+    for (const orderId of orderIds) {
+      try {
+        await admin.rpc('cancel_pending_payment_order', { p_order_id: orderId })
+      } catch (e) {
+        console.error('[checkoutCart] cleanup: cancel failed for order', orderId,
+          e instanceof Error ? e.message : String(e))
+      }
+    }
+  } catch (e) {
+    console.error('[checkoutCart] cleanup: unexpected error',
+      e instanceof Error ? e.message : String(e))
+  }
+}
+
+// Reads the buyer's cart, creates one pending_payment order per available stone
+// (silently skipping any that are sold/unlisted/unavailable), groups them under
+// one checkout_group_id, and opens a single Stripe Checkout Session covering all
+// of them. The cart is NOT cleared here — that happens after payment succeeds.
+//
+// Returns { checkoutUrl, ordered, skipped } on success, { error } on failure.
+// On any post-order-creation failure (grouping error, invalid amount, Stripe
+// error), releases all created orders so no stones stay permanently reserved.
+export async function checkoutCart(): Promise<
+  { checkoutUrl: string; ordered: number; skipped: number } | { error: string }
+> {
+  // ── 1. Auth ────────────────────────────────────────────────────────────────
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'You must be logged in.' }
+
+  // ── 2. Read cart (same query as cart page, RLS-scoped to this buyer) ──────
+  const { data: cartRows } = await supabase
+    .from('storefront_cart')
+    .select('inventory_item_id, added_at')
+    .order('added_at', { ascending: true })
+
+  if (!cartRows || cartRows.length === 0) {
+    return { error: 'Your cart is empty.' }
+  }
+
+  // ── 3. Create one order per stone, skip unavailable ───────────────────────
+  const groupId = crypto.randomUUID()
+
+  type Created = { orderId: string; itemId: string }
+  const created: Created[] = []
+  const skippedIds: string[] = []
+
+  for (const row of cartRows) {
+    const itemId: string = row.inventory_item_id
+    const { data, error } = await supabase.rpc('create_platform_order', {
+      p_inventory_item_id: itemId,
+    })
+    if (error || !data) {
+      // RPC raises for: sold, reserved, unlisted, inactive seller, no price.
+      // All treated as silently skipped — do not abort the whole checkout.
+      skippedIds.push(itemId)
+      continue
+    }
+    created.push({ orderId: data as string, itemId })
+  }
+
+  // ── 4. Edge case: nothing available ───────────────────────────────────────
+  if (created.length === 0) {
+    return { error: 'None of the items in your cart are still available.' }
+  }
+
+  const createdOrderIds = created.map(c => c.orderId)
+
+  // ── 3b. Stamp group id on all created orders in one update ─────────────────
+  // Buyers have no UPDATE policy on orders (RLS allows SELECT only). Use the
+  // service-role admin client so the stamp is not silently blocked. Verify
+  // the returned row count: zero rows updated with no error is still failure.
+  const admin = createAdminClient()
+  const { data: updated, error: groupErr } = await admin
+    .from('orders')
+    .update({ checkout_group_id: groupId })
+    .in('id', createdOrderIds)
+    .select('id')
+
+  if (groupErr || (updated?.length ?? 0) !== createdOrderIds.length) {
+    console.error('[checkoutCart] grouping update failed:',
+      groupErr?.message ?? `expected ${createdOrderIds.length} rows, got ${updated?.length ?? 0}`)
+    await cleanupOrderGroup(createdOrderIds, null)
+    return { error: 'Payment setup failed — please try again.' }
+  }
+
+  // ── 5. Read authoritative totals back from DB ─────────────────────────────
+  const { data: orderRows, error: totalsErr } = await supabase
+    .from('orders')
+    .select('id, order_total')
+    .in('id', createdOrderIds)
+
+  if (totalsErr || !orderRows || orderRows.length === 0) {
+    console.error('[checkoutCart] failed to read order totals:', totalsErr?.message)
+    await cleanupOrderGroup(createdOrderIds, groupId)
+    return { error: 'Payment setup failed — please try again.' }
+  }
+
+  // Build one Stripe line item per order; validate each amount.
+  // Supabase returns numeric columns as strings — coerce with Number().
+  const lineItems: {
+    quantity: number
+    price_data: { currency: string; unit_amount: number; product_data: { name: string } }
+  }[] = []
+  for (const ord of orderRows) {
+    const amountCents = Math.round(Number(ord.order_total) * 100)
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      console.error('[checkoutCart] invalid amount for order', ord.id, ord.order_total)
+      await cleanupOrderGroup(createdOrderIds, groupId)
+      return { error: 'Payment setup failed — please try again.' }
+    }
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: 'eur',
+        unit_amount: amountCents,
+        product_data: {
+          name: `GemWorkers order ${ord.id.substring(0, 8).toUpperCase()}`,
+        },
+      },
+    })
+  }
+
+  // ── 5b. Create Stripe Checkout Session ────────────────────────────────────
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      success_url: `${base}/orders?paid=1&group=${groupId}`,
+      cancel_url:  `${base}/cart?canceled=1&group=${groupId}`,
+      // CRITICAL: the webhook uses this to confirm all orders in the group.
+      metadata: { checkout_group_id: groupId },
+    })
+
+    if (!session.url) {
+      await cleanupOrderGroup(createdOrderIds, groupId)
+      return { error: 'Payment setup failed — please try again.' }
+    }
+
+    return {
+      checkoutUrl: session.url,
+      ordered: createdOrderIds.length,
+      skipped: skippedIds.length,
+    }
+  } catch (err) {
+    // Orders are in pending_payment with stones reserved. Release them.
+    await cleanupOrderGroup(createdOrderIds, groupId)
+    return { error: 'Payment setup failed — please try again.' }
+  }
+}
+
 // Inserts a storefront_cart row for the logged-in buyer.
 // The UNIQUE(buyer_id, inventory_item_id) constraint means a duplicate insert
 // returns error code 23505 — treated as a no-op success ("already in cart").

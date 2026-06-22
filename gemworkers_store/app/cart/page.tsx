@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { StoreHeader } from '@/app/components/StoreHeader'
 import { BuyButton } from '@/app/stones/[id]/BuyButton'
 import { RemoveButton } from './RemoveButton'
+import { BuyAllButton } from './BuyAllButton'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,14 @@ export default async function CartPage() {
     listing: listingMap.get(row.inventory_item_id) ?? null,
   }))
 
+  // An item is buyable if it's visible in public_listings, has a direct-buy
+  // sale method, and has a price — matching what checkoutCart will attempt.
+  const buyableCount = cartItems.filter(({ listing }) =>
+    listing !== null &&
+    listing.sale_method !== 'accept_offers' &&
+    listing.selling_price !== null
+  ).length
+
   return (
     <PageShell>
       <PageTitle count={cartItems.length} />
@@ -150,6 +159,12 @@ export default async function CartPage() {
           )
         )}
       </div>
+
+      {buyableCount > 0 && (
+        <div style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid #f3f4f6' }}>
+          <BuyAllButton />
+        </div>
+      )}
     </PageShell>
   )
 }
