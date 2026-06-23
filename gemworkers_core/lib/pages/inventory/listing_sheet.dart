@@ -57,6 +57,7 @@ class _ListingSheetState extends State<_ListingSheet> {
   double? _commissionRate; // null = still loading
   bool _saving = false;
   late String _saleMethod;
+  String? _shippingMode; // null = seller has not yet chosen
 
   @override
   void initState() {
@@ -132,7 +133,12 @@ class _ListingSheetState extends State<_ListingSheet> {
       setState(() {
         if (item.courier != null) _courierCtrl.text = item.courier!;
         if (item.shippingCost != null) {
-          _shippingCostCtrl.text = item.shippingCost!.toStringAsFixed(2);
+          if (item.shippingCost! == 0) {
+            _shippingMode = 'free';
+          } else {
+            _shippingMode = 'charged';
+            _shippingCostCtrl.text = item.shippingCost!.toStringAsFixed(2);
+          }
         }
         if (item.deliveryDaysMin != null) {
           _deliveryMinCtrl.text = item.deliveryDaysMin!.toString();
@@ -166,8 +172,13 @@ class _ListingSheetState extends State<_ListingSheet> {
           _courierCtrl.text = row['courier'] as String;
         }
         if (row['shipping_cost'] != null) {
-          _shippingCostCtrl.text =
-              (row['shipping_cost'] as num).toDouble().toStringAsFixed(2);
+          final cost = (row['shipping_cost'] as num).toDouble();
+          if (cost == 0) {
+            _shippingMode = 'free';
+          } else {
+            _shippingMode = 'charged';
+            _shippingCostCtrl.text = cost.toStringAsFixed(2);
+          }
         }
         if (row['delivery_days_min'] != null) {
           _deliveryMinCtrl.text = row['delivery_days_min'].toString();
@@ -231,8 +242,10 @@ class _ListingSheetState extends State<_ListingSheet> {
         courier: _courierCtrl.text.trim().isEmpty
             ? null
             : _courierCtrl.text.trim(),
-        shippingCost: double.tryParse(
-            _shippingCostCtrl.text.replaceAll(',', '.')),
+        shippingCost: _shippingMode == 'free'
+            ? 0.0
+            : double.tryParse(
+                _shippingCostCtrl.text.replaceAll(',', '.')),
         deliveryDaysMin: int.tryParse(_deliveryMinCtrl.text.trim()),
         deliveryDaysMax: int.tryParse(_deliveryMaxCtrl.text.trim()),
         prepDays: int.tryParse(_prepDaysCtrl.text.trim()),
@@ -275,7 +288,12 @@ class _ListingSheetState extends State<_ListingSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isListed = widget.item.isListed;
-    final canList = _saleMethod == 'accept_offers' || _buyerPrice > 0;
+    final shippingDecided = _shippingMode != null &&
+        (_shippingMode != 'charged' ||
+            (double.tryParse(_shippingCostCtrl.text.replaceAll(',', '.')) ?? 0) >
+                0);
+    final canList =
+        (_saleMethod == 'accept_offers' || _buyerPrice > 0) && shippingDecided;
     final loading = _commissionRate == null;
 
     return SingleChildScrollView(
@@ -450,6 +468,20 @@ class _ListingSheetState extends State<_ListingSheet> {
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'free', label: Text('Free shipping')),
+                ButtonSegment(value: 'charged', label: Text('Buyer pays')),
+              ],
+              selected: _shippingMode != null ? {_shippingMode!} : {},
+              emptySelectionAllowed: true,
+              onSelectionChanged: (Set<String> selection) {
+                setState(() {
+                  _shippingMode = selection.isEmpty ? null : selection.first;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _courierCtrl,
               decoration: const InputDecoration(
@@ -460,22 +492,23 @@ class _ListingSheetState extends State<_ListingSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _shippingCostCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Shipping cost',
-                prefixText: '€ ',
-                hintText: '0 for free',
-                border: OutlineInputBorder(),
-                isDense: true,
+            if (_shippingMode == 'charged') ...[
+              TextField(
+                controller: _shippingCostCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Shipping cost',
+                  prefixText: '€ ',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
@@ -549,6 +582,14 @@ class _ListingSheetState extends State<_ListingSheet> {
             const SizedBox(height: 20),
 
             // ── Primary action ─────────────────────────────────────────
+            if (!shippingDecided) ...[
+              Text(
+                'Choose a shipping option to list',
+                style:
+                    TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+              const SizedBox(height: 8),
+            ],
             SizedBox(
               width: double.infinity,
               child: FilledButton(
