@@ -10,6 +10,7 @@ import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
 import 'widgets/origin_country_field.dart';
+import 'listing_sheet.dart';
 
 class AddInventoryPage extends StatefulWidget {
   final String productType;
@@ -44,7 +45,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   String _status = 'available';
 
   bool _listOnMarketplace = false;
-  final _sellingPrice = TextEditingController();
 
   // ── Shared product-detail controllers ───────────────────────────────────
 
@@ -105,7 +105,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
     for (final c in [
       _sku, _title, _gemType, _variety, _originCountry, _originRegion,
       _shape, _cutType, _weightValue, _quantity, _costPrice,
-      _barcode, _notes, _sellingPrice,
+      _barcode, _notes,
       _description, _certificationLab, _certificationNumber, _treatment,
       _dimensionsMm, _cut, _clarity, _species, _locality, _matrix,
       _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
@@ -158,10 +158,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
     if (_quantity.text.isNotEmpty && int.tryParse(_quantity.text) == null) {
       return 'Quantity must be a whole number.';
-    }
-    if (_listOnMarketplace) {
-      final sp = double.tryParse(_sellingPrice.text);
-      if (sp == null || sp <= 0) return 'Enter a selling price to list on marketplace.';
     }
     return null;
   }
@@ -220,11 +216,9 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         supplierId: _supplierId,
         supplierName: supplierName,
         locationId: _locationId,
-        isListed: _listOnMarketplace,
-        sellingPrice: _listOnMarketplace
-            ? double.tryParse(_sellingPrice.text)
-            : null,
-        listedAt: _listOnMarketplace ? DateTime.now() : null,
+        isListed: false,
+        sellingPrice: null,
+        listedAt: null,
         productType: widget.productType,
         certificationLab: _orNull(_certificationLab),
         certificationNumber: _orNull(_certificationNumber),
@@ -271,6 +265,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         await _repository.updateItemImages(created.id!, urls);
       }
 
+      if (!mounted) return;
+      if (_listOnMarketplace && created.id != null) {
+        await showListingSheet(context, created);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -453,13 +451,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                     : (v) => setState(() => _listOnMarketplace = v),
                 contentPadding: EdgeInsets.zero,
               ),
-              if (_listOnMarketplace)
-                FormTextField(
-                  'Selling Price *',
-                  _sellingPrice,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                ),
 
               const FormSection('Other'),
               FormTextField(
