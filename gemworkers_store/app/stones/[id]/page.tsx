@@ -27,6 +27,10 @@ type ListingDetail = {
   certification_number: string | null;
   treatment: string | null;
   dimensions_mm: string | null;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  dimension_unit: string | null;
 
   // loose_stone
   gem_type: string | null;
@@ -216,6 +220,14 @@ export default async function StoneDetailPage({
     item.total_weight_grams != null && Number(item.total_weight_grams) > 0
       ? `${item.total_weight_grams} ${item.total_weight_grams_unit ?? 'g'}`
       : null;
+
+  const structuredDimensions = (() => {
+    const parts = [item.length, item.width, item.height]
+      .filter((v): v is number => v != null)
+      .map(String)
+    if (parts.length === 0) return null
+    return `${parts.join(' × ')} ${item.dimension_unit ?? 'mm'}`
+  })()
 
   const originFull = [item.origin_country, item.origin_region]
     .filter((v) => v && v.trim())
@@ -428,7 +440,7 @@ export default async function StoneDetailPage({
                 <SpecRow label="Clarity"       value={item.clarity} />
                 <SpecRow label="Origin"        value={originFull} />
                 <SpecRow label="Treatment"     value={item.treatment} />
-                <SpecRow label="Dimensions"    value={item.dimensions_mm} />
+                <SpecRow label="Dimensions"    value={structuredDimensions} />
                 <SpecRow label="Certification" value={certificationLine} />
               </SpecSection>
             )}
@@ -441,7 +453,7 @@ export default async function StoneDetailPage({
                 <SpecRow label="Origin"        value={item.origin_country} />
                 <SpecRow label="Matrix"        value={item.matrix} />
                 <SpecRow label="Treatment"     value={item.treatment} />
-                <SpecRow label="Dimensions"    value={item.dimensions_mm} />
+                <SpecRow label="Dimensions"    value={structuredDimensions} />
                 <SpecRow label="Certification" value={certificationLine} />
               </SpecSection>
             )}
@@ -454,7 +466,6 @@ export default async function StoneDetailPage({
                 <SpecRow label="Gemstones"     value={item.gemstones_used} />
                 <SpecRow label="Total weight"  value={jewelryWeight} />
                 <SpecRow label="Treatment"     value={item.treatment} />
-                <SpecRow label="Dimensions"    value={item.dimensions_mm} />
                 <SpecRow label="Certification" value={certificationLine} />
               </SpecSection>
             )}
