@@ -32,8 +32,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late final TextEditingController _variety;
   late final TextEditingController _originCountry;
   late final TextEditingController _originRegion;
-  late final TextEditingController _shape;
-  late final TextEditingController _cutType;
   late final TextEditingController _weightValue;
   late final TextEditingController _quantity;
   late final TextEditingController _costPrice;
@@ -45,6 +43,23 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late String _status;
   late final String _productType;
 
+  // ── Shape & Cut dropdowns ─────────────────────────────────────────────────
+
+  static const _shapeOptions = <String>[
+    '', 'Round', 'Oval', 'Pear', 'Cushion', 'Emerald', 'Marquise', 'Heart',
+    'Trillion', 'Princess', 'Octagon', 'Baguette', 'Cabochon', 'Rough / Uncut',
+    'Bead', 'Other',
+  ];
+  static const _cutOptions = <String>[
+    '', 'Brilliant', 'Step', 'Mixed', 'Faceted', 'Cabochon', 'Rose cut',
+    'Rough / Uncut', 'Carved', 'Other',
+  ];
+
+  late String _shapeSelection;
+  late final TextEditingController _shapeOther;
+  late String _cutTypeSelection;
+  late final TextEditingController _cutTypeOther;
+
   // ── Shared product-detail controllers ───────────────────────────────────
 
   late final TextEditingController _description;
@@ -55,7 +70,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
   // ── Loose stone specific ─────────────────────────────────────────────────
 
-  late final TextEditingController _cut;
   late final TextEditingController _clarity;
 
   // ── Specimen specific ────────────────────────────────────────────────────
@@ -101,8 +115,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _variety = TextEditingController(text: i.variety);
     _originCountry = TextEditingController(text: i.originCountry);
     _originRegion = TextEditingController(text: i.originRegion);
-    _shape = TextEditingController(text: i.shape);
-    _cutType = TextEditingController(text: i.cutType);
     _weightValue = TextEditingController(text: i.weightValue.toString());
     _quantity = TextEditingController(text: i.quantity.toString());
     _costPrice = TextEditingController(text: i.costPrice.toString());
@@ -112,13 +124,18 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _weightUnit = i.weightUnit;
     _status = i.status;
     _productType = i.productType;
+    final shapeInList = _shapeOptions.contains(i.shape);
+    _shapeSelection = shapeInList ? i.shape : 'Other';
+    _shapeOther = TextEditingController(text: shapeInList ? '' : i.shape);
+    final cutInList = _cutOptions.contains(i.cutType);
+    _cutTypeSelection = cutInList ? i.cutType : 'Other';
+    _cutTypeOther = TextEditingController(text: cutInList ? '' : i.cutType);
     _description = TextEditingController(text: i.description ?? '');
     _certificationLab = TextEditingController(text: i.certificationLab ?? '');
     _certificationNumber =
         TextEditingController(text: i.certificationNumber ?? '');
     _treatment = TextEditingController(text: i.treatment ?? '');
     _dimensionsMm = TextEditingController(text: i.dimensionsMm ?? '');
-    _cut = TextEditingController(text: i.cut ?? '');
     _clarity = TextEditingController(text: i.clarity ?? '');
     _species = TextEditingController(text: i.species ?? '');
     _locality = TextEditingController(text: i.locality ?? '');
@@ -143,10 +160,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   void dispose() {
     for (final c in [
       _sku, _title, _gemType, _variety, _originCountry, _originRegion,
-      _shape, _cutType, _weightValue, _quantity, _costPrice, _salePrice,
+      _weightValue, _quantity, _costPrice, _salePrice,
       _barcode, _notes,
+      _shapeOther, _cutTypeOther,
       _description, _certificationLab, _certificationNumber, _treatment,
-      _dimensionsMm, _cut, _clarity, _species, _locality, _matrix,
+      _dimensionsMm, _clarity, _species, _locality, _matrix,
       _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
       _gemstonesUsed, _totalWeightGrams,
     ]) {
@@ -250,8 +268,12 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             : widget.item.originCountry,
         originRegion:
             isLooseStone ? _originRegion.text.trim() : widget.item.originRegion,
-        shape: isLooseStone ? _shape.text.trim() : widget.item.shape,
-        cutType: isLooseStone ? _cutType.text.trim() : widget.item.cutType,
+        shape: isLooseStone
+            ? (_shapeSelection == 'Other' ? _shapeOther.text.trim() : _shapeSelection)
+            : widget.item.shape,
+        cutType: isLooseStone
+            ? (_cutTypeSelection == 'Other' ? _cutTypeOther.text.trim() : _cutTypeSelection)
+            : widget.item.cutType,
         weightValue:
             isLooseStone ? double.parse(_weightValue.text) : widget.item.weightValue,
         weightUnit: isLooseStone ? _weightUnit : widget.item.weightUnit,
@@ -277,7 +299,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         dimensionsMm: _orNull(_dimensionsMm),
         description: _orNull(_description),
         videoUrl: widget.item.videoUrl,
-        cut: isLooseStone ? _orNull(_cut) : widget.item.cut,
+        cut: null,
         clarity: isLooseStone ? _orNull(_clarity) : widget.item.clarity,
         species: isSpecimen ? _orNull(_species) : widget.item.species,
         locality: isSpecimen ? _orNull(_locality) : widget.item.locality,
@@ -394,9 +416,24 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             gemTypeController: _gemType,
             varietyController: _variety,
           ),
-          FormTextField('Shape', _shape),
-          FormTextField('Cut Type', _cutType),
-          FormTextField('Cut (finish)', _cut),
+          FormDropdownField<String>(
+            label: 'Shape',
+            value: _shapeSelection,
+            items: _shapeOptions,
+            itemLabel: (v) => v.isEmpty ? '—' : v,
+            onChanged: (v) => setState(() => _shapeSelection = v ?? ''),
+          ),
+          if (_shapeSelection == 'Other')
+            FormTextField('Shape (custom)', _shapeOther),
+          FormDropdownField<String>(
+            label: 'Cut',
+            value: _cutTypeSelection,
+            items: _cutOptions,
+            itemLabel: (v) => v.isEmpty ? '—' : v,
+            onChanged: (v) => setState(() => _cutTypeSelection = v ?? ''),
+          ),
+          if (_cutTypeSelection == 'Other')
+            FormTextField('Cut (custom)', _cutTypeOther),
           FormTextField('Clarity', _clarity),
           const FormSection('Origin'),
           OriginCountryField(controller: _originCountry),
