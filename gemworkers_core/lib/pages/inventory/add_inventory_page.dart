@@ -69,7 +69,13 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final _certificationLab = TextEditingController();
   final _certificationNumber = TextEditingController();
   final _treatment = TextEditingController();
-  final _dimensionsMm = TextEditingController();
+
+  // ── Structured dimensions (loose_stone & specimen) ───────────────────────
+
+  final _lengthCtrl = TextEditingController();
+  final _widthCtrl = TextEditingController();
+  final _heightCtrl = TextEditingController();
+  String _dimensionUnit = 'mm';
 
   // ── Loose stone specific ─────────────────────────────────────────────────
 
@@ -124,7 +130,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       _barcode, _notes,
       _shapeOther, _cutTypeOther,
       _description, _certificationLab, _certificationNumber, _treatment,
-      _dimensionsMm, _clarity, _species, _locality, _matrix,
+      _lengthCtrl, _widthCtrl, _heightCtrl, _clarity, _species, _locality, _matrix,
       _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
       _gemstonesUsed, _totalWeightGrams,
     ]) {
@@ -244,7 +250,11 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         certificationLab: _orNull(_certificationLab),
         certificationNumber: _orNull(_certificationNumber),
         treatment: _orNull(_treatment),
-        dimensionsMm: _orNull(_dimensionsMm),
+        dimensionsMm: null,
+        length: double.tryParse(_lengthCtrl.text),
+        width: double.tryParse(_widthCtrl.text),
+        height: double.tryParse(_heightCtrl.text),
+        dimensionUnit: _dimensionUnit,
         description: _orNull(_description),
         cut: null,
         clarity: isLooseStone ? _orNull(_clarity) : null,
@@ -359,6 +369,24 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             onChanged: (v) => setState(() => _weightGramsUnit = v!),
           ),
           OriginCountryField(controller: _originCountry, label: 'Origin Country'),
+          const FormSection('Dimensions'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: TextInputType.number)),
+            ],
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _dimensionUnit,
+            items: const ['mm', 'cm'],
+            itemLabel: (v) => v,
+            onChanged: (v) => setState(() => _dimensionUnit = v!),
+          ),
         ];
       case 'jewelry':
         return [
@@ -424,6 +452,24 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
             onChanged: (v) => setState(() => _weightUnit = v!),
           ),
+          const FormSection('Dimensions'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: TextInputType.number)),
+            ],
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _dimensionUnit,
+            items: const ['mm', 'cm'],
+            itemLabel: (v) => v,
+            onChanged: (v) => setState(() => _dimensionUnit = v!),
+          ),
         ];
     }
   }
@@ -471,7 +517,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               FormTextField('Certification Lab', _certificationLab),
               FormTextField('Certification Number', _certificationNumber),
               FormTextField('Treatment', _treatment),
-              FormTextField('Dimensions (mm)', _dimensionsMm),
 
               const FormSection('Pricing'),
               FormTextField(

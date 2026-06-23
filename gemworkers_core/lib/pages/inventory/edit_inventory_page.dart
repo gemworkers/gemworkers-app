@@ -68,7 +68,13 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late final TextEditingController _certificationLab;
   late final TextEditingController _certificationNumber;
   late final TextEditingController _treatment;
-  late final TextEditingController _dimensionsMm;
+
+  // ── Structured dimensions (loose_stone & specimen) ───────────────────────
+
+  late final TextEditingController _lengthCtrl;
+  late final TextEditingController _widthCtrl;
+  late final TextEditingController _heightCtrl;
+  late String _dimensionUnit;
 
   // ── Loose stone specific ─────────────────────────────────────────────────
 
@@ -139,7 +145,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _certificationNumber =
         TextEditingController(text: i.certificationNumber ?? '');
     _treatment = TextEditingController(text: i.treatment ?? '');
-    _dimensionsMm = TextEditingController(text: i.dimensionsMm ?? '');
+    _lengthCtrl = TextEditingController(text: i.length?.toString() ?? '');
+    _widthCtrl = TextEditingController(text: i.width?.toString() ?? '');
+    _heightCtrl = TextEditingController(text: i.height?.toString() ?? '');
+    _dimensionUnit = i.dimensionUnit;
     _clarity = TextEditingController(text: i.clarity ?? '');
     _species = TextEditingController(text: i.species ?? '');
     _locality = TextEditingController(text: i.locality ?? '');
@@ -168,7 +177,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       _barcode, _notes,
       _shapeOther, _cutTypeOther,
       _description, _certificationLab, _certificationNumber, _treatment,
-      _dimensionsMm, _clarity, _species, _locality, _matrix,
+      _lengthCtrl, _widthCtrl, _heightCtrl, _clarity, _species, _locality, _matrix,
       _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
       _gemstonesUsed, _totalWeightGrams,
     ]) {
@@ -300,7 +309,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         certificationLab: _orNull(_certificationLab),
         certificationNumber: _orNull(_certificationNumber),
         treatment: _orNull(_treatment),
-        dimensionsMm: _orNull(_dimensionsMm),
+        dimensionsMm: null,
+        length: double.tryParse(_lengthCtrl.text),
+        width: double.tryParse(_widthCtrl.text),
+        height: double.tryParse(_heightCtrl.text),
+        dimensionUnit: _dimensionUnit,
         description: _orNull(_description),
         videoUrl: widget.item.videoUrl,
         cut: null,
@@ -406,6 +419,24 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             onChanged: (v) => setState(() => _weightGramsUnit = v!),
           ),
           OriginCountryField(controller: _originCountry, label: 'Origin Country'),
+          const FormSection('Dimensions'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: TextInputType.number)),
+            ],
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _dimensionUnit,
+            items: const ['mm', 'cm'],
+            itemLabel: (v) => v,
+            onChanged: (v) => setState(() => _dimensionUnit = v!),
+          ),
         ];
       case 'jewelry':
         return [
@@ -467,6 +498,24 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
             onChanged: (v) => setState(() => _weightUnit = v!),
           ),
+          const FormSection('Dimensions'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: TextInputType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: TextInputType.number)),
+            ],
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _dimensionUnit,
+            items: const ['mm', 'cm'],
+            itemLabel: (v) => v,
+            onChanged: (v) => setState(() => _dimensionUnit = v!),
+          ),
         ];
     }
   }
@@ -512,7 +561,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Certification Lab', _certificationLab),
           FormTextField('Certification Number', _certificationNumber),
           FormTextField('Treatment', _treatment),
-          FormTextField('Dimensions (mm)', _dimensionsMm),
 
           const FormSection('Pricing'),
           FormTextField('Cost Price *', _costPrice, keyboardType: TextInputType.number),

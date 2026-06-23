@@ -55,7 +55,11 @@ SELECT
     i.certification_lab,
     i.certification_number,
     i.treatment,
-    i.dimensions_mm,
+    i.dimensions_mm,       -- retired free-text; kept for older data
+    i.length,
+    i.width,
+    i.height,
+    i.dimension_unit,
 
     -- ── loose_stone fields ─────────────────────────────────────────────────
     i.gem_type,

@@ -66,6 +66,10 @@ class InventoryItem {
   final String? certificationNumber;
   final String? treatment;
   final String? dimensionsMm;
+  final double? length;
+  final double? width;
+  final double? height;
+  final String dimensionUnit;
   final String? description;
   final String? videoUrl;
 
@@ -133,6 +137,10 @@ class InventoryItem {
     this.certificationNumber,
     this.treatment,
     this.dimensionsMm,
+    this.length,
+    this.width,
+    this.height,
+    this.dimensionUnit = 'mm',
     this.description,
     this.videoUrl,
     this.cut,
@@ -208,6 +216,10 @@ class InventoryItem {
       certificationNumber: map['certification_number']?.toString(),
       treatment: map['treatment']?.toString(),
       dimensionsMm: map['dimensions_mm']?.toString(),
+      length: map['length'] != null ? (map['length'] as num).toDouble() : null,
+      width: map['width'] != null ? (map['width'] as num).toDouble() : null,
+      height: map['height'] != null ? (map['height'] as num).toDouble() : null,
+      dimensionUnit: map['dimension_unit']?.toString() ?? 'mm',
       description: map['description']?.toString(),
       videoUrl: map['video_url']?.toString(),
       cut: map['cut']?.toString(),
@@ -273,6 +285,10 @@ class InventoryItem {
       'certification_number': certificationNumber,
       'treatment': treatment,
       'dimensions_mm': dimensionsMm,
+      'length': length,
+      'width': width,
+      'height': height,
+      'dimension_unit': dimensionUnit,
       'description': description,
       'video_url': videoUrl,
       'cut': cut,
@@ -335,6 +351,10 @@ class InventoryItem {
     Object? certificationNumber = _omitted,
     Object? treatment = _omitted,
     Object? dimensionsMm = _omitted,
+    Object? length = _omitted,
+    Object? width = _omitted,
+    Object? height = _omitted,
+    String? dimensionUnit,
     Object? description = _omitted,
     Object? videoUrl = _omitted,
     Object? cut = _omitted,
@@ -413,6 +433,10 @@ class InventoryItem {
       dimensionsMm: identical(dimensionsMm, _omitted)
           ? this.dimensionsMm
           : dimensionsMm as String?,
+      length: identical(length, _omitted) ? this.length : length as double?,
+      width: identical(width, _omitted) ? this.width : width as double?,
+      height: identical(height, _omitted) ? this.height : height as double?,
+      dimensionUnit: dimensionUnit ?? this.dimensionUnit,
       description: identical(description, _omitted)
           ? this.description
           : description as String?,
