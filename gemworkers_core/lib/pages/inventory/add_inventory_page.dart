@@ -355,7 +355,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
           const FormSection('Specimen Details'),
           FormTextField('Species', _species),
           FormTextField('Locality', _locality),
-          FormTextField('Matrix', _matrix),
+          FormTextField('Matrix (host rock the specimen is embedded in)', _matrix),
           FormTextField(
             'Weight',
             _weightGrams,
