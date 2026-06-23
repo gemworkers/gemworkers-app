@@ -556,7 +556,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                 _quantity,
                 keyboardType: TextInputType.number,
               ),
-              FormTextField('Barcode', _barcode),
+              FormTextField('Barcode / product code (optional — for repeatable items)', _barcode),
               FormDropdownField<String>(
                 label: 'Status',
                 value: _status,
