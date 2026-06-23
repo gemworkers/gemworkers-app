@@ -37,7 +37,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final _weightValue = TextEditingController();
   final _quantity = TextEditingController(text: '1');
   final _costPrice = TextEditingController();
-  final _salePrice = TextEditingController();
   final _barcode = TextEditingController();
   final _notes = TextEditingController();
 
@@ -105,7 +104,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   void dispose() {
     for (final c in [
       _sku, _title, _gemType, _variety, _originCountry, _originRegion,
-      _shape, _cutType, _weightValue, _quantity, _costPrice, _salePrice,
+      _shape, _cutType, _weightValue, _quantity, _costPrice,
       _barcode, _notes, _sellingPrice,
       _description, _certificationLab, _certificationNumber, _treatment,
       _dimensionsMm, _cut, _clarity, _species, _locality, _matrix,
@@ -156,10 +155,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         double.tryParse(_costPrice.text) == null) {
       return 'Cost price must be a number.';
     }
-    if (_salePrice.text.isNotEmpty &&
-        double.tryParse(_salePrice.text) == null) {
-      return 'Sale price must be a number.';
-    }
+
     if (_quantity.text.isNotEmpty && int.tryParse(_quantity.text) == null) {
       return 'Quantity must be a whole number.';
     }
@@ -215,7 +211,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         weightUnit: isLooseStone ? _weightUnit : 'ct',
         quantity: int.tryParse(_quantity.text) ?? 1,
         costPrice: double.tryParse(_costPrice.text) ?? 0,
-        salePrice: double.tryParse(_salePrice.text) ?? 0,
+        salePrice: 0,
         barcode: _barcode.text.trim(),
         qrCode: '',
         status: _status,
@@ -432,11 +428,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                 _costPrice,
                 keyboardType: TextInputType.number,
               ),
-              FormTextField(
-                'Sale Price',
-                _salePrice,
-                keyboardType: TextInputType.number,
-              ),
+
 
               const FormSection('Supplier'),
               _buildSupplierPicker(),
