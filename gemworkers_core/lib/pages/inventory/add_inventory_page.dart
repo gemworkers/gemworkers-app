@@ -40,6 +40,8 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final _notes = TextEditingController();
 
   String _weightUnit = 'ct';
+  String _weightGramsUnit = 'g';
+  String _totalWeightGramsUnit = 'g';
   String _status = 'available';
 
   bool _listOnMarketplace = false;
@@ -159,12 +161,12 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
     if (widget.productType == 'specimen' &&
         _weightGrams.text.isNotEmpty &&
         double.tryParse(_weightGrams.text) == null) {
-      return 'Weight (grams) must be a number.';
+      return 'Weight must be a number.';
     }
     if (widget.productType == 'jewelry' &&
         _totalWeightGrams.text.isNotEmpty &&
         double.tryParse(_totalWeightGrams.text) == null) {
-      return 'Total weight (grams) must be a number.';
+      return 'Total weight must be a number.';
     }
     if (_costPrice.text.isNotEmpty &&
         double.tryParse(_costPrice.text) == null) {
@@ -250,6 +252,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         locality: isSpecimen ? _orNull(_locality) : null,
         matrix: isSpecimen ? _orNull(_matrix) : null,
         weightGrams: isSpecimen ? double.tryParse(_weightGrams.text) : null,
+        weightGramsUnit: _weightGramsUnit,
         jewelryType: isJewelry ? _orNull(_jewelryType) : null,
         metal: isJewelry ? _orNull(_metal) : null,
         metalPurity: isJewelry ? _orNull(_metalPurity) : null,
@@ -257,6 +260,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         gemstonesUsed: isJewelry ? _orNull(_gemstonesUsed) : null,
         totalWeightGrams:
             isJewelry ? double.tryParse(_totalWeightGrams.text) : null,
+        totalWeightGramsUnit: _totalWeightGramsUnit,
       );
 
       final created = await _repository.addItem(item);
@@ -343,9 +347,16 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
           FormTextField('Locality', _locality),
           FormTextField('Matrix', _matrix),
           FormTextField(
-            'Weight (grams)',
+            'Weight',
             _weightGrams,
             keyboardType: TextInputType.number,
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _weightGramsUnit,
+            items: const ['ct', 'g', 'kg'],
+            itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
+            onChanged: (v) => setState(() => _weightGramsUnit = v!),
           ),
           OriginCountryField(controller: _originCountry, label: 'Origin Country'),
         ];
@@ -358,9 +369,16 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
           FormTextField('Size / Length', _sizeOrLength),
           FormTextField('Gemstones Used', _gemstonesUsed),
           FormTextField(
-            'Total Weight (grams)',
+            'Total Weight',
             _totalWeightGrams,
             keyboardType: TextInputType.number,
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _totalWeightGramsUnit,
+            items: const ['ct', 'g', 'kg'],
+            itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
+            onChanged: (v) => setState(() => _totalWeightGramsUnit = v!),
           ),
         ];
       case 'loose_stone':
@@ -403,6 +421,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             label: 'Unit',
             value: _weightUnit,
             items: const ['ct', 'g', 'kg'],
+            itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
             onChanged: (v) => setState(() => _weightUnit = v!),
           ),
         ];

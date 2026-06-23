@@ -75,6 +75,7 @@ SELECT
     i.locality,
     i.matrix,
     i.weight_grams,
+    i.weight_grams_unit,
 
     -- ── jewelry fields ─────────────────────────────────────────────────────
     i.jewelry_type,
@@ -83,6 +84,7 @@ SELECT
     i.size_or_length,
     i.gemstones_used,
     i.total_weight_grams,
+    i.total_weight_grams_unit,
     i.sale_method,
     i.courier,
     i.shipping_cost,

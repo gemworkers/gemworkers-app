@@ -40,6 +40,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late final TextEditingController _notes;
 
   late String _weightUnit;
+  late String _weightGramsUnit;
+  late String _totalWeightGramsUnit;
   late String _status;
   late final String _productType;
 
@@ -122,6 +124,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _barcode = TextEditingController(text: i.barcode);
     _notes = TextEditingController(text: i.notes);
     _weightUnit = i.weightUnit;
+    _weightGramsUnit = i.weightGramsUnit;
+    _totalWeightGramsUnit = i.totalWeightGramsUnit;
     _status = i.status;
     _productType = i.productType;
     final shapeInList = _shapeOptions.contains(i.shape);
@@ -197,12 +201,12 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     if (_productType == 'specimen' &&
         _weightGrams.text.isNotEmpty &&
         double.tryParse(_weightGrams.text) == null) {
-      return 'Weight (grams) must be a number.';
+      return 'Weight must be a number.';
     }
     if (_productType == 'jewelry' &&
         _totalWeightGrams.text.isNotEmpty &&
         double.tryParse(_totalWeightGrams.text) == null) {
-      return 'Total weight (grams) must be a number.';
+      return 'Total weight must be a number.';
     }
     if (double.tryParse(_costPrice.text) == null) {
       return 'Cost price must be a number.';
@@ -307,6 +311,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         weightGrams: isSpecimen
             ? double.tryParse(_weightGrams.text)
             : widget.item.weightGrams,
+        weightGramsUnit: isSpecimen ? _weightGramsUnit : widget.item.weightGramsUnit,
         jewelryType:
             isJewelry ? _orNull(_jewelryType) : widget.item.jewelryType,
         metal: isJewelry ? _orNull(_metal) : widget.item.metal,
@@ -319,6 +324,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         totalWeightGrams: isJewelry
             ? double.tryParse(_totalWeightGrams.text)
             : widget.item.totalWeightGrams,
+        totalWeightGramsUnit: isJewelry ? _totalWeightGramsUnit : widget.item.totalWeightGramsUnit,
       );
 
       await _repository.updateItem(widget.item.id!, updated);
@@ -388,9 +394,16 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Locality', _locality),
           FormTextField('Matrix', _matrix),
           FormTextField(
-            'Weight (grams)',
+            'Weight',
             _weightGrams,
             keyboardType: TextInputType.number,
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _weightGramsUnit,
+            items: const ['ct', 'g', 'kg'],
+            itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
+            onChanged: (v) => setState(() => _weightGramsUnit = v!),
           ),
           OriginCountryField(controller: _originCountry, label: 'Origin Country'),
         ];
@@ -403,9 +416,16 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Size / Length', _sizeOrLength),
           FormTextField('Gemstones Used', _gemstonesUsed),
           FormTextField(
-            'Total Weight (grams)',
+            'Total Weight',
             _totalWeightGrams,
             keyboardType: TextInputType.number,
+          ),
+          FormDropdownField<String>(
+            label: 'Unit',
+            value: _totalWeightGramsUnit,
+            items: const ['ct', 'g', 'kg'],
+            itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
+            onChanged: (v) => setState(() => _totalWeightGramsUnit = v!),
           ),
         ];
       case 'loose_stone':
@@ -444,6 +464,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             label: 'Unit',
             value: _weightUnit,
             items: const ['ct', 'g', 'kg'],
+            itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
             onChanged: (v) => setState(() => _weightUnit = v!),
           ),
         ];

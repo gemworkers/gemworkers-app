@@ -78,6 +78,7 @@ class InventoryItem {
   final String? locality;
   final String? matrix;
   final double? weightGrams;
+  final String weightGramsUnit;        // unit for weight_grams (ct/g/kg)
 
   // Jewelry specific.
   final String? jewelryType;
@@ -86,6 +87,7 @@ class InventoryItem {
   final String? sizeOrLength;
   final String? gemstonesUsed;
   final double? totalWeightGrams;
+  final String totalWeightGramsUnit;   // unit for total_weight_grams (ct/g/kg)
 
   // Shipping — set at listing time, persists when unlisted for relisting.
   final String? courier;
@@ -139,12 +141,14 @@ class InventoryItem {
     this.locality,
     this.matrix,
     this.weightGrams,
+    this.weightGramsUnit = 'g',
     this.jewelryType,
     this.metal,
     this.metalPurity,
     this.sizeOrLength,
     this.gemstonesUsed,
     this.totalWeightGrams,
+    this.totalWeightGramsUnit = 'g',
     this.courier,
     this.shippingCost,
     this.deliveryDaysMin,
@@ -214,6 +218,7 @@ class InventoryItem {
       weightGrams: map['weight_grams'] != null
           ? (map['weight_grams'] as num).toDouble()
           : null,
+      weightGramsUnit: map['weight_grams_unit']?.toString() ?? 'g',
       jewelryType: map['jewelry_type']?.toString(),
       metal: map['metal']?.toString(),
       metalPurity: map['metal_purity']?.toString(),
@@ -222,6 +227,7 @@ class InventoryItem {
       totalWeightGrams: map['total_weight_grams'] != null
           ? (map['total_weight_grams'] as num).toDouble()
           : null,
+      totalWeightGramsUnit: map['total_weight_grams_unit']?.toString() ?? 'g',
       courier: map['courier']?.toString(),
       shippingCost: map['shipping_cost'] != null
           ? (map['shipping_cost'] as num).toDouble()
@@ -275,12 +281,14 @@ class InventoryItem {
       'locality': locality,
       'matrix': matrix,
       'weight_grams': weightGrams,
+      'weight_grams_unit': weightGramsUnit,
       'jewelry_type': jewelryType,
       'metal': metal,
       'metal_purity': metalPurity,
       'size_or_length': sizeOrLength,
       'gemstones_used': gemstonesUsed,
       'total_weight_grams': totalWeightGrams,
+      'total_weight_grams_unit': totalWeightGramsUnit,
       'courier': courier,
       'shipping_cost': shippingCost,
       'delivery_days_min': deliveryDaysMin,
@@ -335,12 +343,14 @@ class InventoryItem {
     Object? locality = _omitted,
     Object? matrix = _omitted,
     Object? weightGrams = _omitted,
+    String? weightGramsUnit,
     Object? jewelryType = _omitted,
     Object? metal = _omitted,
     Object? metalPurity = _omitted,
     Object? sizeOrLength = _omitted,
     Object? gemstonesUsed = _omitted,
     Object? totalWeightGrams = _omitted,
+    String? totalWeightGramsUnit,
     Object? courier = _omitted,
     Object? shippingCost = _omitted,
     Object? deliveryDaysMin = _omitted,
@@ -417,6 +427,7 @@ class InventoryItem {
       weightGrams: identical(weightGrams, _omitted)
           ? this.weightGrams
           : weightGrams as double?,
+      weightGramsUnit: weightGramsUnit ?? this.weightGramsUnit,
       jewelryType: identical(jewelryType, _omitted)
           ? this.jewelryType
           : jewelryType as String?,
@@ -433,6 +444,7 @@ class InventoryItem {
       totalWeightGrams: identical(totalWeightGrams, _omitted)
           ? this.totalWeightGrams
           : totalWeightGrams as double?,
+      totalWeightGramsUnit: totalWeightGramsUnit ?? this.totalWeightGramsUnit,
       courier:
           identical(courier, _omitted) ? this.courier : courier as String?,
       shippingCost: identical(shippingCost, _omitted)
