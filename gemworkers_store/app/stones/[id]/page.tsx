@@ -45,6 +45,7 @@ type ListingDetail = {
   locality: string | null;
   matrix: string | null;
   weight_grams: number | null;
+  weight_grams_unit: string | null;
 
   // jewelry
   jewelry_type: string | null;
@@ -53,6 +54,7 @@ type ListingDetail = {
   size_or_length: string | null;
   gemstones_used: string | null;
   total_weight_grams: number | null;
+  total_weight_grams_unit: string | null;
 
   // shipping
   courier: string | null;
@@ -207,12 +209,12 @@ export default async function StoneDetailPage({
 
   const specimenWeight =
     item.weight_grams != null && Number(item.weight_grams) > 0
-      ? `${item.weight_grams} g`
+      ? `${item.weight_grams} ${item.weight_grams_unit ?? 'g'}`
       : null;
 
   const jewelryWeight =
     item.total_weight_grams != null && Number(item.total_weight_grams) > 0
-      ? `${item.total_weight_grams} g`
+      ? `${item.total_weight_grams} ${item.total_weight_grams_unit ?? 'g'}`
       : null;
 
   const originFull = [item.origin_country, item.origin_region]
@@ -422,8 +424,7 @@ export default async function StoneDetailPage({
                 <SpecRow label="Variety"       value={item.variety} />
                 <SpecRow label="Weight"        value={looseStoneWeight} />
                 <SpecRow label="Shape"         value={item.shape} />
-                <SpecRow label="Cut"           value={item.cut} />
-                <SpecRow label="Cut type"      value={item.cut_type} />
+                <SpecRow label="Cut"           value={item.cut_type} />
                 <SpecRow label="Clarity"       value={item.clarity} />
                 <SpecRow label="Origin"        value={originFull} />
                 <SpecRow label="Treatment"     value={item.treatment} />
