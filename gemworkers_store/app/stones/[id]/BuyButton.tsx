@@ -18,11 +18,10 @@ type Props = {
   isLoggedIn: boolean
 }
 
-type State = 'idle' | 'confirm' | 'loading' | 'success' | 'error'
+type State = 'idle' | 'confirm' | 'loading' | 'error'
 
 export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLoggedIn }: Props) {
   const [state, setState] = useState<State>('idle')
-  const [orderId, setOrderId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // No asking price → direct buy is not available (offer flow is a future step).
@@ -69,9 +68,11 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
     async function handleConfirm() {
       setState('loading')
       const result = await buyNow(itemId)
-      if ('orderId' in result) {
-        setOrderId(result.orderId)
-        setState('success')
+      if ('checkoutUrl' in result) {
+        // Redirect the buyer to the Stripe-hosted checkout page.
+        // The order is confirmed only after successful payment (webhook step).
+        window.location.href = result.checkoutUrl
+        // Stay in loading state while the browser navigates away.
       } else {
         setErrorMsg(result.error)
         setState('error')
@@ -158,27 +159,6 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
       >
         Placing order…
       </button>
-    )
-  }
-
-  // ── Success ───────────────────────────────────────────────────────────────
-  if (state === 'success') {
-    const ref = orderId ? orderId.substring(0, 8).toUpperCase() : '—'
-    return (
-      <div style={{
-        border: '1px solid #bbf7d0', borderRadius: 8,
-        padding: '16px 18px', background: '#f0fdf4',
-      }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: '#065f46', marginBottom: 6 }}>
-          Order placed
-        </p>
-        <p style={{ fontSize: 13, color: '#047857', marginBottom: 6 }}>
-          Reference: <strong>{ref}</strong>
-        </p>
-        <p style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-          This stone is reserved for you. The seller will be in touch to arrange next steps.
-        </p>
-      </div>
     )
   }
 
