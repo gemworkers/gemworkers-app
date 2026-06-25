@@ -275,7 +275,7 @@ function GroupedOrderCard({
           const oi           = o.order_items[0]
           const itemId       = oi?.inventory_item_id ?? ''
           const stone        = listingMap.get(itemId) ?? null
-          const storedTitle  = oi?.inventory_items?.title ?? 'Stone'
+          const storedTitle  = 'Stone'
           const displayTitle = stone?.title ?? storedTitle
           const subtitle     = stone
             ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
