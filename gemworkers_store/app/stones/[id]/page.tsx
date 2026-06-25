@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { PhotoGallery } from './PhotoGallery';
-import { StoreHeader } from '@/app/components/StoreHeader';
 import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer } from './OfferPanel';
@@ -121,12 +120,7 @@ function SpecSection({ title, children }: { title: string; children: React.React
 
 function NotAvailable() {
   return (
-    <>
-      <style>{`
-        body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
-      `}</style>
-      <StoreHeader />
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
+    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
         <div style={{ fontSize: 52, color: '#d1d5db', marginBottom: 18, lineHeight: 1 }}>◇</div>
         <p style={{ fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
           This item is not available
@@ -142,7 +136,6 @@ function NotAvailable() {
           Browse all stones
         </Link>
       </main>
-    </>
   );
 }
 
@@ -261,19 +254,7 @@ export default async function StoneDetailPage({
     item.prep_days != null;
 
   return (
-    <>
-      <style>{`
-        body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
-        .back-link { color: #9ca3af; transition: color 0.1s ease; }
-        .back-link:hover { color: #374151; }
-        @media (max-width: 680px) {
-          .detail-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
-        }
-      `}</style>
-
-      <StoreHeader />
-
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px' }}>
+    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px' }}>
         {/* Back to browse */}
         <Link href="/" className="back-link" style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -486,6 +467,5 @@ export default async function StoneDetailPage({
           </div>
         </div>
       </main>
-    </>
   );
 }

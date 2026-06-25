@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { StoreHeader } from '@/app/components/StoreHeader'
 import { MarkReceivedButton } from './MarkReceivedButton'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -433,17 +432,7 @@ export default async function BuyerOrdersPage() {
   }
 
   return (
-    <>
-      <style>{`
-        body {
-          background: #fafaf9;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-        }
-      `}</style>
-
-      <StoreHeader />
-
-      <main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px 80px' }}>
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px 80px' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 6 }}>
           My Orders
         </h1>
@@ -485,6 +474,5 @@ export default async function BuyerOrdersPage() {
           </div>
         )}
       </main>
-    </>
   )
 }

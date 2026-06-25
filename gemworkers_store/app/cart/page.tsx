@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { StoreHeader } from '@/app/components/StoreHeader'
 import { BuyButton } from '@/app/stones/[id]/BuyButton'
 import { RemoveButton } from './RemoveButton'
 import { BuyAllButton } from './BuyAllButton'
@@ -39,15 +38,9 @@ const eurDecimal = new Intl.NumberFormat('en-IE', {
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <style>{`
-        body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
-      `}</style>
-      <StoreHeader />
-      <main style={{ maxWidth: 780, margin: '0 auto', padding: '40px 32px 80px' }}>
-        {children}
-      </main>
-    </>
+    <main style={{ maxWidth: 780, margin: '0 auto', padding: '40px 32px 80px' }}>
+      {children}
+    </main>
   )
 }
 
