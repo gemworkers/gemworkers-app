@@ -43,6 +43,22 @@ export async function POST(req: NextRequest) {
     const groupId = session.metadata?.checkout_group_id
     const orderId = session.metadata?.order_id
 
+    // Build shipping payload from what Stripe collected.
+    // SDK v22+: address lives at collected_information.shipping_details (not top-level shipping_details).
+    // Phone is on customer_details.phone (unchanged across SDK versions).
+    // All fields written; nulls fine for optional ones like line2/state.
+    const addr = session.collected_information?.shipping_details
+    const shippingData = {
+      shipping_name:        addr?.name                ?? null,
+      shipping_line1:       addr?.address?.line1      ?? null,
+      shipping_line2:       addr?.address?.line2      ?? null,
+      shipping_city:        addr?.address?.city       ?? null,
+      shipping_state:       addr?.address?.state      ?? null,
+      shipping_postal_code: addr?.address?.postal_code ?? null,
+      shipping_country:     addr?.address?.country    ?? null,
+      shipping_phone:       session.customer_details?.phone ?? null,
+    }
+
     if (groupId) {
       // Cart payment: confirm all orders in the group with one RPC call.
       const { error } = await supabase.rpc('confirm_order_group', {
@@ -52,6 +68,24 @@ export async function POST(req: NextRequest) {
         console.error('[webhook] confirm_order_group failed for group', groupId, ':', error.message)
         return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
       }
+
+      // Persist address to every order in the group. Non-fatal if it fails —
+      // payment and confirmation already succeeded; don't cause Stripe to retry.
+      try {
+        const { data: updated, error: addrErr } = await supabase
+          .from('orders')
+          .update(shippingData)
+          .eq('checkout_group_id', groupId)
+          .select('id')
+        if (addrErr) {
+          console.error('[webhook] address update failed for group', groupId, ':', addrErr.message)
+        } else if (!updated || updated.length === 0) {
+          console.error('[webhook] address update matched 0 orders for group', groupId, '— RLS block or missing rows?')
+        }
+      } catch (e) {
+        console.error('[webhook] address update threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
+      }
+
     } else if (orderId) {
       // Single-stone buy-now payment.
       // confirm_order_paid is idempotent at the SQL level: it RETURN-s void
@@ -69,6 +103,22 @@ export async function POST(req: NextRequest) {
           console.error('[webhook] confirm_order_paid failed for order', orderId, ':', error.message)
           return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
         }
+      }
+
+      // Persist address to the single order. Non-fatal if it fails.
+      try {
+        const { data: updated, error: addrErr } = await supabase
+          .from('orders')
+          .update(shippingData)
+          .eq('id', orderId)
+          .select('id')
+        if (addrErr) {
+          console.error('[webhook] address update failed for order', orderId, ':', addrErr.message)
+        } else if (!updated || updated.length === 0) {
+          console.error('[webhook] address update matched 0 orders for order', orderId, '— RLS block or missing row?')
+        }
+      } catch (e) {
+        console.error('[webhook] address update threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
       }
     }
     // Neither present: skip (malformed metadata — return 200 so Stripe doesn't retry).
