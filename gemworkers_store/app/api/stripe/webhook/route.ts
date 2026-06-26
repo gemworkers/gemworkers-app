@@ -5,6 +5,7 @@ import type Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
+import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
 
 // ── Email notification helpers ─────────────────────────────────────────────────
 // Called after order confirmation + address write. Always best-effort — callers
@@ -169,6 +170,144 @@ async function notifyGroupOrders(admin: AdminClient, groupId: string): Promise<v
   }
 }
 
+async function notifyCustomerSingleOrder(
+  admin: AdminClient,
+  orderId: string,
+  stripeEmail: string | null,
+): Promise<void> {
+  // Resolve email: Stripe's collected value is authoritative; fall back to buyers table.
+  let customerEmail = stripeEmail?.trim() || ''
+  if (!customerEmail) {
+    const { data: ob } = await admin
+      .from('orders').select('buyer_id').eq('id', orderId).single()
+    const buyerId = (ob as { buyer_id: string } | null)?.buyer_id
+    if (buyerId) {
+      const { data: bd } = await admin
+        .from('buyers').select('email').eq('id', buyerId).single()
+      customerEmail = (bd as { email: string } | null)?.email?.trim() ?? ''
+    }
+  }
+  if (!customerEmail) {
+    console.error('[webhook] customer email: no address resolved for order', orderId)
+    return
+  }
+
+  const { data: ordData } = await admin
+    .from('orders')
+    .select('order_number, order_total, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .eq('id', orderId)
+    .single()
+  if (!ordData) { console.error('[webhook] customer email: order not found', orderId); return }
+
+  const o = ordData as {
+    order_number: string; order_total: string | number
+    shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
+    shipping_city: string | null; shipping_state: string | null
+    shipping_postal_code: string | null; shipping_country: string | null; shipping_phone: string | null
+  }
+
+  const { data: itemData } = await admin
+    .from('order_items').select('inventory_item_id').eq('order_id', orderId).limit(1)
+  const itemId = (itemData as { inventory_item_id: string }[] | null)?.[0]?.inventory_item_id
+  let itemTitle = 'Stone'
+  if (itemId) {
+    const { data: invData } = await admin
+      .from('inventory_items').select('title').eq('id', itemId).single()
+    itemTitle = (invData as { title: string } | null)?.title ?? 'Stone'
+  }
+
+  const shipping: ShippingAddress = {
+    name:       o.shipping_name,
+    line1:      o.shipping_line1,
+    line2:      o.shipping_line2,
+    city:       o.shipping_city,
+    state:      o.shipping_state,
+    postalCode: o.shipping_postal_code,
+    country:    o.shipping_country,
+    phone:      o.shipping_phone,
+  }
+
+  await sendOrderConfirmationEmail({
+    to:       [customerEmail],
+    orders:   [{ orderNumber: o.order_number, itemTitle, orderTotal: Number(o.order_total) }],
+    shipping,
+  })
+}
+
+async function notifyCustomerGroupOrder(
+  admin: AdminClient,
+  groupId: string,
+  stripeEmail: string | null,
+): Promise<void> {
+  type GroupOrderRow = {
+    id: string; buyer_id: string; order_number: string; order_total: string | number
+    shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
+    shipping_city: string | null; shipping_state: string | null
+    shipping_postal_code: string | null; shipping_country: string | null; shipping_phone: string | null
+  }
+
+  const { data: ordersData } = await admin
+    .from('orders')
+    .select('id, buyer_id, order_number, order_total, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .eq('checkout_group_id', groupId)
+  const orders = (ordersData as GroupOrderRow[] | null) ?? []
+  if (orders.length === 0) return
+
+  // Resolve email: Stripe's collected value is authoritative; fall back to buyers table.
+  let customerEmail = stripeEmail?.trim() || ''
+  if (!customerEmail) {
+    const buyerId = orders[0]!.buyer_id
+    const { data: bd } = await admin
+      .from('buyers').select('email').eq('id', buyerId).single()
+    customerEmail = (bd as { email: string } | null)?.email?.trim() ?? ''
+  }
+  if (!customerEmail) {
+    console.error('[webhook] customer email: no address resolved for group', groupId)
+    return
+  }
+
+  // Resolve item titles.
+  const orderIds = orders.map(o => o.id)
+  const { data: itemsData } = await admin
+    .from('order_items').select('order_id, inventory_item_id').in('order_id', orderIds)
+  const items = (itemsData as { order_id: string; inventory_item_id: string }[] | null) ?? []
+
+  const invIds = [...new Set(items.map(i => i.inventory_item_id))]
+  const { data: invData } = await admin
+    .from('inventory_items').select('id, title').in('id', invIds)
+  const invMap = new Map(
+    ((invData as { id: string; title: string }[] | null) ?? []).map(i => [i.id, i.title])
+  )
+
+  const orderTitleMap = new Map<string, string>()
+  for (const it of items) {
+    if (!orderTitleMap.has(it.order_id)) {
+      orderTitleMap.set(it.order_id, invMap.get(it.inventory_item_id) ?? 'Stone')
+    }
+  }
+
+  // Shipping is shared across the group — use the first order's fields.
+  const first = orders[0]!
+  const shipping: ShippingAddress = {
+    name:       first.shipping_name,
+    line1:      first.shipping_line1,
+    line2:      first.shipping_line2,
+    city:       first.shipping_city,
+    state:      first.shipping_state,
+    postalCode: first.shipping_postal_code,
+    country:    first.shipping_country,
+    phone:      first.shipping_phone,
+  }
+
+  const lines: EmailOrderLine[] = orders.map(o => ({
+    orderNumber: o.order_number,
+    itemTitle:   orderTitleMap.get(o.id) ?? 'Stone',
+    orderTotal:  Number(o.order_total),
+  }))
+
+  await sendOrderConfirmationEmail({ to: [customerEmail], orders: lines, shipping })
+}
+
 // ── Webhook handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -214,6 +353,7 @@ export async function POST(req: NextRequest) {
     // Phone is on customer_details.phone (unchanged across SDK versions).
     // All fields written; nulls fine for optional ones like line2/state.
     const addr = session.collected_information?.shipping_details
+    const custEmail = session.customer_details?.email?.trim() || null
     const shippingData = {
       shipping_name:        addr?.name                ?? null,
       shipping_line1:       addr?.address?.line1      ?? null,
@@ -259,6 +399,13 @@ export async function POST(req: NextRequest) {
         console.error('[webhook] email notification threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
       }
 
+      // Customer order confirmation email — best-effort.
+      try {
+        await notifyCustomerGroupOrder(supabase, groupId, custEmail)
+      } catch (e) {
+        console.error('[webhook] customer confirmation email threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
+      }
+
     } else if (orderId) {
       // Single-stone buy-now payment.
       // confirm_order_paid is idempotent at the SQL level: it RETURN-s void
@@ -299,6 +446,13 @@ export async function POST(req: NextRequest) {
         await notifySingleOrder(supabase, orderId)
       } catch (e) {
         console.error('[webhook] email notification threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
+      }
+
+      // Customer order confirmation email — best-effort.
+      try {
+        await notifyCustomerSingleOrder(supabase, orderId, custEmail)
+      } catch (e) {
+        console.error('[webhook] customer confirmation email threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
       }
     }
     // Neither present: skip (malformed metadata — return 200 so Stripe doesn't retry).
