@@ -4,6 +4,172 @@ import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
+
+// ── Email notification helpers ─────────────────────────────────────────────────
+// Called after order confirmation + address write. Always best-effort — callers
+// wrap in try/catch so a Resend failure never fails the webhook response.
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
+interface OrderRow {
+  id:                  string
+  order_number:        string
+  order_total:         string | number
+  seller_id:           string
+  shipping_name:       string | null
+  shipping_line1:      string | null
+  shipping_line2:      string | null
+  shipping_city:       string | null
+  shipping_state:      string | null
+  shipping_postal_code: string | null
+  shipping_country:    string | null
+  shipping_phone:      string | null
+}
+
+function rowToShipping(o: OrderRow): ShippingAddress {
+  return {
+    name:       o.shipping_name,
+    line1:      o.shipping_line1,
+    line2:      o.shipping_line2,
+    city:       o.shipping_city,
+    state:      o.shipping_state,
+    postalCode: o.shipping_postal_code,
+    country:    o.shipping_country,
+    phone:      o.shipping_phone,
+  }
+}
+
+async function notifySingleOrder(admin: AdminClient, orderId: string): Promise<void> {
+  const ownerEmail = process.env.OWNER_EMAIL?.trim() ?? ''
+
+  // Order details (shipping fields written by the address-update step).
+  const { data: ordData } = await admin
+    .from('orders')
+    .select('id, order_number, order_total, seller_id, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .eq('id', orderId)
+    .single()
+  if (!ordData) { console.error('[webhook] email: order not found', orderId); return }
+  const ord = ordData as OrderRow
+
+  // Item title — first (and normally only) line item.
+  const { data: itemData } = await admin
+    .from('order_items')
+    .select('inventory_item_id')
+    .eq('order_id', orderId)
+    .limit(1)
+  const itemId = (itemData as { inventory_item_id: string }[] | null)?.[0]?.inventory_item_id
+  let itemTitle = 'Stone'
+  if (itemId) {
+    const { data: invData } = await admin
+      .from('inventory_items').select('title').eq('id', itemId).single()
+    itemTitle = (invData as { title: string } | null)?.title ?? 'Stone'
+  }
+
+  // Seller email.
+  const { data: sellerData } = await admin
+    .from('sellers').select('email').eq('id', ord.seller_id).single()
+  const sellerEmail = (sellerData as { email: string } | null)?.email?.trim() ?? ''
+  if (!sellerEmail) {
+    console.error('[webhook] email: seller', ord.seller_id, 'has no email — skipping seller recipient for order', orderId)
+  }
+
+  const to = [sellerEmail, ownerEmail].filter(e => e !== '')
+  if (to.length === 0) { console.error('[webhook] email: no recipients for order', orderId); return }
+
+  await sendNewOrderEmail({
+    to,
+    subject:  `New GemWorkers order — ${itemTitle}`,
+    orders:   [{ orderNumber: ord.order_number, itemTitle, orderTotal: Number(ord.order_total) }],
+    shipping: rowToShipping(ord),
+  })
+}
+
+async function notifyGroupOrders(admin: AdminClient, groupId: string): Promise<void> {
+  const ownerEmail = process.env.OWNER_EMAIL?.trim() ?? ''
+
+  // 1. All orders in the group (shipping is shared — same buyer checkout).
+  const { data: ordersData } = await admin
+    .from('orders')
+    .select('id, order_number, order_total, seller_id, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .eq('checkout_group_id', groupId)
+  const orders = (ordersData as OrderRow[] | null) ?? []
+  if (orders.length === 0) return
+
+  // 2. First order's shipping fields represent the whole group.
+  const shipping = rowToShipping(orders[0]!)
+
+  // 3. All order items → map order_id → item title.
+  const orderIds = orders.map(o => o.id)
+  const { data: itemsData } = await admin
+    .from('order_items').select('order_id, inventory_item_id').in('order_id', orderIds)
+  const items = (itemsData as { order_id: string; inventory_item_id: string }[] | null) ?? []
+
+  const invIds = [...new Set(items.map(i => i.inventory_item_id))]
+  const { data: invData } = await admin
+    .from('inventory_items').select('id, title').in('id', invIds)
+  const invMap = new Map(((invData as { id: string; title: string }[] | null) ?? []).map(i => [i.id, i.title]))
+
+  const orderTitleMap = new Map<string, string>()
+  for (const it of items) {
+    if (!orderTitleMap.has(it.order_id)) {
+      orderTitleMap.set(it.order_id, invMap.get(it.inventory_item_id) ?? 'Stone')
+    }
+  }
+
+  // 4. Seller emails.
+  const sellerIds = [...new Set(orders.map(o => o.seller_id))]
+  const { data: sellersData } = await admin
+    .from('sellers').select('id, email').in('id', sellerIds)
+  const sellerEmailMap = new Map(
+    ((sellersData as { id: string; email: string }[] | null) ?? [])
+      .map(s => [s.id, s.email?.trim() ?? ''])
+  )
+
+  // Owner — one summary of ALL orders in the group.
+  if (ownerEmail) {
+    const allLines: EmailOrderLine[] = orders.map(o => ({
+      orderNumber: o.order_number,
+      itemTitle:   orderTitleMap.get(o.id) ?? 'Stone',
+      orderTotal:  Number(o.order_total),
+    }))
+    await sendNewOrderEmail({
+      to:       [ownerEmail],
+      subject:  `New GemWorkers order group — ${orders.length} stone${orders.length !== 1 ? 's' : ''}`,
+      orders:   allLines,
+      shipping,
+    })
+  }
+
+  // Each seller — only their orders in the group.
+  const sellerOrders = new Map<string, OrderRow[]>()
+  for (const ord of orders) {
+    const existing = sellerOrders.get(ord.seller_id)
+    if (existing) { existing.push(ord) } else { sellerOrders.set(ord.seller_id, [ord]) }
+  }
+  for (const [sellerId, sellerOrderList] of sellerOrders) {
+    const sellerEmail = sellerEmailMap.get(sellerId) ?? ''
+    if (!sellerEmail) {
+      console.error('[webhook] email: seller', sellerId, 'has no email — skipping seller recipient in group', groupId)
+      continue
+    }
+    const lines: EmailOrderLine[] = sellerOrderList.map(o => ({
+      orderNumber: o.order_number,
+      itemTitle:   orderTitleMap.get(o.id) ?? 'Stone',
+      orderTotal:  Number(o.order_total),
+    }))
+    await sendNewOrderEmail({
+      to:       [sellerEmail],
+      subject:  lines.length === 1
+        ? `New GemWorkers order — ${lines[0]!.itemTitle}`
+        : `New GemWorkers order — ${lines.length} stones`,
+      orders:   lines,
+      shipping,
+    })
+  }
+}
+
+// ── Webhook handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   // Raw body required — Stripe signature verification needs the exact bytes
@@ -86,6 +252,13 @@ export async function POST(req: NextRequest) {
         console.error('[webhook] address update threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
       }
 
+      // Send new-order notification emails — best-effort, never fails the webhook.
+      try {
+        await notifyGroupOrders(supabase, groupId)
+      } catch (e) {
+        console.error('[webhook] email notification threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
+      }
+
     } else if (orderId) {
       // Single-stone buy-now payment.
       // confirm_order_paid is idempotent at the SQL level: it RETURN-s void
@@ -119,6 +292,13 @@ export async function POST(req: NextRequest) {
         }
       } catch (e) {
         console.error('[webhook] address update threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
+      }
+
+      // Send new-order notification email — best-effort, never fails the webhook.
+      try {
+        await notifySingleOrder(supabase, orderId)
+      } catch (e) {
+        console.error('[webhook] email notification threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
       }
     }
     // Neither present: skip (malformed metadata — return 200 so Stripe doesn't retry).
