@@ -12,6 +12,7 @@ import '../../repositories/order_repository.dart';
 import '../../repositories/purchase_repository.dart';
 import '../../repositories/seller_repository.dart';
 import '../inventory/inventory_detail_page.dart';
+import '../orders/orders_page.dart';
 import 'dashboard_intelligence.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -35,6 +36,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Seller? _selectedSeller;
   DashboardTimeRange _timeRange = DashboardTimeRange.thisMonth;
   int _orderCount = 0;
+  int _toShipCount = 0;
   int _customerCount = 0;
   double _revenue = 0.0;
   double _totalSpent = 0.0;
@@ -76,6 +78,10 @@ class _DashboardPageState extends State<DashboardPage> {
         totalSpent =
             await _purchaseRepo.getTotalSpent(sellerId: sellerScopeId);
       } catch (_) {}
+      int toShipCount = 0;
+      try {
+        toShipCount = await _orderRepo.getConfirmedPlatformCount();
+      } catch (_) {}
 
       final results = await Future.wait([itemsFuture, sellersFuture]);
       final items = results[0] as List<InventoryItem>;
@@ -96,6 +102,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _sellers = sellers;
           _selectedSeller = selectedSeller;
           _orderCount = orderCount;
+          _toShipCount = toShipCount;
           _customerCount = customerCount;
           _revenue = revenue;
           _totalSpent = totalSpent;
@@ -265,6 +272,16 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
+  Future<void> _openConfirmedOrders() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OrdersPage(initialStatusFilter: 'confirmed'),
+      ),
+    );
+    _load();
+  }
+
   Future<void> _openItem(InventoryItem item) async {
     await Navigator.push(
       context,
@@ -344,6 +361,16 @@ class _DashboardPageState extends State<DashboardPage> {
                 value: '$_orderCount',
                 icon: Icons.receipt_long_outlined,
                 color: Colors.deepPurple,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'To Ship',
+                value: '$_toShipCount',
+                icon: Icons.local_shipping_outlined,
+                color: Colors.blue,
+                onTap: _openConfirmedOrders,
               ),
             ),
             if (!UserProfileService.instance.isSeller) ...[
@@ -559,41 +586,48 @@ class _StatCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.label,
     required this.value,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+    final content = Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          ),
+        ],
       ),
     );
+    if (onTap != null) {
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, child: content),
+      );
+    }
+    return Card(child: content);
   }
 }
 

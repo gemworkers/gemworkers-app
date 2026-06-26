@@ -13,6 +13,7 @@ import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
 import 'pages/purchases/purchases_page.dart';
 import 'pages/suppliers/suppliers_page.dart';
+import 'repositories/order_repository.dart';
 
 class GemWorkersApp extends StatelessWidget {
   const GemWorkersApp({super.key});
@@ -89,6 +90,21 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
+  int _toShipCount = 0;
+  final _orderRepo = OrderRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToShipCount();
+  }
+
+  Future<void> _loadToShipCount() async {
+    try {
+      final count = await _orderRepo.getConfirmedPlatformCount();
+      if (mounted) setState(() => _toShipCount = count);
+    } catch (_) {}
+  }
 
   bool get _isOwner => UserProfileService.instance.isOwner;
 
@@ -114,10 +130,18 @@ class _MainLayoutState extends State<MainLayout> {
           selectedIcon: Icon(Icons.inventory_2),
           label: Text('Inventory'),
         ),
-        const NavigationRailDestination(
-          icon: Icon(Icons.receipt_long_outlined),
-          selectedIcon: Icon(Icons.receipt_long),
-          label: Text('Orders'),
+        NavigationRailDestination(
+          icon: Badge(
+            isLabelVisible: _toShipCount > 0,
+            label: Text('$_toShipCount'),
+            child: const Icon(Icons.receipt_long_outlined),
+          ),
+          selectedIcon: Badge(
+            isLabelVisible: _toShipCount > 0,
+            label: Text('$_toShipCount'),
+            child: const Icon(Icons.receipt_long),
+          ),
+          label: const Text('Orders'),
         ),
         const NavigationRailDestination(
           icon: Icon(Icons.local_offer_outlined),
@@ -160,8 +184,10 @@ class _MainLayoutState extends State<MainLayout> {
         children: [
           NavigationRail(
             selectedIndex: safeIndex,
-            onDestinationSelected: (i) =>
-                setState(() => _selectedIndex = i),
+            onDestinationSelected: (i) {
+              setState(() => _selectedIndex = i);
+              _loadToShipCount();
+            },
             labelType: NavigationRailLabelType.all,
             destinations: destinations,
             trailing: const _UserMenu(),

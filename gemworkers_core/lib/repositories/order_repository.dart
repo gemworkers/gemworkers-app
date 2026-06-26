@@ -148,6 +148,19 @@ class OrderRepository {
         .eq('id', orderId);
   }
 
+  // ── To-ship count ─────────────────────────────────────────────────────────
+
+  /// Count of confirmed platform orders waiting to be shipped.
+  /// RLS scopes automatically: sellers see their own, owner sees all.
+  Future<int> getConfirmedPlatformCount() async {
+    final response = await supabase
+        .from('orders')
+        .select('id')
+        .eq('status', 'confirmed')
+        .eq('sale_channel', 'platform');
+    return response.length;
+  }
+
   // ── Dashboard stats ───────────────────────────────────────────────────────
 
   /// Returns total order count and cumulative revenue from paid orders.

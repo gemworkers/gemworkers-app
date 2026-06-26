@@ -7,7 +7,8 @@ import 'add_edit_order_page.dart';
 import 'order_detail_page.dart';
 
 class OrdersPage extends StatefulWidget {
-  const OrdersPage({super.key});
+  final String? initialStatusFilter;
+  const OrdersPage({super.key, this.initialStatusFilter});
 
   @override
   State<OrdersPage> createState() => _OrdersPageState();
@@ -25,6 +26,7 @@ class _OrdersPageState extends State<OrdersPage> {
   @override
   void initState() {
     super.initState();
+    _statusFilter = widget.initialStatusFilter;
     _load();
   }
 
