@@ -105,6 +105,16 @@ class Order {
   /// True when the owner used the admin override to ship on a seller's behalf.
   final bool shippedByOwner;
 
+  // ── Shipping address (populated by Stripe checkout) ───────────────────────
+  final String? shippingName;
+  final String? shippingLine1;
+  final String? shippingLine2;
+  final String? shippingCity;
+  final String? shippingState;
+  final String? shippingPostalCode;
+  final String? shippingCountry;
+  final String? shippingPhone;
+
   const Order({
     this.id,
     this.customerId,
@@ -127,6 +137,14 @@ class Order {
     this.shippedAt,
     this.receivedAt,
     this.shippedByOwner = false,
+    this.shippingName,
+    this.shippingLine1,
+    this.shippingLine2,
+    this.shippingCity,
+    this.shippingState,
+    this.shippingPostalCode,
+    this.shippingCountry,
+    this.shippingPhone,
   });
 
   /// Computed from loaded items — use orderTotal for the stored, authoritative value.
@@ -172,6 +190,14 @@ class Order {
           ? DateTime.parse(map['received_at'])
           : null,
       shippedByOwner: map['shipped_by_owner'] as bool? ?? false,
+      shippingName:       map['shipping_name']?.toString(),
+      shippingLine1:      map['shipping_line1']?.toString(),
+      shippingLine2:      map['shipping_line2']?.toString(),
+      shippingCity:       map['shipping_city']?.toString(),
+      shippingState:      map['shipping_state']?.toString(),
+      shippingPostalCode: map['shipping_postal_code']?.toString(),
+      shippingCountry:    map['shipping_country']?.toString(),
+      shippingPhone:      map['shipping_phone']?.toString(),
     );
   }
 
@@ -216,6 +242,14 @@ class Order {
     Object? shippedAt = _omitted,
     Object? receivedAt = _omitted,
     bool? shippedByOwner,
+    Object? shippingName = _omitted,
+    Object? shippingLine1 = _omitted,
+    Object? shippingLine2 = _omitted,
+    Object? shippingCity = _omitted,
+    Object? shippingState = _omitted,
+    Object? shippingPostalCode = _omitted,
+    Object? shippingCountry = _omitted,
+    Object? shippingPhone = _omitted,
   }) {
     return Order(
       id: id ?? this.id,
@@ -251,6 +285,22 @@ class Order {
           ? this.receivedAt
           : receivedAt as DateTime?,
       shippedByOwner: shippedByOwner ?? this.shippedByOwner,
+      shippingName: identical(shippingName, _omitted)
+          ? this.shippingName : shippingName as String?,
+      shippingLine1: identical(shippingLine1, _omitted)
+          ? this.shippingLine1 : shippingLine1 as String?,
+      shippingLine2: identical(shippingLine2, _omitted)
+          ? this.shippingLine2 : shippingLine2 as String?,
+      shippingCity: identical(shippingCity, _omitted)
+          ? this.shippingCity : shippingCity as String?,
+      shippingState: identical(shippingState, _omitted)
+          ? this.shippingState : shippingState as String?,
+      shippingPostalCode: identical(shippingPostalCode, _omitted)
+          ? this.shippingPostalCode : shippingPostalCode as String?,
+      shippingCountry: identical(shippingCountry, _omitted)
+          ? this.shippingCountry : shippingCountry as String?,
+      shippingPhone: identical(shippingPhone, _omitted)
+          ? this.shippingPhone : shippingPhone as String?,
     );
   }
 }

@@ -227,6 +227,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       children: [
                         _buildHeader(order),
                         const SizedBox(height: 16),
+                        if (const {'confirmed', 'shipped', 'received', 'paid'}
+                            .contains(order.status)) ...[
+                          _buildShippingAddress(order),
+                          const SizedBox(height: 16),
+                        ],
                         _buildLineItems(order),
                         const SizedBox(height: 16),
                         if (order.notes.isNotEmpty) _buildNotes(order),
@@ -438,6 +443,56 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildShippingAddress(Order order) {
+    final hasAddress = order.shippingLine1 != null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Shipping Address',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (!hasAddress)
+              Text(
+                'No shipping address on file',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              )
+            else ...[
+              if (order.shippingName != null)
+                _row('Recipient', order.shippingName!),
+              _addressLine(order.shippingLine1!),
+              if (order.shippingLine2?.isNotEmpty == true)
+                _addressLine(order.shippingLine2!),
+              _addressLine(_cityStateLine(order)),
+              if (order.shippingCountry?.isNotEmpty == true)
+                _addressLine(order.shippingCountry!),
+              if (order.shippingPhone?.isNotEmpty == true)
+                _row('Phone', order.shippingPhone!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _addressLine(String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(text, style: const TextStyle(fontSize: 13)),
+      );
+
+  String _cityStateLine(Order order) {
+    final city = order.shippingCity ?? '';
+    final statePostal = [
+      if (order.shippingState?.isNotEmpty == true) order.shippingState!,
+      if (order.shippingPostalCode?.isNotEmpty == true) order.shippingPostalCode!,
+    ].join(' ');
+    if (city.isEmpty) return statePostal;
+    if (statePostal.isEmpty) return city;
+    return '$city, $statePostal';
   }
 
   Widget? _buildActionBar(Order order) {
