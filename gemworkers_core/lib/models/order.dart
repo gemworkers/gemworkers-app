@@ -105,6 +105,20 @@ class Order {
   /// True when the owner used the admin override to ship on a seller's behalf.
   final bool shippedByOwner;
 
+  // ── Payout tracking ───────────────────────────────────────────────────────
+
+  /// 'unpaid' | 'paid' | null (legacy / manual orders).
+  final String? payoutStatus;
+
+  /// Stamped server-side by mark_payout_paid(); null until paid out.
+  final DateTime? payoutPaidAt;
+
+  /// e.g. 'bank_transfer', 'paypal', etc.
+  final String? payoutMethod;
+
+  /// External reference / transaction id for the payout.
+  final String? payoutReference;
+
   // ── Shipping address (populated by Stripe checkout) ───────────────────────
   final String? shippingName;
   final String? shippingLine1;
@@ -145,6 +159,10 @@ class Order {
     this.shippingPostalCode,
     this.shippingCountry,
     this.shippingPhone,
+    this.payoutStatus,
+    this.payoutPaidAt,
+    this.payoutMethod,
+    this.payoutReference,
   });
 
   /// Computed from loaded items — use orderTotal for the stored, authoritative value.
@@ -198,6 +216,12 @@ class Order {
       shippingPostalCode: map['shipping_postal_code']?.toString(),
       shippingCountry:    map['shipping_country']?.toString(),
       shippingPhone:      map['shipping_phone']?.toString(),
+      payoutStatus:    map['payout_status']?.toString(),
+      payoutPaidAt:    map['payout_paid_at'] != null
+          ? DateTime.parse(map['payout_paid_at'])
+          : null,
+      payoutMethod:    map['payout_method']?.toString(),
+      payoutReference: map['payout_reference']?.toString(),
     );
   }
 
@@ -250,6 +274,10 @@ class Order {
     Object? shippingPostalCode = _omitted,
     Object? shippingCountry = _omitted,
     Object? shippingPhone = _omitted,
+    Object? payoutStatus = _omitted,
+    Object? payoutPaidAt = _omitted,
+    Object? payoutMethod = _omitted,
+    Object? payoutReference = _omitted,
   }) {
     return Order(
       id: id ?? this.id,
@@ -301,6 +329,14 @@ class Order {
           ? this.shippingCountry : shippingCountry as String?,
       shippingPhone: identical(shippingPhone, _omitted)
           ? this.shippingPhone : shippingPhone as String?,
+      payoutStatus: identical(payoutStatus, _omitted)
+          ? this.payoutStatus : payoutStatus as String?,
+      payoutPaidAt: identical(payoutPaidAt, _omitted)
+          ? this.payoutPaidAt : payoutPaidAt as DateTime?,
+      payoutMethod: identical(payoutMethod, _omitted)
+          ? this.payoutMethod : payoutMethod as String?,
+      payoutReference: identical(payoutReference, _omitted)
+          ? this.payoutReference : payoutReference as String?,
     );
   }
 }

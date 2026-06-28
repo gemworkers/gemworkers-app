@@ -97,6 +97,16 @@ class OrderRepository {
     });
   }
 
+  /// Records that the seller payout was made via the SECURITY DEFINER RPC.
+  Future<void> markPayoutPaid(
+      String orderId, {String? method, String? reference}) async {
+    await supabase.rpc('mark_payout_paid', params: {
+      'p_order_id': orderId,
+      'p_method': method,
+      'p_reference': reference,
+    });
+  }
+
   /// Sets order → 'paid' and marks all its inventory items → 'sold'.
   Future<void> markPaid(String orderId) async {
     // Update order first; if this fails nothing else changes.
