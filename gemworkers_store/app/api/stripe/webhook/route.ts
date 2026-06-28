@@ -363,6 +363,7 @@ export async function POST(req: NextRequest) {
       shipping_postal_code: addr?.address?.postal_code ?? null,
       shipping_country:     addr?.address?.country    ?? null,
       shipping_phone:       session.customer_details?.phone ?? null,
+      order_email:          custEmail,
     }
 
     if (groupId) {
