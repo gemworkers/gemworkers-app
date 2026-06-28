@@ -1,10 +1,7 @@
 // SERVER ONLY — never import from client components.
 import { Resend } from 'resend'
 
-// TODO: switch from: to 'GemWorkers <orders@gemworkers.com>' once the domain
-//       is verified in Resend. Until then only the Resend account-owner email
-//       actually receives in test mode; seller delivery starts after verification.
-const FROM = 'GemWorkers <onboarding@resend.dev>'
+const FROM = 'GemWorkers <orders@gemworkers.com>'
 
 // Lazy-initialized so the constructor doesn't throw at module-load time when
 // RESEND_API_KEY is absent (e.g. during next build page-data collection).

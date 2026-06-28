@@ -5,10 +5,7 @@ import type { EmailOrderLine, ShippingAddress } from './sendNewOrderEmail'
 // Re-export types so callers only need one import.
 export type { EmailOrderLine, ShippingAddress }
 
-// TODO: switch from: to 'GemWorkers <orders@gemworkers.com>' once the domain
-//       is verified in Resend. Until then only the Resend account-owner email
-//       actually receives in test mode.
-const FROM = 'GemWorkers <onboarding@resend.dev>'
+const FROM = 'GemWorkers <orders@gemworkers.com>'
 
 let _resend: Resend | null = null
 function getResend(): Resend {
@@ -82,7 +79,7 @@ function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
       ${phoneRow}
     </div>
 
-    <p style="font-size:12px;color:#9ca3af;margin:0">GemWorkers &middot; Questions? Email us at hello@gemworkers.com</p>
+    <p style="font-size:12px;color:#9ca3af;margin:0">This is an automated message &mdash; please do not reply. Questions? Email us at hello@gemworkers.com</p>
   </div>
 </body></html>`
 }
