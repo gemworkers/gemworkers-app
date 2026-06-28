@@ -12,6 +12,7 @@ interface OrderRecord {
   order_number:         string
   tracking_number:      string | null
   buyer_id:             string | null
+  order_email:          string | null
   status:               string
   checkout_group_id:    string | null
   shipping_name:        string | null
@@ -166,21 +167,26 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // ── 5. Fetch customer email ────────────────────────────────────────────────
-  const { data: buyerRow, error: buyerErr } = await supabase
-    .from("buyers")
-    .select("email")
-    .eq("id", record.buyer_id)
-    .single()
+  // ── 5. Resolve customer email: order_email (checkout) → buyers.email → skip
+  let customerEmail = (record.order_email as string | null)?.trim() ?? ""
 
-  const customerEmail = (buyerRow as { email: string } | null)?.email?.trim() ?? ""
-  if (buyerErr || !customerEmail) {
-    console.error(
-      "[order-shipped-email] could not resolve customer email for buyer",
-      record.buyer_id,
-      buyerErr?.message,
-    )
-    return json({ skipped: true, reason: "no customer email resolved" })
+  if (!customerEmail) {
+    const { data: buyerRow, error: buyerErr } = await supabase
+      .from("buyers")
+      .select("email")
+      .eq("id", record.buyer_id)
+      .single()
+
+    customerEmail = (buyerRow as { email: string } | null)?.email?.trim() ?? ""
+    if (buyerErr || !customerEmail) {
+      console.error(
+        "[order-shipped-email] could not resolve customer email for order",
+        record.id,
+        "buyer", record.buyer_id,
+        buyerErr?.message,
+      )
+      return json({ skipped: true, reason: "no customer email resolved" })
+    }
   }
 
   // ── 6. Fetch stone title ───────────────────────────────────────────────────
