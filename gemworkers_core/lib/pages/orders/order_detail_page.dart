@@ -568,7 +568,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         order.saleChannel == 'platform' &&
         order.payoutStatus != 'paid';
 
-    if (status == 'received' && !showPayoutButton) return null;
+    // Payout button is available from 'confirmed' onward (not draft/cancelled).
+    final showPayout = showPayoutButton &&
+        const {'confirmed', 'shipped', 'received', 'paid'}.contains(status);
+
+    if (status == 'received' && !showPayout) return null;
 
     return SafeArea(
       child: Padding(
@@ -610,6 +614,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                         backgroundColor: Colors.orange),
                   ),
                 ),
+                if (showPayout) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _actionInProgress ? null : _markPayoutPaid,
+                      icon: const Icon(Icons.payments_outlined),
+                      label: const Text('Mark Payout Paid'),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.green),
+                    ),
+                  ),
+                ],
               ] else ...[
                 // Manual order: existing Cancel + Mark Paid unchanged.
                 Expanded(
@@ -633,7 +649,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 ),
               ],
             ],
-            if (status == 'shipped')
+            if (status == 'shipped') ...[
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -644,17 +660,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                   ),
                 ),
               ),
-            if (status == 'received' && showPayoutButton)
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _actionInProgress ? null : _markPayoutPaid,
-                  icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Mark Payout Paid'),
-                  style: FilledButton.styleFrom(backgroundColor: Colors.green),
-                ),
-              ),
-            if (status == 'paid') ...[
-              if (showPayoutButton) ...[
+              if (showPayout) ...[
+                const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: _actionInProgress ? null : _markPayoutPaid,
@@ -664,8 +671,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                         FilledButton.styleFrom(backgroundColor: Colors.green),
                   ),
                 ),
-                const SizedBox(width: 12),
               ],
+            ],
+            if (status == 'received' && showPayout)
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _actionInProgress ? null : _markPayoutPaid,
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('Mark Payout Paid'),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                ),
+              ),
+            if (status == 'paid') ...[
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _actionInProgress ? null : _cancelOrder,
@@ -675,6 +692,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       foregroundColor: Colors.red),
                 ),
               ),
+              if (showPayout) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _actionInProgress ? null : _markPayoutPaid,
+                    icon: const Icon(Icons.payments_outlined),
+                    label: const Text('Mark Payout Paid'),
+                    style:
+                        FilledButton.styleFrom(backgroundColor: Colors.green),
+                  ),
+                ),
+              ],
             ],
           ],
         ),
