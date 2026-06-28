@@ -137,6 +137,70 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     });
   }
 
+  Future<void> _markPayoutPaid() async {
+    String? selectedMethod = 'Wise';
+    final referenceCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Mark Payout Paid'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Record that the seller payout has been made.'),
+              const SizedBox(height: 16),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'Wise', label: Text('Wise')),
+                  ButtonSegment(
+                      value: 'Payoneer', label: Text('Payoneer')),
+                ],
+                selected: {selectedMethod ?? 'Wise'},
+                onSelectionChanged: (v) =>
+                    setLocal(() => selectedMethod = v.first),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: referenceCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Transaction reference (optional)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Mark Paid'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final method = selectedMethod;
+    final reference =
+        referenceCtrl.text.trim().isEmpty ? null : referenceCtrl.text.trim();
+    referenceCtrl.dispose();
+
+    if (confirmed != true || !mounted) return;
+    await _runAction(() async {
+      await _repository.markPayoutPaid(widget.orderId,
+          method: method, reference: reference);
+      await _load();
+    });
+  }
+
   Future<void> _deleteOrder() async {
     final confirmed = await _confirmDialog(
       title: 'Delete Order',
@@ -326,6 +390,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 prefix: '−',
               ),
               _moneyRow('Seller payout', order.sellerPayout, bold: true),
+              _row('Payout', _payoutStatusLabel(order)),
             ],
           ],
         ),
@@ -498,7 +563,12 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Widget? _buildActionBar(Order order) {
     final status = order.status;
     if (status == 'cancelled') return null;
-    if (status == 'received') return null;
+
+    final showPayoutButton = UserProfileService.instance.isOwner &&
+        order.saleChannel == 'platform' &&
+        order.payoutStatus != 'paid';
+
+    if (status == 'received' && !showPayoutButton) return null;
 
     return SafeArea(
       child: Padding(
@@ -574,7 +644,28 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                   ),
                 ),
               ),
-            if (status == 'paid')
+            if (status == 'received' && showPayoutButton)
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _actionInProgress ? null : _markPayoutPaid,
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('Mark Payout Paid'),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                ),
+              ),
+            if (status == 'paid') ...[
+              if (showPayoutButton) ...[
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _actionInProgress ? null : _markPayoutPaid,
+                    icon: const Icon(Icons.payments_outlined),
+                    label: const Text('Mark Payout Paid'),
+                    style:
+                        FilledButton.styleFrom(backgroundColor: Colors.green),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _actionInProgress ? null : _cancelOrder,
@@ -584,6 +675,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       foregroundColor: Colors.red),
                 ),
               ),
+            ],
           ],
         ),
       ),
@@ -640,6 +732,24 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         ],
       ),
     );
+  }
+
+  String _payoutStatusLabel(Order order) {
+    if (order.payoutStatus != 'paid') return 'Unpaid';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final parts = <String>['Paid'];
+    if (order.payoutPaidAt != null) {
+      final d = order.payoutPaidAt!.toLocal();
+      parts.add('${d.day} ${months[d.month - 1]} ${d.year}');
+    }
+    if (order.payoutMethod?.isNotEmpty == true) parts.add(order.payoutMethod!);
+    if (order.payoutReference?.isNotEmpty == true) {
+      parts.add('ref ${order.payoutReference!}');
+    }
+    return parts.join(' · ');
   }
 
   String _pct(double rate) {
