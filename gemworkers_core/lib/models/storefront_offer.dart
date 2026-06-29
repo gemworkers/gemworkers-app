@@ -1,6 +1,7 @@
 class StorefrontOffer {
   final String id;
   final String inventoryItemId;
+  final String sellerId;
   final String stoneTitle;   // from inventory_items join
   final double offeredPrice;
   final String status;       // 'pending' | 'accepted' | 'declined'
@@ -13,6 +14,7 @@ class StorefrontOffer {
   const StorefrontOffer({
     required this.id,
     required this.inventoryItemId,
+    required this.sellerId,
     required this.stoneTitle,
     required this.offeredPrice,
     required this.status,
@@ -29,6 +31,7 @@ class StorefrontOffer {
     return StorefrontOffer(
       id:               map['id'].toString(),
       inventoryItemId:  map['inventory_item_id'].toString(),
+      sellerId:         map['seller_id'].toString(),
       stoneTitle:       item?['title']?.toString() ?? '',
       offeredPrice:     (map['offered_price'] as num).toDouble(),
       status:           map['status']?.toString() ?? 'pending',

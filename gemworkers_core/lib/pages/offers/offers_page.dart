@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/storefront_offer.dart';
 import '../../repositories/offers_repository.dart';
 
@@ -28,9 +29,13 @@ class _OffersPageState extends State<OffersPage> {
     setState(() => _loading = true);
     try {
       final offers = await _repository.fetchOffers();
+      final svc = UserProfileService.instance;
+      final scoped = svc.shouldFilterBySeller
+          ? offers.where((o) => o.sellerId == svc.sellerId).toList()
+          : offers;
       if (mounted) {
         setState(() {
-          _offers = offers;
+          _offers = scoped;
           _loading = false;
         });
       }

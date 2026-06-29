@@ -5,9 +5,10 @@ import '../models/storefront_offer.dart';
 class OffersRepository {
   final SupabaseClient supabase = Supabase.instance.client;
 
-  /// Fetches pending + accepted + declined offers for the logged-in seller.
-  /// RLS (offers_seller_select) scopes the query to this seller automatically —
-  /// no manual seller_id filter is needed.
+  /// Fetches pending + accepted + declined offers for the logged-in user.
+  /// RLS (offers_seller_select) already scopes sellers to their own rows at
+  /// the DB level; the app layer applies shouldFilterBySeller on top for
+  /// consistency with orders/purchases pages.
   /// Withdrawn and expired offers are excluded: they need no action.
   Future<List<StorefrontOffer>> fetchOffers() async {
     final response = await supabase
