@@ -91,6 +91,21 @@ class _AddEditSellerPageState extends State<AddEditSellerPage> {
       return;
     }
 
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email is required')));
+      return;
+    }
+    final atIndex = email.indexOf('@');
+    if (atIndex < 1 ||
+        !email.substring(atIndex + 1).contains('.') ||
+        email.endsWith('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid email')));
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       final commissionPct = double.tryParse(_commissionRatePct.text);
@@ -98,7 +113,7 @@ class _AddEditSellerPageState extends State<AddEditSellerPage> {
         name: name,
         country: _country.text.trim(),
         contactName: _contactName.text.trim(),
-        email: _email.text.trim(),
+        email: email,
         phone: _phone.text.trim(),
         status: _status,
         commissionRate:
