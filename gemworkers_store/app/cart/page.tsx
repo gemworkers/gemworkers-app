@@ -16,7 +16,6 @@ type CartListing = {
   image_url: string | null
   gem_type: string | null
   variety: string | null
-  seller_name: string | null
   seller_country: string | null
   shipping_cost: number | null
 }
@@ -128,7 +127,7 @@ export default async function CartPage() {
   const itemIds = cartRows.map(r => r.inventory_item_id)
   const { data: listings } = await supabase
     .from('public_listings')
-    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_name, seller_country, shipping_cost')
+    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_country, shipping_cost')
     .in('id', itemIds)
 
   const listingMap = new Map<string, CartListing>(

@@ -18,7 +18,6 @@ type ListingDetail = {
   sale_method: 'buy_now' | 'accept_offers' | 'both';
   description: string | null;
   image_urls: string[] | null;
-  seller_name: string | null;
 
   video_url: string | null;
 
@@ -308,21 +307,6 @@ export default async function StoneDetailPage({
             }}>
               {item.title}
             </h1>
-
-            {/* Seller */}
-            {item.seller_name && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                fontSize: 12, color: '#9ca3af', marginBottom: 16,
-              }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9,22 9,12 15,12 15,22" />
-                </svg>
-                {item.seller_name}
-              </div>
-            )}
 
             {/* Price */}
             {item.sale_method === 'accept_offers' ? (

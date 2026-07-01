@@ -76,12 +76,6 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
           }}>
             GEMWORKERS
           </span>
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#9ca3af',
-            border: '1px solid #e5e7eb', borderRadius: 3, padding: '2px 7px',
-          }}>
-            MARKETPLACE
-          </span>
         </Link>
 
         <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>

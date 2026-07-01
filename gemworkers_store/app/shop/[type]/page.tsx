@@ -25,7 +25,6 @@ type CategoryItem = {
   selling_price:  number | null
   sale_method:    string | null
   shipping_cost:  number | null
-  seller_name:    string | null
   image_url:      string | null
 }
 
@@ -58,7 +57,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
   // image_urls is a jsonb array here — we extract [0] below.
   const { data, error } = await supabase
     .from('public_listing_details')
-    .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, selling_price, sale_method, shipping_cost, seller_name, image_urls')
+    .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, selling_price, sale_method, shipping_cost, image_urls')
     .eq('product_type', type)
 
   if (error) console.error('[shop] query error:', error.message)
@@ -74,7 +73,6 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
     selling_price:  row.selling_price  != null ? Number(row.selling_price) : null,
     sale_method:    row.sale_method    as string | null,
     shipping_cost:  row.shipping_cost  != null ? Number(row.shipping_cost) : null,
-    seller_name:    row.seller_name    as string | null,
     image_url:      Array.isArray(row.image_urls)
       ? ((row.image_urls as unknown as string[])[0] ?? null)
       : null,
@@ -242,16 +240,6 @@ function StoneCard({ item }: { item: CategoryItem }) {
             </span>
           ) : (
             <span style={{ fontSize: 13, color: '#d1d5db' }}>—</span>
-          )}
-          {item.seller_name && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#9ca3af' }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9,22 9,12 15,12 15,22" />
-              </svg>
-              {item.seller_name}
-            </span>
           )}
         </div>
         {cost !== null && (

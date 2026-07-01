@@ -13,7 +13,6 @@ type ListedItem = {
   sale_method: string;
   shipping_cost: number | null;
   seller_id: string;
-  seller_name: string | null;
   image_url: string | null;
 };
 
@@ -128,16 +127,6 @@ export default async function HomePage() {
                       </span>
                     ) : (
                       <span style={{ fontSize: 13, color: "#d1d5db" }}>—</span>
-                    )}
-                    {item.seller_name && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#9ca3af" }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                          stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                          <polyline points="9,22 9,12 15,12 15,22" />
-                        </svg>
-                        {item.seller_name}
-                      </span>
                     )}
                   </div>
                   {cost !== null && (

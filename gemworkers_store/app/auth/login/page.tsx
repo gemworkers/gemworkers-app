@@ -58,12 +58,6 @@ export default function LoginPage() {
           }}>
             GEMWORKERS
           </span>
-          <span style={{
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#9ca3af',
-            border: '1px solid #e5e7eb', borderRadius: 3, padding: '2px 7px',
-          }}>
-            MARKETPLACE
-          </span>
         </Link>
       </header>
 
