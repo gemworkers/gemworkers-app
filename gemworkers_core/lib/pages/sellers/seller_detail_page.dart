@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/location.dart';
 import '../../models/seller.dart';
 import '../../repositories/location_repository.dart';
@@ -23,6 +25,7 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
   List<Location> _locationTree = [];
   bool _loading = true;
   bool _deleting = false;
+  bool _inviting = false;
 
   @override
   void initState() {
@@ -101,6 +104,79 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
             .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
         setState(() => _deleting = false);
       }
+    }
+  }
+
+  Future<void> _confirmInvite() async {
+    final seller = _seller;
+    if (seller == null) return;
+
+    if (seller.email.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Add an email for this seller before inviting.')));
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Invite seller?'),
+        content: Text(
+            'Send a login invitation to ${seller.email}? They will receive '
+            'an email to set their password and access the GemWorkers admin app.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Send invite'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _inviting = true);
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'seller-invite',
+        body: {'seller_id': seller.id},
+      );
+      final data = res.data as Map<String, dynamic>?;
+
+      String message;
+      if (data?['alreadyInvited'] == true) {
+        message = 'This seller was already invited.';
+      } else if (data?['ok'] == true || data?['invited'] == true) {
+        message = 'Invitation sent to ${seller.email}.';
+      } else {
+        message =
+            data?['error']?.toString() ?? 'Invite failed. Please try again.';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    } on FunctionException catch (e) {
+      final details = e.details;
+      final message = details is Map && details['error'] != null
+          ? details['error'].toString()
+          : 'Invite failed: ${e.reasonPhrase ?? e.status}';
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Invite failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _inviting = false);
     }
   }
 
@@ -279,6 +355,17 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
         title: Text(seller?.name ?? 'Seller'),
         actions: [
           if (!_loading && seller != null) ...[
+            if (UserProfileService.instance.isOwner)
+              IconButton(
+                icon: _inviting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.mail_outline),
+                tooltip: 'Invite to log in',
+                onPressed: _inviting ? null : _confirmInvite,
+              ),
             IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Edit',
