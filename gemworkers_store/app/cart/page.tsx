@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { BuyButton } from '@/app/stones/[id]/BuyButton'
 import { RemoveButton } from './RemoveButton'
 import { BuyAllButton } from './BuyAllButton'
+import { countryName } from '@/lib/countries'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,7 @@ type CartListing = {
   gem_type: string | null
   variety: string | null
   seller_name: string | null
+  seller_country: string | null
   shipping_cost: number | null
 }
 
@@ -126,7 +128,7 @@ export default async function CartPage() {
   const itemIds = cartRows.map(r => r.inventory_item_id)
   const { data: listings } = await supabase
     .from('public_listings')
-    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_name, shipping_cost')
+    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_name, seller_country, shipping_cost')
     .in('id', itemIds)
 
   const listingMap = new Map<string, CartListing>(
@@ -195,6 +197,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
     .filter(Boolean)
     .join(' · ') || null
   const cost = listing.shipping_cost == null ? null : Number(listing.shipping_cost)
+  const shipFrom = countryName(listing.seller_country)
 
   return (
     <div style={{
@@ -244,8 +247,13 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
           </p>
         </Link>
         {subtitle && (
-          <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
+          <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: shipFrom ? 3 : 8 }}>
             {subtitle}
+          </p>
+        )}
+        {shipFrom && (
+          <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
+            Ships from {shipFrom}
           </p>
         )}
         <p style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 16, letterSpacing: '-0.01em' }}>

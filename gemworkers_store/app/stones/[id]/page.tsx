@@ -6,6 +6,7 @@ import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
 import { cancelPendingOrder } from '@/app/actions/commerce';
+import { countryName } from '@/lib/countries';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ type ListingDetail = {
   total_weight_grams_unit: string | null;
 
   // shipping
+  seller_country: string | null;
   courier: string | null;
   shipping_cost: number | null;
   delivery_days_min: number | null;
@@ -246,7 +248,10 @@ export default async function StoneDetailPage({
         ? `From ${item.delivery_days_min} days`
         : null;
 
+  const shipFromName = countryName(item.seller_country)
+
   const hasShipping =
+    item.seller_country != null ||
     item.courier != null ||
     item.shipping_cost != null ||
     item.delivery_days_min != null ||
@@ -451,12 +456,13 @@ export default async function StoneDetailPage({
               </SpecSection>
             )}
 
-            {/* Shipping — omit entire section when all five fields are null */}
+            {/* Shipping — omit entire section when all fields are null */}
             {hasShipping && (
               <SpecSection title="Shipping">
-                <SpecRow label="Courier"  value={item.courier} />
-                <SpecRow label="Cost"     value={shippingCostDisplay} />
-                <SpecRow label="Delivery" value={deliveryRange} />
+                <SpecRow label="Ships from" value={shipFromName} />
+                <SpecRow label="Courier"    value={item.courier} />
+                <SpecRow label="Cost"       value={shippingCostDisplay} />
+                <SpecRow label="Delivery"   value={deliveryRange} />
                 {item.prep_days != null && (
                   <SpecRow label="Handling" value={`Ready in ${item.prep_days} days`} />
                 )}
