@@ -165,15 +165,26 @@ export default function SellerAcceptInvitePage() {
             Password set
           </h1>
           <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>
-            You can now log in to the GemWorkers admin app.
+            Your account is ready. Head to your seller dashboard to start listing your stones.
           </p>
           {sellerEmail && (
-            <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.6 }}>
-              Open the GemWorkers app on your device and sign in with{' '}
+            <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.6, marginBottom: 28 }}>
+              Sign in with{' '}
               <strong style={{ color: '#374151' }}>{sellerEmail}</strong>{' '}
               and the password you just chose.
             </p>
           )}
+          <a
+            href="https://sell.gemworkers.com"
+            style={{
+              display: 'inline-block', padding: '10px 24px',
+              background: '#111', color: '#fff', borderRadius: 6,
+              textDecoration: 'none', fontSize: 14, fontWeight: 600,
+              letterSpacing: '0.02em',
+            }}
+          >
+            Go to Seller Dashboard
+          </a>
         </main>
       </>
     )
