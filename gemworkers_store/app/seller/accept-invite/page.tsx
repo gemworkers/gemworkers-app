@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 const inputStyle: React.CSSProperties = {
@@ -103,13 +104,8 @@ export default function SellerAcceptInvitePage() {
           borderBottom: '1px solid #e5e7eb',
           background: '#fff',
         }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <span style={{
-              fontSize: 18, fontWeight: 700, letterSpacing: '0.13em',
-              fontFamily: "Georgia, 'Times New Roman', serif", color: '#111',
-            }}>
-              GEMWORKERS
-            </span>
+          <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
+            <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
           </Link>
         </header>
         <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
@@ -146,13 +142,8 @@ export default function SellerAcceptInvitePage() {
           borderBottom: '1px solid #e5e7eb',
           background: '#fff',
         }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <span style={{
-              fontSize: 18, fontWeight: 700, letterSpacing: '0.13em',
-              fontFamily: "Georgia, 'Times New Roman', serif", color: '#111',
-            }}>
-              GEMWORKERS
-            </span>
+          <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
+            <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
           </Link>
         </header>
         <main style={{ maxWidth: 420, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
@@ -197,13 +188,8 @@ export default function SellerAcceptInvitePage() {
       borderBottom: '1px solid #e5e7eb',
       background: '#fff',
     }}>
-      <Link href="/" style={{ textDecoration: 'none' }}>
-        <span style={{
-          fontSize: 18, fontWeight: 700, letterSpacing: '0.13em',
-          fontFamily: "Georgia, 'Times New Roman', serif", color: '#111',
-        }}>
-          GEMWORKERS
-        </span>
+      <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
+        <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
       </Link>
     </header>
   )

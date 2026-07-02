@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { StoreHeader } from '@/app/components/StoreHeader'
 
@@ -33,17 +34,14 @@ function Footer() {
         flexWrap: 'wrap', gap: 40, alignItems: 'flex-start',
       }}>
         {/* Brand */}
-        <div style={{ maxWidth: 240 }}>
-          <span style={{
-            display: 'block', marginBottom: 10,
-            fontSize: 15, fontWeight: 700, letterSpacing: '0.13em',
-            fontFamily: "Georgia, 'Times New Roman', serif", color: '#111',
-          }}>
-            GEMWORKERS
-          </span>
-          <p style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.7 }}>
-            Curated gemstones, minerals &amp; jewelry, direct from specialist sellers.
-          </p>
+        <div>
+          <Image
+            src="/logo-black.png"
+            alt="GemWorkers"
+            height={90}
+            width={124}
+            style={{ display: 'block' }}
+          />
         </div>
 
         {/* Links */}

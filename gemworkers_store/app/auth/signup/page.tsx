@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -107,13 +108,8 @@ export default function SignupPage() {
         borderBottom: '1px solid #e5e7eb',
         background: '#fff',
       }}>
-        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{
-            fontSize: 18, fontWeight: 700, letterSpacing: '0.13em',
-            fontFamily: "Georgia, 'Times New Roman', serif", color: '#111',
-          }}>
-            GEMWORKERS
-          </span>
+        <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
+          <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
         </Link>
       </header>
 
