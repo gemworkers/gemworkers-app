@@ -1,26 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
+import { StoneGrid } from "@/app/components/StoneGrid";
+import { HeroSection } from "@/app/components/HeroSection";
+import type { StoneCardItem } from "@/app/components/StoneCard";
 
 type ListedItem = {
   id: string;
   title: string;
-  gem_type: string;
-  variety: string;
+  gem_type: string | null;
+  variety: string | null;
   weight_value: number | null;
-  weight_unit: string;
-  origin_country: string;
+  weight_unit: string | null;
+  origin_country: string | null;
   selling_price: number | null;
   sale_method: string;
   shipping_cost: number | null;
   seller_id: string;
   image_url: string | null;
 };
-
-const eur = new Intl.NumberFormat("en-IE", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 0,
-});
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -29,117 +25,69 @@ export default async function HomePage() {
   if (error) console.error("[GemWorkers Store] Supabase error:", error.message);
 
   const items = (data ?? []) as ListedItem[];
+  const cardItems: StoneCardItem[] = items.map(item => ({
+    id:             item.id,
+    title:          item.title,
+    gem_type:       item.gem_type,
+    variety:        item.variety,
+    weight_value:   item.weight_value,
+    weight_unit:    item.weight_unit,
+    origin_country: item.origin_country,
+    selling_price:  item.selling_price,
+    sale_method:    item.sale_method,
+    shipping_cost:  item.shipping_cost,
+    image_url:      item.image_url,
+  }))
 
   return (
-    <main style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 32px 80px" }}>
+    <main>
 
-      {/* Stone count */}
-      <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 24, letterSpacing: "0.04em" }}>
-        Showing {items.length} of {items.length} stones
-      </p>
+      {/* ── Hero ──────────────────────────────────────────────────────── */}
+      <HeroSection />
 
-      {/* Empty state */}
-      {items.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "100px 0" }}>
-          <div style={{ fontSize: 36, color: "#d1d5db", marginBottom: 14 }}>◇</div>
-          <p style={{ fontSize: 15, color: "#9ca3af", letterSpacing: "0.01em" }}>
-            No stones listed yet.
+      <div className="gold-rule" />
+
+      {/* ── Collection grid ───────────────────────────────────────────── */}
+      <section style={{ maxWidth: 1400, margin: '0 auto', padding: '60px 32px 80px' }}>
+
+        <div style={{
+          display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+          marginBottom: 36, gap: 12,
+        }}>
+          <p style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
+            color: '#c9a962', fontFamily: 'var(--font-inter, system-ui)',
+          }}>
+            The Collection
+          </p>
+          <p style={{
+            fontSize: 11, color: '#4a4440', letterSpacing: '0.06em',
+            fontFamily: 'var(--font-inter, system-ui)',
+          }}>
+            {items.length} {items.length === 1 ? 'stone' : 'stones'}
           </p>
         </div>
-      ) : (
-        <div className="stones-grid">
-          {items.map((item) => {
-            const gemLabel = item.variety?.trim() || item.gem_type?.trim() || null;
-            const originLabel = item.origin_country?.trim() || null;
-            const subtitle = [gemLabel, originLabel].filter(Boolean).join(" · ");
-            const initial = gemLabel ? gemLabel.charAt(0).toUpperCase() : "◇";
-            const hasWeight = item.weight_value != null && Number(item.weight_value) > 0;
-            const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
 
-            return (
-              <Link
-                key={item.id}
-                href={`/stones/${item.id}`}
-                className="stone-card"
-                style={{
-                  display: "block", textDecoration: "none", color: "inherit",
-                  border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden",
-                  background: "#fff",
-                }}
-              >
-                {/* ── Image area ── */}
-                <div style={{ position: "relative", aspectRatio: "1", overflow: "hidden" }}>
-                  {item.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.image_url}
-                      alt={item.title}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                  ) : (
-                    <div style={{
-                      width: "100%", height: "100%",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      background: "linear-gradient(145deg, #f6f3ef 0%, #ece8e2 100%)",
-                    }}>
-                      <span style={{
-                        fontSize: 48, color: "#c4b8ab", fontWeight: 300,
-                        fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: 1,
-                        userSelect: "none",
-                      }}>
-                        {initial}
-                      </span>
-                    </div>
-                  )}
+        {items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '100px 0' }}>
+            <div style={{
+              fontSize: 32, color: '#2a2a30', marginBottom: 16,
+              fontFamily: 'var(--font-cormorant, Georgia, serif)',
+            }}>
+              ◇
+            </div>
+            <p style={{
+              fontSize: 15, color: '#4a4440', letterSpacing: '0.04em',
+              fontFamily: 'var(--font-inter, system-ui)',
+            }}>
+              No stones listed yet.
+            </p>
+          </div>
+        ) : (
+          <StoneGrid items={cardItems} />
+        )}
+      </section>
 
-                  {/* Carat badge */}
-                  {hasWeight && (
-                    <div style={{
-                      position: "absolute", top: 8, right: 8,
-                      background: "rgba(255,255,255,0.92)", backdropFilter: "blur(6px)",
-                      borderRadius: 4, padding: "2px 8px",
-                      fontSize: 11, fontWeight: 600, color: "#374151", letterSpacing: "0.03em",
-                    }}>
-                      {item.weight_value} {item.weight_unit}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Card body ── */}
-                <div style={{ padding: "12px 14px 14px" }}>
-                  <p style={{
-                    fontSize: 14, fontWeight: 600, color: "#111",
-                    lineHeight: 1.35, marginBottom: subtitle ? 4 : 10,
-                  }}>
-                    {item.title}
-                  </p>
-                  {subtitle && (
-                    <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 10, lineHeight: 1.4 }}>
-                      {subtitle}
-                    </p>
-                  )}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    {item.sale_method === 'accept_offers' ? (
-                      <span style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Offers</span>
-                    ) : item.selling_price != null ? (
-                      <span style={{ fontSize: 15, fontWeight: 700, color: "#111", letterSpacing: "-0.01em" }}>
-                        {eur.format(Number(item.selling_price))}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 13, color: "#d1d5db" }}>—</span>
-                    )}
-                  </div>
-                  {cost !== null && (
-                    <p style={{ fontSize: 11, marginTop: 5, color: cost === 0 ? "#16a34a" : "#6b7280" }}>
-                      {cost === 0 ? "Free shipping" : `+ €${cost.toFixed(0)} shipping`}
-                    </p>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
     </main>
   );
 }
