@@ -24,9 +24,10 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
         style={{
           display: 'block', textAlign: 'center',
           padding: '9px 0', fontSize: 13, fontWeight: 500,
-          color: '#6b7280', background: '#fff',
-          border: '1px solid #e5e7eb', borderRadius: 6,
+          color: '#9d9080', background: 'transparent',
+          border: '1px solid #2a2a30', borderRadius: 6,
           textDecoration: 'none', letterSpacing: '0.02em',
+          fontFamily: 'var(--font-inter, system-ui)',
         }}
       >
         Log in to save
@@ -50,9 +51,10 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
         }}
         style={{
           width: '100%', padding: '9px 0', fontSize: 13, fontWeight: 500,
-          color: '#374151', background: '#fff',
-          border: '1px solid #d1d5db', borderRadius: 6,
+          color: '#9d9080', background: 'transparent',
+          border: '1px solid #2a2a30', borderRadius: 6,
           cursor: 'pointer', letterSpacing: '0.02em',
+          fontFamily: 'var(--font-inter, system-ui)',
         }}
       >
         Add to cart
@@ -65,8 +67,8 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
     return (
       <button disabled style={{
         width: '100%', padding: '9px 0', fontSize: 13, fontWeight: 500,
-        color: '#9ca3af', background: '#fff',
-        border: '1px solid #e5e7eb', borderRadius: 6,
+        color: '#4a4440', background: 'transparent',
+        border: '1px solid #2a2a30', borderRadius: 6,
         cursor: 'not-allowed',
       }}>
         Adding…
@@ -80,13 +82,13 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '9px 12px',
-        border: '1px solid #d1fae5', borderRadius: 6,
-        background: '#f0fdf4',
+        border: '1px solid rgba(45,212,191,0.3)', borderRadius: 6,
+        background: 'rgba(45,212,191,0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#059669' }}>In cart</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2dd4bf' }}>In cart</span>
           <Link href="/cart" style={{
-            fontSize: 13, color: '#374151',
+            fontSize: 13, color: '#9d9080',
             textDecoration: 'underline', textUnderlineOffset: 2,
           }}>
             View cart
@@ -104,7 +106,7 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
             }
           }}
           style={{
-            fontSize: 12, color: '#9ca3af', background: 'none', border: 'none',
+            fontSize: 12, color: '#4a4440', background: 'none', border: 'none',
             cursor: 'pointer', padding: 0,
           }}
         >
@@ -118,8 +120,8 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   if (state === 'loading_remove') {
     return (
       <div style={{
-        padding: '9px 12px', fontSize: 13, color: '#9ca3af',
-        border: '1px solid #e5e7eb', borderRadius: 6,
+        padding: '9px 12px', fontSize: 13, color: '#4a4440',
+        border: '1px solid #2a2a30', borderRadius: 6,
       }}>
         Removing…
       </div>
@@ -131,16 +133,16 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '9px 12px',
-      border: '1px solid #fecaca', borderRadius: 6,
-      background: '#fef2f2',
+      border: '1px solid rgba(220,38,38,0.35)', borderRadius: 6,
+      background: 'rgba(220,38,38,0.08)',
     }}>
-      <span style={{ fontSize: 12, color: '#dc2626', flex: 1 }}>
+      <span style={{ fontSize: 12, color: '#f87171', flex: 1 }}>
         {errorMsg ?? 'Something went wrong.'}
       </span>
       <button
         onClick={() => { setErrorMsg(null); setState('idle') }}
         style={{
-          fontSize: 12, color: '#374151', background: 'none',
+          fontSize: 12, color: '#9d9080', background: 'none',
           border: 'none', cursor: 'pointer', textDecoration: 'underline',
           textUnderlineOffset: 2, whiteSpace: 'nowrap',
         }}

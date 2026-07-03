@@ -27,21 +27,28 @@ export function MarkReceivedButton({ orderId }: { orderId: string }) {
         onClick={handleClick}
         disabled={loading}
         style={{
-          padding: '8px 20px',
-          background: loading ? '#d1d5db' : '#14b8a6',
-          color: '#fff',
-          border: 'none',
+          padding: '7px 18px',
+          background: 'rgba(45,212,191,0.12)',
+          color: '#2dd4bf',
+          border: '1px solid rgba(45,212,191,0.4)',
           borderRadius: 6,
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: 600,
           cursor: loading ? 'not-allowed' : 'pointer',
-          letterSpacing: '0.02em',
+          letterSpacing: '0.04em',
+          opacity: loading ? 0.6 : 1,
+          fontFamily: 'var(--font-inter, system-ui)',
         }}
       >
         {loading ? 'Confirming…' : 'Mark as Received'}
       </button>
       {err && (
-        <p style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>{err}</p>
+        <p style={{
+          fontSize: 12, color: '#f87171', marginTop: 6,
+          fontFamily: 'var(--font-inter, system-ui)',
+        }}>
+          {err}
+        </p>
       )}
     </div>
   )

@@ -44,6 +44,7 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
           <img
             src={item.image_url}
             alt={item.title}
+            className="stone-img"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (

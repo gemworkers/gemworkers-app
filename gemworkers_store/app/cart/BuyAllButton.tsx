@@ -14,7 +14,6 @@ export function BuyAllButton() {
     const result = await checkoutCart()
     if ('checkoutUrl' in result) {
       window.location.href = result.checkoutUrl
-      // Stay in loading while the browser navigates to Stripe.
     } else {
       setErrorMsg(result.error)
       setState('error')
@@ -24,18 +23,22 @@ export function BuyAllButton() {
   if (state === 'error') {
     return (
       <div style={{
-        border: '1px solid #fecaca', borderRadius: 8,
-        padding: '16px 18px', background: '#fef2f2',
+        border: '1px solid rgba(220,38,38,0.35)', borderRadius: 8,
+        padding: '16px 18px', background: 'rgba(220,38,38,0.08)',
       }}>
-        <p style={{ fontSize: 13, color: '#dc2626', lineHeight: 1.5, marginBottom: 14 }}>
+        <p style={{
+          fontSize: 13, color: '#f87171', lineHeight: 1.5, marginBottom: 14,
+          fontFamily: 'var(--font-inter, system-ui)',
+        }}>
           {errorMsg ?? 'Something went wrong — please try again.'}
         </p>
         <button
           onClick={() => { setErrorMsg(null); setState('idle') }}
           style={{
-            fontSize: 13, fontWeight: 500, color: '#374151',
-            background: '#fff', border: '1px solid #e5e7eb',
+            fontSize: 13, fontWeight: 500, color: '#9d9080',
+            background: '#1e1e24', border: '1px solid #2a2a30',
             borderRadius: 6, padding: '7px 16px', cursor: 'pointer',
+            fontFamily: 'var(--font-inter, system-ui)',
           }}
         >
           Try again
@@ -46,19 +49,23 @@ export function BuyAllButton() {
 
   return (
     <div>
-      <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 12 }}>
+      <p style={{
+        fontSize: 12, color: '#9d9080', marginBottom: 12,
+        fontFamily: 'var(--font-inter, system-ui)',
+      }}>
         Pay for everything in one go.
       </p>
       <button
         onClick={handleClick}
         disabled={state === 'loading'}
         style={{
-          width: '100%', padding: '12px 0', fontSize: 14, fontWeight: 600,
-          color: '#fff',
-          background: state === 'loading' ? '#6b7280' : '#111',
+          width: '100%', padding: '13px 0', fontSize: 13, fontWeight: 600,
+          color: '#0e0e10',
+          background: state === 'loading' ? '#7a6234' : '#c9a962',
           border: 'none', borderRadius: 6,
           cursor: state === 'loading' ? 'not-allowed' : 'pointer',
-          letterSpacing: '0.02em',
+          letterSpacing: '0.06em',
+          fontFamily: 'var(--font-inter, system-ui)',
         }}
       >
         {state === 'loading' ? 'Preparing checkout…' : 'Buy all'}

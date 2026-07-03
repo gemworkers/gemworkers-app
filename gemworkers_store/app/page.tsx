@@ -1,3 +1,5 @@
+import { existsSync } from 'fs'
+import { join } from 'path'
 import { createClient } from "@/lib/supabase/server";
 import { StoneGrid } from "@/app/components/StoneGrid";
 import { HeroSection } from "@/app/components/HeroSection";
@@ -19,9 +21,10 @@ type ListedItem = {
 };
 
 export default async function HomePage() {
+  const hasHero = existsSync(join(process.cwd(), 'public', 'hero.jpg'))
+
   const supabase = await createClient();
   const { data, error } = await supabase.from("public_listings").select("*");
-
   if (error) console.error("[GemWorkers Store] Supabase error:", error.message);
 
   const items = (data ?? []) as ListedItem[];
@@ -41,15 +44,10 @@ export default async function HomePage() {
 
   return (
     <main>
-
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <HeroSection />
-
+      <HeroSection hasHero={hasHero} />
       <div className="gold-rule" />
 
-      {/* ── Collection grid ───────────────────────────────────────────── */}
       <section style={{ maxWidth: 1400, margin: '0 auto', padding: '60px 32px 80px' }}>
-
         <div style={{
           display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
           marginBottom: 36, gap: 12,
@@ -73,9 +71,7 @@ export default async function HomePage() {
             <div style={{
               fontSize: 32, color: '#2a2a30', marginBottom: 16,
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
-            }}>
-              ◇
-            </div>
+            }}>◇</div>
             <p style={{
               fontSize: 15, color: '#4a4440', letterSpacing: '0.04em',
               fontFamily: 'var(--font-inter, system-ui)',
@@ -87,7 +83,6 @@ export default async function HomePage() {
           <StoneGrid items={cardItems} />
         )}
       </section>
-
     </main>
   );
 }

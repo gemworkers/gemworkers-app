@@ -76,7 +76,6 @@ const eur = new Intl.NumberFormat('en-IE', {
   maximumFractionDigits: 0,
 });
 
-/** Renders a single label/value row; returns null for empty/null values. */
 function SpecRow({
   label,
   value,
@@ -86,57 +85,78 @@ function SpecRow({
 }) {
   if (value == null || value === '') return null;
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: 7, paddingBottom: 7 }}>
+    <div style={{
+      display: 'flex', alignItems: 'flex-start',
+      padding: '8px 12px',
+      borderBottom: '1px solid #2a2a30',
+    }}>
       <span style={{
         flexShrink: 0, width: 120, paddingRight: 12,
-        color: '#9ca3af', fontSize: 13, fontWeight: 500,
+        color: '#9d9080', fontSize: 13,
+        fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {label}
       </span>
-      <span style={{ color: '#374151', fontSize: 13 }}>
+      <span style={{
+        color: '#f5f0e8', fontSize: 13,
+        fontFamily: 'var(--font-inter, system-ui)',
+      }}>
         {String(value)}
       </span>
     </div>
   );
 }
 
-/** Section heading + spec rows wrapper. */
 function SpecSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 24 }}>
       <p style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.15em',
-        color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10,
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
+        color: '#c9a962', textTransform: 'uppercase', marginBottom: 8,
+        fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {title}
       </p>
-      <div>{children}</div>
+      <div style={{
+        border: '1px solid #2a2a30', borderRadius: 6, overflow: 'hidden',
+      }}>
+        {children}
+      </div>
     </div>
   );
 }
 
 // ── Not-available state ───────────────────────────────────────────────────────
-// Shown for: missing id, unlisted, sold, inactive-seller — identical presentation
-// regardless of reason (don't reveal whether an id exists).
 
 function NotAvailable() {
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
-        <div style={{ fontSize: 52, color: '#d1d5db', marginBottom: 18, lineHeight: 1 }}>◇</div>
-        <p style={{ fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-          This item is not available
-        </p>
-        <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 36 }}>
-          It may have been sold, unlisted, or the link may be incorrect.
-        </p>
-        <Link href="/" style={{
-          display: 'inline-block', padding: '10px 24px',
-          background: '#111', color: '#fff', borderRadius: 6,
-          textDecoration: 'none', fontSize: 14, fontWeight: 600, letterSpacing: '0.02em',
-        }}>
-          Browse all stones
-        </Link>
-      </main>
+      <div style={{
+        fontSize: 52, color: '#2a2a30', marginBottom: 18, lineHeight: 1,
+        fontFamily: 'var(--font-cormorant, Georgia, serif)',
+      }}>◇</div>
+      <p style={{
+        fontSize: 18, fontWeight: 300, color: '#f5f0e8', marginBottom: 8,
+        fontFamily: 'var(--font-cormorant, Georgia, serif)',
+      }}>
+        This item is not available
+      </p>
+      <p style={{
+        fontSize: 13, color: '#9d9080', marginBottom: 36,
+        fontFamily: 'var(--font-inter, system-ui)',
+      }}>
+        It may have been sold, unlisted, or the link may be incorrect.
+      </p>
+      <Link href="/" style={{
+        display: 'inline-block', padding: '11px 28px',
+        border: '1px solid rgba(201,169,98,0.5)', color: '#c9a962',
+        borderRadius: 6, textDecoration: 'none', fontSize: 12,
+        fontWeight: 600, letterSpacing: '0.1em',
+        fontFamily: 'var(--font-inter, system-ui)',
+      }}>
+        Browse all stones
+      </Link>
+    </main>
   );
 }
 
@@ -154,16 +174,10 @@ export default async function StoneDetailPage({
     searchParams,
   ]);
 
-  // Fast cancel path: buyer returned from Stripe via cancel_url.
-  // Release the order and stone immediately rather than waiting for Stripe's
-  // ~24h session expiry. Guard: both params must be present.
   if (canceled === '1' && canceledOrderId) {
     await cancelPendingOrder(canceledOrderId);
   }
 
-  // Fetch user, listing, cart membership, and buyer's offer in parallel.
-  // All four share one cookie-based client (buyer's session).
-  // cartRow and offerRow are null for anon users (RLS returns 0 rows).
   const supabase = await createClient();
   const [{ data: { user } }, { data, error }, { data: cartRow }, { data: offerRow }] =
     await Promise.all([
@@ -178,8 +192,6 @@ export default async function StoneDetailPage({
         .select('id')
         .eq('inventory_item_id', id)
         .maybeSingle(),
-      // Fetch the buyer's most recent non-withdrawn offer so OfferPanel opens
-      // in the correct state (pending/accepted/declined) on first load.
       supabase
         .from('storefront_offers')
         .select('id, offered_price, status')
@@ -190,8 +202,6 @@ export default async function StoneDetailPage({
         .maybeSingle(),
     ]);
 
-  // Any error or no row → not available (don't distinguish between "doesn't exist"
-  // and "exists but unlisted/sold" — both render identically)
   if (error || !data) {
     return <NotAvailable />;
   }
@@ -199,7 +209,6 @@ export default async function StoneDetailPage({
   const item = data as ListingDetail;
   const photos = item.image_urls ?? [];
 
-  // Derived display values
   const looseStoneWeight =
     item.weight_value != null && Number(item.weight_value) > 0
       ? `${item.weight_value} ${item.weight_unit ?? ''}`.trim()
@@ -235,7 +244,6 @@ export default async function StoneDetailPage({
     .filter((v) => v && v.trim())
     .join(' ') || null;
 
-  // Shipping derived values — normalize once, branch on typed number
   const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
   const shippingCostDisplay =
     cost === null ? null : cost === 0 ? 'Free' : `€${cost.toFixed(0)}`;
@@ -259,203 +267,214 @@ export default async function StoneDetailPage({
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px' }}>
-        {/* Back to browse */}
-        <Link href="/" className="back-link" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 13, textDecoration: 'none',
-          marginBottom: 28, letterSpacing: '0.02em',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back to browse
-        </Link>
+      {/* Back to browse */}
+      <Link href="/" className="back-link" style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 12, textDecoration: 'none',
+        marginBottom: 28, letterSpacing: '0.04em',
+        fontFamily: 'var(--font-inter, system-ui)',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        Back to browse
+      </Link>
 
-        {/* Cancel-return notice — only shown when buyer came back from Stripe */}
-        {canceled === '1' && (
-          <div style={{
-            marginBottom: 28,
-            padding: '12px 16px',
-            background: '#fefce8',
-            border: '1px solid #fde68a',
-            borderRadius: 8,
-            fontSize: 13,
-            color: '#92400e',
+      {/* Cancel-return notice */}
+      {canceled === '1' && (
+        <div style={{
+          marginBottom: 28,
+          padding: '12px 16px',
+          background: 'rgba(201,169,98,0.08)',
+          border: '1px solid rgba(201,169,98,0.25)',
+          borderRadius: 8,
+          fontSize: 13,
+          color: '#c9a962',
+          fontFamily: 'var(--font-inter, system-ui)',
+        }}>
+          Payment canceled — this stone is available again.
+        </div>
+      )}
+
+      {/* ── Two-column layout ── */}
+      <div className="detail-grid" style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+        gap: 56,
+        alignItems: 'start',
+      }}>
+
+        {/* ── Left: photo gallery ── */}
+        <PhotoGallery imageUrls={photos} title={item.title} />
+
+        {/* ── Right: info panel ── */}
+        <div>
+          {/* Title */}
+          <h1 style={{
+            fontSize: 28, fontWeight: 300, color: '#f5f0e8', lineHeight: 1.2,
+            marginBottom: 10,
+            fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>
-            Payment canceled — this stone is available again.
-          </div>
-        )}
+            {item.title}
+          </h1>
 
-        {/* ── Two-column layout ── */}
-        <div className="detail-grid" style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-          gap: 56,
-          alignItems: 'start',
-        }}>
-
-          {/* ── Left: photo gallery ── */}
-          <PhotoGallery imageUrls={photos} title={item.title} />
-
-          {/* ── Right: info panel ── */}
-          <div>
-            {/* Title */}
-            <h1 style={{
-              fontSize: 26, fontWeight: 700, color: '#111', lineHeight: 1.25,
-              marginBottom: 8, fontFamily: "Georgia, 'Times New Roman', serif",
+          {/* Price */}
+          {item.sale_method === 'accept_offers' ? (
+            <p style={{
+              fontSize: 20, color: '#9d9080', marginBottom: 16,
+              fontFamily: 'var(--font-cormorant, Georgia, serif)',
             }}>
-              {item.title}
-            </h1>
+              Make an offer
+            </p>
+          ) : item.selling_price != null ? (
+            <p style={{
+              fontSize: 36, fontWeight: 400, color: '#f5f0e8',
+              letterSpacing: '-0.01em', marginBottom: 16,
+              fontFamily: 'var(--font-cormorant, Georgia, serif)',
+            }}>
+              {eur.format(Number(item.selling_price))}
+            </p>
+          ) : (
+            <p style={{
+              fontSize: 20, color: '#4a4440', marginBottom: 16,
+              fontFamily: 'var(--font-cormorant, Georgia, serif)',
+            }}>
+              Price on request
+            </p>
+          )}
 
-            {/* Price */}
-            {item.sale_method === 'accept_offers' ? (
-              <p style={{ fontSize: 18, color: '#9ca3af', marginBottom: 16 }}>
-                Make an offer
-              </p>
-            ) : item.selling_price != null ? (
-              <p style={{
-                fontSize: 32, fontWeight: 700, color: '#111',
-                letterSpacing: '-0.02em', marginBottom: 16,
+          {/* Stone / Shipping / Total */}
+          {item.selling_price != null && cost !== null && cost > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 13, color: '#9d9080', marginBottom: 3,
               }}>
-                {eur.format(Number(item.selling_price))}
-              </p>
-            ) : (
-              <p style={{ fontSize: 18, color: '#d1d5db', marginBottom: 16 }}>
-                Price on request
-              </p>
-            )}
-
-            {/* Stone / Shipping / Total — only when shipping is known and > 0 */}
-            {item.selling_price != null && cost !== null && cost > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  fontSize: 13, color: '#9ca3af', marginBottom: 3,
-                }}>
-                  <span>Stone</span>
-                  <span>{eur.format(Number(item.selling_price))}</span>
-                </div>
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  fontSize: 13, color: '#9ca3af', marginBottom: 6,
-                }}>
-                  <span>Shipping</span>
-                  <span>{eur.format(cost)}</span>
-                </div>
-                <div style={{ height: 1, background: '#e5e7eb', marginBottom: 6 }} />
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between',
-                  fontSize: 14, fontWeight: 700, color: '#111',
-                }}>
-                  <span>Total</span>
-                  <span>{eur.format(Number(item.selling_price) + cost)}</span>
-                </div>
+                <span>Stone</span>
+                <span>{eur.format(Number(item.selling_price))}</span>
               </div>
-            )}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 13, color: '#9d9080', marginBottom: 6,
+              }}>
+                <span>Shipping</span>
+                <span>{eur.format(cost)}</span>
+              </div>
+              <div style={{ height: 1, background: '#2a2a30', marginBottom: 6 }} />
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 14, fontWeight: 600, color: '#f5f0e8',
+              }}>
+                <span>Total</span>
+                <span>{eur.format(Number(item.selling_price) + cost)}</span>
+              </div>
+            </div>
+          )}
 
-            {/* Buy + cart + offer actions */}
-            <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* BuyButton: buy_now + both only */}
-              {item.sale_method !== 'accept_offers' && (
-                <BuyButton
-                  itemId={item.id}
-                  itemTitle={item.title}
-                  sellingPrice={item.selling_price}
-                  shippingCost={cost}
-                  isLoggedIn={!!user}
-                />
-              )}
-              <CartButton
+          {/* Actions */}
+          <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {item.sale_method !== 'accept_offers' && (
+              <BuyButton
+                itemId={item.id}
+                itemTitle={item.title}
+                sellingPrice={item.selling_price}
+                shippingCost={cost}
+                isLoggedIn={!!user}
+              />
+            )}
+            <CartButton
+              itemId={item.id}
+              isLoggedIn={!!user}
+              initialInCart={!!cartRow}
+            />
+            {item.sale_method !== 'buy_now' && (
+              <OfferPanel
                 itemId={item.id}
                 isLoggedIn={!!user}
-                initialInCart={!!cartRow}
+                initialOffer={offerRow as BuyerOffer | null}
               />
-              {/* OfferPanel: accept_offers + both only */}
-              {item.sale_method !== 'buy_now' && (
-                <OfferPanel
-                  itemId={item.id}
-                  isLoggedIn={!!user}
-                  initialOffer={offerRow as BuyerOffer | null}
-                />
-              )}
-            </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', marginBottom: 24 }} />
-
-            {/* Description */}
-            {item.description && (
-              <div style={{ marginBottom: 28 }}>
-                <p style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: '0.15em',
-                  color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10,
-                }}>
-                  Description
-                </p>
-                <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.7 }}>
-                  {item.description}
-                </p>
-              </div>
             )}
-
-            {/* ── Type-aware specs — only fields relevant to this product type ── */}
-
-            {item.product_type === 'loose_stone' && (
-              <SpecSection title="Stone Details">
-                <SpecRow label="Gem type"      value={item.gem_type} />
-                <SpecRow label="Variety"       value={item.variety} />
-                <SpecRow label="Weight"        value={looseStoneWeight} />
-                <SpecRow label="Shape"         value={item.shape} />
-                <SpecRow label="Cut"           value={item.cut_type} />
-                <SpecRow label="Clarity"       value={item.clarity} />
-                <SpecRow label="Origin"        value={originFull} />
-                <SpecRow label="Treatment"     value={item.treatment} />
-                <SpecRow label="Dimensions"    value={structuredDimensions} />
-                <SpecRow label="Certification" value={certificationLine} />
-              </SpecSection>
-            )}
-
-            {item.product_type === 'specimen' && (
-              <SpecSection title="Specimen Details">
-                <SpecRow label="Species"       value={item.species} />
-                <SpecRow label="Weight"        value={specimenWeight} />
-                <SpecRow label="Locality"      value={item.locality} />
-                <SpecRow label="Origin"        value={item.origin_country} />
-                <SpecRow label="Matrix"        value={item.matrix} />
-                <SpecRow label="Treatment"     value={item.treatment} />
-                <SpecRow label="Dimensions"    value={structuredDimensions} />
-                <SpecRow label="Certification" value={certificationLine} />
-              </SpecSection>
-            )}
-
-            {item.product_type === 'jewelry' && (
-              <SpecSection title="Jewelry Details">
-                <SpecRow label="Type"          value={item.jewelry_type} />
-                <SpecRow label="Metal"         value={metalLine} />
-                <SpecRow label="Size / Length" value={item.size_or_length} />
-                <SpecRow label="Gemstones"     value={item.gemstones_used} />
-                <SpecRow label="Total weight"  value={jewelryWeight} />
-                <SpecRow label="Treatment"     value={item.treatment} />
-                <SpecRow label="Certification" value={certificationLine} />
-              </SpecSection>
-            )}
-
-            {/* Shipping — omit entire section when all fields are null */}
-            {hasShipping && (
-              <SpecSection title="Shipping">
-                <SpecRow label="Ships from" value={shipFromName} />
-                <SpecRow label="Courier"    value={item.courier} />
-                <SpecRow label="Cost"       value={shippingCostDisplay} />
-                <SpecRow label="Delivery"   value={deliveryRange} />
-                {item.prep_days != null && (
-                  <SpecRow label="Handling" value={`Ready in ${item.prep_days} days`} />
-                )}
-              </SpecSection>
-            )}
-
-            {item.video_url && <VideoPlayer url={item.video_url} />}
           </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #2a2a30', marginBottom: 24 }} />
+
+          {/* Description */}
+          {item.description && (
+            <div style={{ marginBottom: 28 }}>
+              <p style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
+                color: '#c9a962', textTransform: 'uppercase', marginBottom: 8,
+                fontFamily: 'var(--font-inter, system-ui)',
+              }}>
+                Description
+              </p>
+              <p style={{
+                fontSize: 14, color: '#9d9080', lineHeight: 1.7,
+                fontFamily: 'var(--font-inter, system-ui)',
+              }}>
+                {item.description}
+              </p>
+            </div>
+          )}
+
+          {/* Type-aware specs */}
+
+          {item.product_type === 'loose_stone' && (
+            <SpecSection title="Stone Details">
+              <SpecRow label="Gem type"      value={item.gem_type} />
+              <SpecRow label="Variety"       value={item.variety} />
+              <SpecRow label="Weight"        value={looseStoneWeight} />
+              <SpecRow label="Shape"         value={item.shape} />
+              <SpecRow label="Cut"           value={item.cut_type} />
+              <SpecRow label="Clarity"       value={item.clarity} />
+              <SpecRow label="Origin"        value={originFull} />
+              <SpecRow label="Treatment"     value={item.treatment} />
+              <SpecRow label="Dimensions"    value={structuredDimensions} />
+              <SpecRow label="Certification" value={certificationLine} />
+            </SpecSection>
+          )}
+
+          {item.product_type === 'specimen' && (
+            <SpecSection title="Specimen Details">
+              <SpecRow label="Species"       value={item.species} />
+              <SpecRow label="Weight"        value={specimenWeight} />
+              <SpecRow label="Locality"      value={item.locality} />
+              <SpecRow label="Origin"        value={item.origin_country} />
+              <SpecRow label="Matrix"        value={item.matrix} />
+              <SpecRow label="Treatment"     value={item.treatment} />
+              <SpecRow label="Dimensions"    value={structuredDimensions} />
+              <SpecRow label="Certification" value={certificationLine} />
+            </SpecSection>
+          )}
+
+          {item.product_type === 'jewelry' && (
+            <SpecSection title="Jewelry Details">
+              <SpecRow label="Type"          value={item.jewelry_type} />
+              <SpecRow label="Metal"         value={metalLine} />
+              <SpecRow label="Size / Length" value={item.size_or_length} />
+              <SpecRow label="Gemstones"     value={item.gemstones_used} />
+              <SpecRow label="Total weight"  value={jewelryWeight} />
+              <SpecRow label="Treatment"     value={item.treatment} />
+              <SpecRow label="Certification" value={certificationLine} />
+            </SpecSection>
+          )}
+
+          {hasShipping && (
+            <SpecSection title="Shipping">
+              <SpecRow label="Ships from" value={shipFromName} />
+              <SpecRow label="Courier"    value={item.courier} />
+              <SpecRow label="Cost"       value={shippingCostDisplay} />
+              <SpecRow label="Delivery"   value={deliveryRange} />
+              {item.prep_days != null && (
+                <SpecRow label="Handling" value={`Ready in ${item.prep_days} days`} />
+              )}
+            </SpecSection>
+          )}
+
+          {item.video_url && <VideoPlayer url={item.video_url} />}
         </div>
-      </main>
+      </div>
+    </main>
   );
 }

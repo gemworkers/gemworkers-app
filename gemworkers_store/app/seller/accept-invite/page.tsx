@@ -2,17 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', fontSize: 14, color: '#111',
-  border: '1px solid #e5e7eb', borderRadius: 6, boxSizing: 'border-box',
-  background: '#fff', outline: 'none',
+  width: '100%', padding: '9px 12px', fontSize: 14,
+  color: '#f5f0e8', background: '#1e1e24',
+  border: '1px solid #2a2a30', borderRadius: 6,
+  boxSizing: 'border-box', outline: 'none',
+  fontFamily: 'var(--font-inter, system-ui)',
 }
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6,
+  display: 'block', fontSize: 11, fontWeight: 600,
+  color: '#9d9080', marginBottom: 6, letterSpacing: '0.06em',
+  fontFamily: 'var(--font-inter, system-ui)',
 }
 
 export default function SellerAcceptInvitePage() {
@@ -34,7 +37,6 @@ export default function SellerAcceptInvitePage() {
       const refreshToken  = params.get('refresh_token')
       const type          = params.get('type')
 
-      // Clear tokens from the address bar so they don't linger.
       window.history.replaceState(null, '', window.location.pathname)
 
       if (type !== 'invite' || !accessToken || !refreshToken) {
@@ -94,198 +96,164 @@ export default function SellerAcceptInvitePage() {
   // ── STATE A — invalid/expired link ─────────────────────────────────────────
   if (sessionError) {
     return (
-      <>
-        <style>{`
-          body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
-        `}</style>
-        <header style={{
-          display: 'flex', alignItems: 'center',
-          padding: '0 32px', height: 60,
-          borderBottom: '1px solid #e5e7eb',
-          background: '#fff',
+      <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
+        <div style={{
+          background: '#16161a', border: '1px solid #2a2a30',
+          borderRadius: 10, padding: 28,
         }}>
-          <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
-            <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
-          </Link>
-        </header>
-        <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
-          <div style={{
-            background: '#fff', border: '1px solid #e5e7eb',
-            borderRadius: 10, padding: 28,
+          <h1 style={{
+            fontSize: 22, fontWeight: 300, color: '#f5f0e8',
+            fontFamily: 'var(--font-cormorant, Georgia, serif)',
+            marginBottom: 12, marginTop: 0,
           }}>
-            <h1 style={{
-              fontSize: 20, fontWeight: 700, color: '#111',
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              marginBottom: 12, marginTop: 0,
-            }}>
-              Invitation link problem
-            </h1>
-            <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, margin: 0 }}>
-              {sessionError}
-            </p>
-          </div>
-        </main>
-      </>
+            Invitation link problem
+          </h1>
+          <p style={{
+            fontSize: 14, color: '#9d9080', lineHeight: 1.6, margin: 0,
+            fontFamily: 'var(--font-inter, system-ui)',
+          }}>
+            {sessionError}
+          </p>
+        </div>
+      </main>
     )
   }
 
   // ── STATE B — password set successfully ────────────────────────────────────
   if (success) {
     return (
-      <>
-        <style>{`
-          body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
-        `}</style>
-        <header style={{
-          display: 'flex', alignItems: 'center',
-          padding: '0 32px', height: 60,
-          borderBottom: '1px solid #e5e7eb',
-          background: '#fff',
+      <main style={{ maxWidth: 420, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
+        <div style={{
+          fontSize: 42, marginBottom: 16, color: '#c9a962',
+          fontFamily: 'var(--font-cormorant, Georgia, serif)',
+        }}>✓</div>
+        <h1 style={{
+          fontSize: 24, fontWeight: 300, color: '#f5f0e8',
+          fontFamily: 'var(--font-cormorant, Georgia, serif)',
+          marginBottom: 10,
         }}>
-          <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
-            <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
-          </Link>
-        </header>
-        <main style={{ maxWidth: 420, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 42, marginBottom: 16, color: '#9ca3af' }}>✓</div>
-          <h1 style={{
-            fontSize: 20, fontWeight: 700, color: '#111',
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            marginBottom: 10,
+          Password set
+        </h1>
+        <p style={{
+          fontSize: 14, color: '#9d9080', lineHeight: 1.6, marginBottom: 8,
+          fontFamily: 'var(--font-inter, system-ui)',
+        }}>
+          Your account is ready. Head to your seller dashboard to start listing your stones.
+        </p>
+        {sellerEmail && (
+          <p style={{
+            fontSize: 13, color: '#9d9080', lineHeight: 1.6, marginBottom: 28,
+            fontFamily: 'var(--font-inter, system-ui)',
           }}>
-            Password set
-          </h1>
-          <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>
-            Your account is ready. Head to your seller dashboard to start listing your stones.
+            Sign in with{' '}
+            <strong style={{ color: '#f5f0e8' }}>{sellerEmail}</strong>{' '}
+            and the password you just chose.
           </p>
-          {sellerEmail && (
-            <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.6, marginBottom: 28 }}>
-              Sign in with{' '}
-              <strong style={{ color: '#374151' }}>{sellerEmail}</strong>{' '}
-              and the password you just chose.
-            </p>
-          )}
-          <a
-            href="https://sell.gemworkers.com"
-            style={{
-              display: 'inline-block', padding: '10px 24px',
-              background: '#111', color: '#fff', borderRadius: 6,
-              textDecoration: 'none', fontSize: 14, fontWeight: 600,
-              letterSpacing: '0.02em',
-            }}
-          >
-            Go to Seller Dashboard
-          </a>
-        </main>
-      </>
+        )}
+        <a
+          href="https://sell.gemworkers.com"
+          style={{
+            display: 'inline-block', padding: '11px 28px',
+            background: '#c9a962', color: '#0e0e10',
+            border: 'none', borderRadius: 6,
+            textDecoration: 'none', fontSize: 12, fontWeight: 600,
+            letterSpacing: '0.1em',
+            fontFamily: 'var(--font-inter, system-ui)',
+          }}
+        >
+          Go to Seller Dashboard
+        </a>
+      </main>
     )
   }
 
-  const header = (
-    <header style={{
-      display: 'flex', alignItems: 'center',
-      padding: '0 32px', height: 60,
-      borderBottom: '1px solid #e5e7eb',
-      background: '#fff',
-    }}>
-      <Link href="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
-        <Image src="/logo-black.png" alt="GemWorkers" height={44} width={61} style={{ display: 'block' }} />
-      </Link>
-    </header>
-  )
-
-  const bodyStyle = (
-    <style>{`
-      body { background: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
-    `}</style>
-  )
-
-  // ── STATE D — session not yet established (briefly on load) ────────────────
+  // ── STATE D — session not yet established ──────────────────────────────────
   if (!sessionReady) {
     return (
-      <>
-        {bodyStyle}
-        {header}
-        <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
-          <div style={{
-            background: '#fff', border: '1px solid #e5e7eb',
-            borderRadius: 10, padding: 28, textAlign: 'center',
+      <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
+        <div style={{
+          background: '#16161a', border: '1px solid #2a2a30',
+          borderRadius: 10, padding: 28, textAlign: 'center',
+        }}>
+          <p style={{
+            fontSize: 14, color: '#9d9080', margin: 0,
+            fontFamily: 'var(--font-inter, system-ui)',
           }}>
-            <p style={{ fontSize: 14, color: '#9ca3af', margin: 0 }}>
-              Verifying your invitation…
-            </p>
-          </div>
-        </main>
-      </>
+            Verifying your invitation…
+          </p>
+        </div>
+      </main>
     )
   }
 
   // ── STATE C — session ready, show set-password form ────────────────────────
   return (
-    <>
-      {bodyStyle}
-      {header}
-      <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
-        <h1 style={{
-          fontSize: 22, fontWeight: 700, color: '#111',
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          marginBottom: 6,
-        }}>
-          Set your password
-        </h1>
-        <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 28 }}>
-          Welcome to GemWorkers. Choose a password to activate your seller account.
-        </p>
+    <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
+      <h1 style={{
+        fontSize: 28, fontWeight: 300, color: '#f5f0e8',
+        fontFamily: 'var(--font-cormorant, Georgia, serif)',
+        marginBottom: 6,
+      }}>
+        Set your password
+      </h1>
+      <p style={{
+        fontSize: 13, color: '#9d9080', marginBottom: 28,
+        fontFamily: 'var(--font-inter, system-ui)',
+      }}>
+        Welcome to GemWorkers. Choose a password to activate your seller account.
+      </p>
 
-        <form onSubmit={handleSubmit} style={{
-          background: '#fff', border: '1px solid #e5e7eb',
-          borderRadius: 10, padding: 28,
-        }}>
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Password</label>
-            <input
-              type="password" required minLength={8} autoComplete="new-password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+      <form onSubmit={handleSubmit} style={{
+        background: '#16161a', border: '1px solid #2a2a30',
+        borderRadius: 10, padding: 28,
+      }}>
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>Password</label>
+          <input
+            type="password" required minLength={8} autoComplete="new-password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label style={labelStyle}>Confirm password</label>
-            <input
-              type="password" required minLength={8} autoComplete="new-password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+        <div style={{ marginBottom: 24 }}>
+          <label style={labelStyle}>Confirm password</label>
+          <input
+            type="password" required minLength={8} autoComplete="new-password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
 
-          {formError && (
-            <p style={{
-              fontSize: 13, color: '#dc2626',
-              background: '#fef2f2', border: '1px solid #fecaca',
-              borderRadius: 6, padding: '8px 12px', marginBottom: 16,
-            }}>
-              {formError}
-            </p>
-          )}
+        {formError && (
+          <p style={{
+            fontSize: 13, color: '#f87171',
+            background: 'rgba(220,38,38,0.08)',
+            border: '1px solid rgba(220,38,38,0.3)',
+            borderRadius: 6, padding: '8px 12px', marginBottom: 16,
+            fontFamily: 'var(--font-inter, system-ui)',
+          }}>
+            {formError}
+          </p>
+        )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%', padding: '10px 0', fontSize: 14, fontWeight: 600,
-              color: '#fff', background: loading ? '#6b7280' : '#111',
-              border: 'none', borderRadius: 6,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {loading ? 'Setting…' : 'Set password'}
-          </button>
-        </form>
-      </main>
-    </>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
+            color: '#0e0e10', background: loading ? '#7a6234' : '#c9a962',
+            border: 'none', borderRadius: 6,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            letterSpacing: '0.06em',
+            fontFamily: 'var(--font-inter, system-ui)',
+          }}
+        >
+          {loading ? 'Setting…' : 'Set password'}
+        </button>
+      </form>
+    </main>
   )
 }

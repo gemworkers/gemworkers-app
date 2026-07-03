@@ -16,12 +16,12 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
       <div style={{
         width: '100%', aspectRatio: '1 / 1',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(145deg, #f6f3ef 0%, #ece8e2 100%)',
+        background: 'linear-gradient(145deg, #1e1e24 0%, #252530 100%)',
         borderRadius: 12,
       }}>
         <span style={{
-          fontSize: 96, color: '#c4b8ab', fontWeight: 300,
-          fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: 1,
+          fontSize: 96, color: '#4a4440', fontWeight: 300,
+          fontFamily: 'var(--font-cormorant, Georgia, serif)', lineHeight: 1,
           userSelect: 'none',
         }}>
           ◇
@@ -33,12 +33,13 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
   // ── 1 photo ───────────────────────────────────────────────────────────────
   if (imageUrls.length === 1) {
     return (
-      <div style={{ borderRadius: 12, overflow: 'hidden', background: '#f6f3ef' }}>
+      <div className="photo-zoom-wrapper" style={{ borderRadius: 12, background: '#1e1e24' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrls[0]}
           alt={title}
-          style={{ width: '100%', display: 'block', objectFit: 'cover', maxHeight: 520 }}
+          className="photo-zoom-img"
+          style={{ width: '100%', objectFit: 'cover', maxHeight: 520 }}
         />
       </div>
     );
@@ -48,15 +49,15 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
   return (
     <div>
       {/* Main image */}
-      <div style={{
-        borderRadius: 12, overflow: 'hidden', background: '#f6f3ef',
-        marginBottom: 10,
+      <div className="photo-zoom-wrapper" style={{
+        borderRadius: 12, background: '#1e1e24', marginBottom: 10,
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrls[selected]}
           alt={`${title} — photo ${selected + 1} of ${imageUrls.length}`}
-          style={{ width: '100%', display: 'block', objectFit: 'cover', maxHeight: 520 }}
+          className="photo-zoom-img"
+          style={{ width: '100%', objectFit: 'cover', maxHeight: 520 }}
         />
       </div>
 
@@ -71,10 +72,10 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
               flex: '0 0 72px', height: 72,
               padding: 0, border: 'none', cursor: 'pointer',
               borderRadius: 6, overflow: 'hidden',
-              outline: i === selected ? '2px solid #374151' : '2px solid transparent',
+              outline: i === selected ? '2px solid #c9a962' : '2px solid transparent',
               outlineOffset: 2,
-              background: '#f6f3ef',
-              transition: 'outline-color 0.1s ease',
+              background: '#1e1e24',
+              transition: 'outline-color 0.15s ease',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
