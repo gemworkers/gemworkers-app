@@ -52,6 +52,30 @@ class FormTextField extends StatelessWidget {
   }
 }
 
+/// Same visual style as [FormTextField] but non-editable — for fields whose
+/// value is system-assigned (e.g. an auto-generated SKU) and must never be
+/// typed into.
+class ReadOnlyFormField extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const ReadOnlyFormField(this.label, this.value, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        child: Text(value.isNotEmpty ? value : '—'),
+      ),
+    );
+  }
+}
+
 /// Outlined dropdown that works correctly as a controlled widget.
 /// Uses InputDecorator + DropdownButton instead of DropdownButtonFormField
 /// to avoid the deprecated `value` parameter.

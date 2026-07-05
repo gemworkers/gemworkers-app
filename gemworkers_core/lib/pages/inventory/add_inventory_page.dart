@@ -27,7 +27,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
   // ── Controllers ───────────────────────────────────────────────────────────
 
-  final _sku = TextEditingController();
   final _title = TextEditingController();
   final _gemType = TextEditingController();
   final _variety = TextEditingController();
@@ -125,7 +124,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   @override
   void dispose() {
     for (final c in [
-      _sku, _title, _gemType, _variety, _originCountry, _originRegion,
+      _title, _gemType, _variety, _originCountry, _originRegion,
       _weightValue, _quantity, _costPrice,
       _barcode, _notes,
       _shapeOther, _cutTypeOther,
@@ -157,7 +156,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   // ── Validation & save ─────────────────────────────────────────────────────
 
   String? _validate() {
-    if (_sku.text.trim().isEmpty) return 'SKU is required.';
     if (_title.text.trim().isEmpty) return 'Title is required.';
     if (widget.productType == 'loose_stone' &&
         _weightValue.text.isNotEmpty &&
@@ -216,10 +214,13 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       final isJewelry = widget.productType == 'jewelry';
 
       final item = InventoryItem(
-        sku: _sku.text.trim(),
+        // sku intentionally omitted — DB trigger (trg_set_sku) generates it.
         title: _title.text.trim(),
-        gemType: isLooseStone ? _gemType.text.trim() : '',
-        variety: isLooseStone ? _variety.text.trim() : '',
+        // Captured for all product types now — specimen/jewelry reuse the
+        // same gem-type dropdown as loose_stone so their SKUs get a real
+        // gem code instead of falling back to OTHR.
+        gemType: _gemType.text.trim(),
+        variety: _variety.text.trim(),
         originCountry: (isLooseStone || isSpecimen)
             ? _originCountry.text.trim()
             : '',
@@ -274,6 +275,15 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       );
 
       final created = await _repository.addItem(item);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved — SKU: ${created.sku}'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
 
       if (_photos.isNotEmpty && created.id != null) {
         final urls = <String>[];
@@ -353,6 +363,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       case 'specimen':
         return [
           const FormSection('Specimen Details'),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
           FormTextField('Species', _species),
           FormTextField('Locality', _locality),
           FormTextField('Matrix (host rock the specimen is embedded in)', _matrix),
@@ -391,6 +405,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       case 'jewelry':
         return [
           const FormSection('Jewelry Details'),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
           FormTextField('Jewelry Type', _jewelryType),
           FormTextField('Metal', _metal),
           FormTextField('Metal Purity', _metalPurity),
@@ -507,7 +525,16 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               _buildPhotoSelector(),
 
               const FormSection('Identification'),
-              FormTextField('SKU *', _sku),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Text(
+                  'SKU will be generated automatically',
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
               FormTextField('Title *', _title),
 
               ..._buildTypeSpecificFields(),

@@ -26,7 +26,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   final _supplierRepository = SupplierRepository();
   final _movementRepo = ItemMovementRepository();
 
-  late final TextEditingController _sku;
   late final TextEditingController _title;
   late final TextEditingController _gemType;
   late final TextEditingController _variety;
@@ -117,7 +116,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   void initState() {
     super.initState();
     final i = widget.item;
-    _sku = TextEditingController(text: i.sku);
     _title = TextEditingController(text: i.title);
     _gemType = TextEditingController(text: i.gemType);
     _variety = TextEditingController(text: i.variety);
@@ -172,7 +170,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   @override
   void dispose() {
     for (final c in [
-      _sku, _title, _gemType, _variety, _originCountry, _originRegion,
+      _title, _gemType, _variety, _originCountry, _originRegion,
       _weightValue, _quantity, _costPrice, _salePrice,
       _barcode, _notes,
       _shapeOther, _cutTypeOther,
@@ -201,7 +199,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   // ── Validation & save ─────────────────────────────────────────────────────
 
   String? _validate() {
-    if (_sku.text.trim().isEmpty) return 'SKU is required.';
     if (_title.text.trim().isEmpty) return 'Title is required.';
     if (_productType == 'loose_stone' &&
         double.tryParse(_weightValue.text) == null) {
@@ -272,10 +269,13 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
       final updated = InventoryItem(
         id: widget.item.id,
-        sku: _sku.text.trim(),
+        sku: widget.item.sku, // immutable once assigned — never re-derived from form input
         title: _title.text.trim(),
-        gemType: isLooseStone ? _gemType.text.trim() : widget.item.gemType,
-        variety: isLooseStone ? _variety.text.trim() : widget.item.variety,
+        // Captured for all product types now — specimen/jewelry reuse the
+        // same gem-type dropdown as loose_stone so their SKUs get a real
+        // gem code instead of falling back to OTHR.
+        gemType: _gemType.text.trim(),
+        variety: _variety.text.trim(),
         originCountry: (isLooseStone || isSpecimen)
             ? _originCountry.text.trim()
             : widget.item.originCountry,
@@ -403,6 +403,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       case 'specimen':
         return [
           const FormSection('Specimen Details'),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
           FormTextField('Species', _species),
           FormTextField('Locality', _locality),
           FormTextField('Matrix (host rock the specimen is embedded in)', _matrix),
@@ -441,6 +445,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       case 'jewelry':
         return [
           const FormSection('Jewelry Details'),
+          GemAndVarietyFields(
+            gemTypeController: _gemType,
+            varietyController: _variety,
+          ),
           FormTextField('Jewelry Type', _jewelryType),
           FormTextField('Metal', _metal),
           FormTextField('Metal Purity', _metalPurity),
@@ -551,7 +559,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           _buildPhotoSelector(),
 
           const FormSection('Identification'),
-          FormTextField('SKU *', _sku),
+          ReadOnlyFormField('SKU', widget.item.sku),
           FormTextField('Title *', _title),
 
           ..._buildTypeSpecificFields(),

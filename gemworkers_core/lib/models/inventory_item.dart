@@ -7,6 +7,7 @@ const _omitted = _Omitted();
 class InventoryItem {
   final String? id;
 
+  // DB-generated (trg_set_sku) when left empty on insert — see sql/sku_autogen.sql.
   final String sku;
   final String title;
 
@@ -102,7 +103,7 @@ class InventoryItem {
 
   const InventoryItem({
     this.id,
-    required this.sku,
+    this.sku = '',
     required this.title,
     required this.gemType,
     required this.variety,
@@ -252,7 +253,9 @@ class InventoryItem {
 
   Map<String, dynamic> toMap() {
     return {
-      'sku': sku,
+      // Omitted when blank so the DB trigger (trg_set_sku) generates it —
+      // see sql/sku_autogen.sql. A non-empty sku (edits, imports) passes through.
+      if (sku.isNotEmpty) 'sku': sku,
       'title': title,
       'gem_type': gemType,
       'variety': variety,
