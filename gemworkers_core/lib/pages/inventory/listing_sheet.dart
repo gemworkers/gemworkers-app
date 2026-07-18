@@ -108,8 +108,7 @@ class _ListingSheetState extends State<_ListingSheet> {
       final seller = await SellerRepository().getSeller(sellerId);
       final rate = seller.commissionRate;
       if (mounted) {
-        final resolved =
-            (rate == null || rate == 0) ? _kDefaultCommission : rate;
+        final resolved = rate ?? _kDefaultCommission;
         setState(() => _commissionRate = resolved);
         _prefillPayout(resolved);
       }

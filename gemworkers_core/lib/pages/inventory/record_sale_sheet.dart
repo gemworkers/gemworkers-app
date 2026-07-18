@@ -78,7 +78,7 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
       final rate = (row?['commission_rate'] as num?)?.toDouble();
       if (mounted) {
         setState(() {
-          if (rate != null && rate > 0) _commissionRate = rate;
+          if (rate != null) _commissionRate = rate;
           _loadingRate = false;
         });
       }
