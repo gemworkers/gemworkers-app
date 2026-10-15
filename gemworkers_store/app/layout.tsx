@@ -36,6 +36,12 @@ const COMPANY_LINKS = [
   { label: 'Journal',    href: '/journal' },
   { label: 'Contact',    href: '/contact' },
 ]
+const CUSTOMER_CARE_LINKS = [
+  { label: 'Shipping',          href: '/shipping' },
+  { label: 'Returns & Refunds', href: '/returns' },
+  { label: 'Our Guarantee',     href: '/guarantee' },
+  { label: 'FAQ',               href: '/faq' },
+]
 
 function Footer() {
   return (
@@ -56,8 +62,12 @@ function Footer() {
         </div>
 
         {/* Links */}
-        <div style={{ display: 'flex', gap: 60 }}>
-          {[{ title: 'Shop', links: SHOP_LINKS }, { title: 'Company', links: COMPANY_LINKS }].map(col => (
+        <div style={{ display: 'flex', gap: 60, flexWrap: 'wrap' }}>
+          {[
+            { title: 'Shop',          links: SHOP_LINKS },
+            { title: 'Company',       links: COMPANY_LINKS },
+            { title: 'Customer Care', links: CUSTOMER_CARE_LINKS },
+          ].map(col => (
             <div key={col.title}>
               <p style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
