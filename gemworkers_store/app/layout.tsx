@@ -37,10 +37,12 @@ const COMPANY_LINKS = [
   { label: 'Contact',    href: '/contact' },
 ]
 const CUSTOMER_CARE_LINKS = [
-  { label: 'Shipping',          href: '/shipping' },
-  { label: 'Returns & Refunds', href: '/returns' },
-  { label: 'Our Guarantee',     href: '/guarantee' },
-  { label: 'FAQ',               href: '/faq' },
+  { label: 'Shipping',           href: '/shipping' },
+  { label: 'Returns & Refunds',  href: '/returns' },
+  { label: 'Our Guarantee',      href: '/guarantee' },
+  { label: 'FAQ',                href: '/faq' },
+  { label: 'Terms & Conditions', href: '/terms' },
+  { label: 'Privacy Policy',     href: '/privacy' },
 ]
 
 function Footer() {
