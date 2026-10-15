@@ -1,23 +1,30 @@
+import Link from 'next/link'
 import { ContentPage } from '@/app/components/ContentPage'
 
 export default function AboutPage() {
   return (
-    <ContentPage eyebrow="About" title="About GemWorkers">
+    <ContentPage eyebrow="About" title="Our Story">
+      <p>GemWorkers is a family story, generations deep.</p>
       <p>
-        GemWorkers is a curated house of fine gemstones — loose stones, mineral
-        specimens, and jewellery — sourced directly from the cutters and gem workers
-        whose craft defines them. Every piece is selected by hand, with an eye for
-        quality, character, and provenance.
+        It begins in the mountains of Kunar, in eastern Afghanistan, a region prized by
+        collectors for its kunzite, tourmaline and aquamarine. Our founder Zakaria's family
+        has worked with these stones for generations, as have many families in the valley.
+        More than thirty years ago, his father and uncles began trading gemstones themselves.
       </p>
       <p>
-        We work with a small circle of specialist artisans: lapidaries who have spent
-        decades at the wheel, buyers who travel to origin, and craftspeople who treat
-        each stone as the subject — not the material. What you find here you will not
-        find on a wholesale shelf.
+        Zakaria grew up in that world. In 2015 he began selling gemstones across Afghanistan
+        and Pakistan, and after moving to the Netherlands he founded GemWorkers to bring the
+        stones he knows so well to collectors and jewelry lovers around the world.
       </p>
       <p>
-        {/* placeholder — replace with full brand story */}
-        More about our origins, values, and approach coming soon.
+        Today we work with a small circle of trusted gem cutters and specialists in Pakistan,
+        Thailand and the Netherlands, many of them family. Every piece is chosen by hand,
+        described honestly, and shipped with care.
+      </p>
+      <p>
+        Our promise is simple: natural stones, honest descriptions, and the kind of knowledge
+        that only comes from generations in the trade. Read{' '}
+        <Link href="/guarantee">Our Guarantee</Link>.
       </p>
 
       <div className="not-prose" style={{
@@ -29,9 +36,9 @@ export default function AboutPage() {
         flexWrap: 'wrap',
       }}>
         {[
-          { label: 'Founded', value: '2024' },
-          { label: 'Makers',  value: 'Small circle' },
-          { label: 'Origin',  value: 'Direct source' },
+          { label: 'Founded', value: '2015' },
+          { label: 'Makers',  value: '5+' },
+          { label: 'Roots',   value: 'Kunar' },
         ].map(stat => (
           <div key={stat.label}>
             <p style={{
