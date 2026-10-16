@@ -20,7 +20,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
     const { data, error } = await supabase
       .from('public_listings')
-      .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, selling_price, sale_method, shipping_cost, image_url')
+      .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, seller_country, selling_price, sale_method, shipping_cost, image_url')
       .or(`title.ilike.%${safe}%,gem_type.ilike.%${safe}%,variety.ilike.%${safe}%,origin_country.ilike.%${safe}%`)
 
     if (error) {
@@ -36,6 +36,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
       weight_value:   row.weight_value   != null ? Number(row.weight_value)  : null,
       weight_unit:    row.weight_unit    as string | null,
       origin_country: row.origin_country as string | null,
+      seller_country: row.seller_country as string | null,
       selling_price:  row.selling_price  != null ? Number(row.selling_price) : null,
       sale_method:    row.sale_method    as string | null,
       shipping_cost:  row.shipping_cost  != null ? Number(row.shipping_cost) : null,
@@ -44,82 +45,57 @@ export default async function SearchPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main style={{ maxWidth: 1400, margin: '0 auto', padding: '56px 32px 80px' }}>
+    <main className="pd-wrap browse-main">
+      <nav aria-label="Breadcrumb" className="pd-crumbs">
+        <Link href="/">Home</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Search</span>
+      </nav>
 
       {/* ── Heading ── */}
-      <p style={{
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-        color: '#7A5A22', marginBottom: 14,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        Search
-      </p>
-
-      {query ? (
-        <h1 style={{
-          fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 300, color: '#1F1B16',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          letterSpacing: '0.04em', lineHeight: 1.2, marginBottom: 8,
-        }}>
-          &ldquo;{query}&rdquo;
-        </h1>
-      ) : (
-        <h1 style={{
-          fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 300, color: '#6B6052',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          letterSpacing: '0.04em', lineHeight: 1.2, marginBottom: 0,
-        }}>
-          What are you looking for?
-        </h1>
-      )}
-
-      {!query && (
-        <p style={{
-          fontSize: 14, color: '#6B6052', marginTop: 12, lineHeight: 1.6,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          Use the search bar above to find gemstones by name, type, variety, or origin.
+      <h1 className="font-serif browse-title">
+        {query ? <>Results for &lsquo;{query}&rsquo;</> : 'Search'}
+      </h1>
+      {query && !hasError && (
+        <p className="browse-count">
+          {items.length} {items.length === 1 ? 'stone' : 'stones'}
         </p>
       )}
 
-      {query && !hasError && (
-        <>
-          <div className="gold-rule" style={{ margin: '24px 0 28px' }} />
-          <p style={{
-            fontSize: 11, color: '#6B6052', marginBottom: 28, letterSpacing: '0.06em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            {items.length === 0 ? 'No results' : `${items.length} ${items.length === 1 ? 'result' : 'results'}`}
-          </p>
-        </>
+      {/* ── Search form ── */}
+      <form action="/search" method="get" role="search" className="browse-search">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="Search by gem, variety or origin"
+          aria-label="Search gemstones"
+        />
+        <button type="submit">Search</button>
+      </form>
+
+      {!query && (
+        <p className="browse-count" style={{ marginTop: 0 }}>
+          Find gemstones by name, type, variety or origin.
+        </p>
       )}
 
       {hasError && (
-        <p style={{
-          fontSize: 13, color: '#B42318', marginTop: 12,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
+        <p style={{ fontSize: 15, color: '#B42318', marginTop: 8 }}>
           Search failed — please try again.
         </p>
       )}
 
-      {items.length > 0 && <StoneGrid items={items} />}
+      {items.length > 0 && <StoneGrid items={items} className="home-arrivals-grid" />}
 
       {query && !hasError && items.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <p style={{
-            fontSize: 15, color: '#6B6052', marginBottom: 24,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            No stones matched &ldquo;{query}&rdquo;
+        <div className="browse-empty">
+          <p>No stones matched &lsquo;{query}&rsquo;.</p>
+          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
+          <p style={{ marginTop: 14 }}>
+            Can&apos;t find it?{' '}
+            <Link href="/contact?topic=Request%20a%20stone" className="pd-link">Request a stone</Link>
           </p>
-          <Link href="/" style={{
-            fontSize: 12, color: '#5A5045', letterSpacing: '0.06em',
-            textDecoration: 'none',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Browse all stones →
-          </Link>
         </div>
       )}
     </main>

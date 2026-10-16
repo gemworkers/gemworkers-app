@@ -9,6 +9,13 @@ const TYPE_LABELS: Record<string, string> = {
   jewelry:     'Jewelry',
 }
 
+// Singular / plural noun for the count line
+const TYPE_NOUNS: Record<string, [string, string]> = {
+  loose_stone: ['stone', 'stones'],
+  specimen:    ['specimen', 'specimens'],
+  jewelry:     ['piece', 'pieces'],
+}
+
 const VALID_TYPES = new Set(['loose_stone', 'specimen', 'jewelry'])
 
 type PageProps = {
@@ -24,10 +31,21 @@ type CategoryRow = {
   weight_value:   number | null
   weight_unit:    string | null
   origin_country: string | null
+  seller_country: string | null
   selling_price:  number | null
   sale_method:    string | null
   shipping_cost:  number | null
   image_urls:     unknown
+}
+
+function Breadcrumb({ label }: { label: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className="pd-crumbs">
+      <Link href="/">Home</Link>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{label}</span>
+    </nav>
+  )
 }
 
 export default async function ShopCategoryPage({ params, searchParams }: PageProps) {
@@ -36,26 +54,24 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
 
   if (!VALID_TYPES.has(type)) {
     return (
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '80px 32px' }}>
-        <p style={{
-          fontSize: 24, fontWeight: 300, color: '#1F1B16', marginBottom: 12,
-          fontFamily: 'var(--font-cormorant, Georgia, serif)', letterSpacing: '0.05em',
-        }}>
-          Category not found.
-        </p>
-        <Link href="/" className="back-link" style={{ fontSize: 13 }}>
-          ← Browse all stones
-        </Link>
+      <main className="pd-wrap browse-main">
+        <Breadcrumb label="Not found" />
+        <h1 className="font-serif browse-title">Category not found</h1>
+        <div className="browse-empty">
+          <p>This category doesn&apos;t exist.</p>
+          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
+        </div>
       </main>
     )
   }
 
   const label    = TYPE_LABELS[type]
+  const [one, many] = TYPE_NOUNS[type]
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('public_listing_details')
-    .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, selling_price, sale_method, shipping_cost, image_urls')
+    .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, seller_country, selling_price, sale_method, shipping_cost, image_urls')
     .eq('product_type', type)
 
   if (error) console.error('[shop] query error:', error.message)
@@ -68,6 +84,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
     weight_value:   row.weight_value   != null ? Number(row.weight_value)  : null,
     weight_unit:    row.weight_unit,
     origin_country: row.origin_country,
+    seller_country: row.seller_country,
     selling_price:  row.selling_price  != null ? Number(row.selling_price) : null,
     sale_method:    row.sale_method,
     shipping_cost:  row.shipping_cost  != null ? Number(row.shipping_cost) : null,
@@ -83,80 +100,43 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
   const items = gem ? allItems.filter(i => i.gem_type === gem) : allItems
 
   return (
-    <main style={{ maxWidth: 1400, margin: '0 auto', padding: '56px 32px 80px' }}>
+    <main className="pd-wrap browse-main">
+      <Breadcrumb label={label} />
 
       {/* ── Heading ── */}
-      <div style={{ marginBottom: 36 }}>
-        <p style={{
-          fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-          color: '#7A5A22', marginBottom: 12,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          Shop
-        </p>
-        <h1 style={{
-          fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 300, color: '#1F1B16',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          letterSpacing: '0.06em', lineHeight: 1.15,
-        }}>
-          {label}
-        </h1>
-      </div>
-
-      <div className="gold-rule" style={{ marginBottom: 36 }} />
+      <h1 className="font-serif browse-title">{label}</h1>
+      <p className="browse-count">
+        {items.length} {items.length === 1 ? one : many}{gem ? ` · ${gem}` : ''}
+      </p>
 
       {/* ── Gem-type filter chips ── */}
       {gemTypes.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 32 }}>
-          <Link href={`/shop/${type}`} style={{
-            fontSize: 11, padding: '5px 14px', borderRadius: 20,
-            border: `1px solid ${!gem ? '#7A5A22' : '#ECE5D8'}`,
-            background: !gem ? 'rgba(122,90,34,0.12)' : 'transparent',
-            color: !gem ? '#7A5A22' : '#5A5045',
-            textDecoration: 'none', letterSpacing: '0.06em',
-            fontFamily: 'var(--font-inter, system-ui)',
-            transition: 'border-color 200ms, color 200ms',
-          }}>
+        <div className="browse-chips">
+          <Link href={`/shop/${type}`} className={`browse-chip${!gem ? ' is-active' : ''}`}>
             All
           </Link>
           {gemTypes.map(g => (
-            <Link key={g} href={`/shop/${type}?gem=${encodeURIComponent(g)}`} style={{
-              fontSize: 11, padding: '5px 14px', borderRadius: 20,
-              border: `1px solid ${gem === g ? '#7A5A22' : '#ECE5D8'}`,
-              background: gem === g ? 'rgba(122,90,34,0.12)' : 'transparent',
-              color: gem === g ? '#7A5A22' : '#5A5045',
-              textDecoration: 'none', letterSpacing: '0.06em',
-              fontFamily: 'var(--font-inter, system-ui)',
-              transition: 'border-color 200ms, color 200ms',
-            }}>
+            <Link
+              key={g}
+              href={`/shop/${type}?gem=${encodeURIComponent(g)}`}
+              className={`browse-chip${gem === g ? ' is-active' : ''}`}
+            >
               {g}
             </Link>
           ))}
         </div>
       )}
 
-      {/* ── Result count ── */}
-      <p style={{
-        fontSize: 11, color: '#6B6052', marginBottom: 28, letterSpacing: '0.06em',
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        {items.length === 0
-          ? 'No listings found'
-          : `${items.length} ${items.length === 1 ? 'listing' : 'listings'}${gem ? ` · ${gem}` : ''}`}
-      </p>
-
       {/* ── Grid or empty state ── */}
       {items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <p style={{
-            fontSize: 15, color: '#6B6052', letterSpacing: '0.04em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            {gem ? `No ${gem} listed in this category yet.` : 'No listings in this category yet.'}
+        <div className="browse-empty">
+          <p>
+            {gem ? `No ${gem} listed in this category yet.` : 'Nothing listed in this category yet — check back soon.'}
           </p>
+          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
         </div>
       ) : (
-        <StoneGrid items={items} />
+        <StoneGrid items={items} className="home-arrivals-grid" />
       )}
     </main>
   )
