@@ -36,6 +36,8 @@ type CategoryRow = {
   sale_method:    string | null
   shipping_cost:  number | null
   image_urls:     unknown
+  // Present once public_views_available_only.sql is applied; absent before.
+  status?:        string | null
 }
 
 function Breadcrumb({ label }: { label: string }) {
@@ -71,12 +73,17 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
 
   const { data, error } = await supabase
     .from('public_listing_details')
-    .select('id, title, gem_type, variety, weight_value, weight_unit, origin_country, seller_country, selling_price, sale_method, shipping_cost, image_urls')
+    // '*' rather than a column list: naming `status` would fail against views
+    // that predate it. Reserved stones keep their detail page but stay off the grid.
+    .select('*')
     .eq('product_type', type)
 
   if (error) console.error('[shop] query error:', error.message)
 
-  const allItems: StoneCardItem[] = (data ?? []).map((row: CategoryRow) => ({
+  const rows = ((data ?? []) as CategoryRow[])
+    .filter(row => (row.status ?? 'available') === 'available')
+
+  const allItems: StoneCardItem[] = rows.map((row: CategoryRow) => ({
     id:             row.id,
     title:          row.title,
     gem_type:       row.gem_type,

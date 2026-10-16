@@ -16,7 +16,6 @@ type ListedItem = {
   selling_price: number | null;
   sale_method: string;
   shipping_cost: number | null;
-  seller_id: string;
   seller_country: string | null;
   image_url: string | null;
 };

@@ -68,6 +68,10 @@ type ListingDetail = {
   delivery_days_min: number | null;
   delivery_days_max: number | null;
   prep_days: number | null;
+
+  // Stock state ('available' | 'reserved'). Added by
+  // public_views_available_only.sql; absent on older views → treat as available.
+  status?: string | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -172,6 +176,7 @@ export default async function StoneDetailPage({
   }
 
   const item = data as ListingDetail;
+  const isReserved = item.status === 'reserved';
   const photos = item.image_urls ?? [];
   const category = CATEGORY[item.product_type] ?? CATEGORY.loose_stone;
   const nextParam = encodeURIComponent(`/stones/${item.id}`);
@@ -301,7 +306,23 @@ export default async function StoneDetailPage({
           </div>
 
           {/* Actions */}
-          {user ? (
+          {isReserved ? (
+            <div style={{
+              padding: '18px 20px', borderRadius: 18,
+              background: '#F4EEE4', border: '1px solid #ECE5D8',
+            }}>
+              <span style={{
+                display: 'inline-block', fontSize: 12, fontWeight: 600,
+                color: '#7A5A22', background: '#FFFFFF', border: '1px solid #ECE5D8',
+                borderRadius: 14, padding: '4px 12px', marginBottom: 10,
+              }}>
+                Reserved
+              </span>
+              <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6 }}>
+                This stone is currently reserved. It may become available again soon.
+              </p>
+            </div>
+          ) : user ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {item.sale_method !== 'accept_offers' && (
                 <BuyButton
