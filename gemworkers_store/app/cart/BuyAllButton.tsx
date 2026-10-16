@@ -23,11 +23,11 @@ export function BuyAllButton() {
   if (state === 'error') {
     return (
       <div style={{
-        border: '1px solid rgba(220,38,38,0.35)', borderRadius: 8,
-        padding: '16px 18px', background: 'rgba(220,38,38,0.08)',
+        border: '1px solid rgba(180,35,24,0.25)', borderRadius: 8,
+        padding: '16px 18px', background: 'rgba(180,35,24,0.06)',
       }}>
         <p style={{
-          fontSize: 13, color: '#f87171', lineHeight: 1.5, marginBottom: 14,
+          fontSize: 13, color: '#B42318', lineHeight: 1.5, marginBottom: 14,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           {errorMsg ?? 'Something went wrong — please try again.'}
@@ -35,8 +35,8 @@ export function BuyAllButton() {
         <button
           onClick={() => { setErrorMsg(null); setState('idle') }}
           style={{
-            fontSize: 13, fontWeight: 500, color: '#9d9080',
-            background: '#1e1e24', border: '1px solid #2a2a30',
+            fontSize: 13, fontWeight: 500, color: '#5A5045',
+            background: '#F4EEE4', border: '1px solid #ECE5D8',
             borderRadius: 6, padding: '7px 16px', cursor: 'pointer',
             fontFamily: 'var(--font-inter, system-ui)',
           }}
@@ -50,7 +50,7 @@ export function BuyAllButton() {
   return (
     <div>
       <p style={{
-        fontSize: 12, color: '#9d9080', marginBottom: 12,
+        fontSize: 12, color: '#5A5045', marginBottom: 12,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         Pay for everything in one go.
@@ -60,8 +60,8 @@ export function BuyAllButton() {
         disabled={state === 'loading'}
         style={{
           width: '100%', padding: '13px 0', fontSize: 13, fontWeight: 600,
-          color: '#0e0e10',
-          background: state === 'loading' ? '#7a6234' : '#c9a962',
+          color: '#FBF8F3',
+          background: state === 'loading' ? '#B89A63' : '#7A5A22',
           border: 'none', borderRadius: 6,
           cursor: state === 'loading' ? 'not-allowed' : 'pointer',
           letterSpacing: '0.06em',

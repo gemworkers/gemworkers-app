@@ -54,12 +54,12 @@ export default async function HomePage() {
         }}>
           <p style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-            color: '#c9a962', fontFamily: 'var(--font-inter, system-ui)',
+            color: '#7A5A22', fontFamily: 'var(--font-inter, system-ui)',
           }}>
             The Collection
           </p>
           <p style={{
-            fontSize: 11, color: '#4a4440', letterSpacing: '0.06em',
+            fontSize: 11, color: '#6B6052', letterSpacing: '0.06em',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             {items.length} {items.length === 1 ? 'stone' : 'stones'}
@@ -69,11 +69,11 @@ export default async function HomePage() {
         {items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '100px 0' }}>
             <div style={{
-              fontSize: 32, color: '#2a2a30', marginBottom: 16,
+              fontSize: 32, color: '#ECE5D8', marginBottom: 16,
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
             }}>◇</div>
             <p style={{
-              fontSize: 15, color: '#4a4440', letterSpacing: '0.04em',
+              fontSize: 15, color: '#6B6052', letterSpacing: '0.04em',
               fontFamily: 'var(--font-inter, system-ui)',
             }}>
               No stones listed yet.

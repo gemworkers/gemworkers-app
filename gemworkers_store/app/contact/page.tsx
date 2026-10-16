@@ -17,13 +17,13 @@ export default async function ContactPage({ searchParams }: Props) {
       <div className="not-prose">
         <ContactForm initialTopic={initialTopic} />
         <p style={{
-          fontSize: 13, color: '#9d9080', marginTop: 20,
+          fontSize: 13, color: '#5A5045', marginTop: 20,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Prefer email? Write to us at{' '}
           <a
             href="mailto:hello@gemworkers.com"
-            style={{ color: '#c9a962', textDecoration: 'none' }}
+            style={{ color: '#7A5A22', textDecoration: 'none' }}
           >
             hello@gemworkers.com
           </a>

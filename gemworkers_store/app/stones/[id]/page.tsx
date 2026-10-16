@@ -88,17 +88,17 @@ function SpecRow({
     <div style={{
       display: 'flex', alignItems: 'flex-start',
       padding: '8px 12px',
-      borderBottom: '1px solid #2a2a30',
+      borderBottom: '1px solid #ECE5D8',
     }}>
       <span style={{
         flexShrink: 0, width: 120, paddingRight: 12,
-        color: '#9d9080', fontSize: 13,
+        color: '#5A5045', fontSize: 13,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {label}
       </span>
       <span style={{
-        color: '#f5f0e8', fontSize: 13,
+        color: '#1F1B16', fontSize: 13,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {String(value)}
@@ -112,13 +112,13 @@ function SpecSection({ title, children }: { title: string; children: React.React
     <div style={{ marginBottom: 24 }}>
       <p style={{
         fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
-        color: '#c9a962', textTransform: 'uppercase', marginBottom: 8,
+        color: '#7A5A22', textTransform: 'uppercase', marginBottom: 8,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {title}
       </p>
       <div style={{
-        border: '1px solid #2a2a30', borderRadius: 6, overflow: 'hidden',
+        border: '1px solid #ECE5D8', borderRadius: 6, overflow: 'hidden',
       }}>
         {children}
       </div>
@@ -132,24 +132,24 @@ function NotAvailable() {
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
       <div style={{
-        fontSize: 52, color: '#2a2a30', marginBottom: 18, lineHeight: 1,
+        fontSize: 52, color: '#ECE5D8', marginBottom: 18, lineHeight: 1,
         fontFamily: 'var(--font-cormorant, Georgia, serif)',
       }}>◇</div>
       <p style={{
-        fontSize: 18, fontWeight: 300, color: '#f5f0e8', marginBottom: 8,
+        fontSize: 18, fontWeight: 300, color: '#1F1B16', marginBottom: 8,
         fontFamily: 'var(--font-cormorant, Georgia, serif)',
       }}>
         This item is not available
       </p>
       <p style={{
-        fontSize: 13, color: '#9d9080', marginBottom: 36,
+        fontSize: 13, color: '#5A5045', marginBottom: 36,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         It may have been sold, unlisted, or the link may be incorrect.
       </p>
       <Link href="/" style={{
         display: 'inline-block', padding: '11px 28px',
-        border: '1px solid rgba(201,169,98,0.5)', color: '#c9a962',
+        border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
         borderRadius: 6, textDecoration: 'none', fontSize: 12,
         fontWeight: 600, letterSpacing: '0.1em',
         fontFamily: 'var(--font-inter, system-ui)',
@@ -286,11 +286,11 @@ export default async function StoneDetailPage({
         <div style={{
           marginBottom: 28,
           padding: '12px 16px',
-          background: 'rgba(201,169,98,0.08)',
-          border: '1px solid rgba(201,169,98,0.25)',
+          background: 'rgba(122,90,34,0.08)',
+          border: '1px solid rgba(122,90,34,0.25)',
           borderRadius: 8,
           fontSize: 13,
-          color: '#c9a962',
+          color: '#7A5A22',
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Payment canceled — this stone is available again.
@@ -312,7 +312,7 @@ export default async function StoneDetailPage({
         <div>
           {/* Title */}
           <h1 style={{
-            fontSize: 28, fontWeight: 300, color: '#f5f0e8', lineHeight: 1.2,
+            fontSize: 28, fontWeight: 300, color: '#1F1B16', lineHeight: 1.2,
             marginBottom: 10,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>
@@ -322,14 +322,14 @@ export default async function StoneDetailPage({
           {/* Price */}
           {item.sale_method === 'accept_offers' ? (
             <p style={{
-              fontSize: 20, color: '#9d9080', marginBottom: 16,
+              fontSize: 20, color: '#5A5045', marginBottom: 16,
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
             }}>
               Make an offer
             </p>
           ) : item.selling_price != null ? (
             <p style={{
-              fontSize: 36, fontWeight: 400, color: '#f5f0e8',
+              fontSize: 36, fontWeight: 400, color: '#1F1B16',
               letterSpacing: '-0.01em', marginBottom: 16,
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
             }}>
@@ -337,7 +337,7 @@ export default async function StoneDetailPage({
             </p>
           ) : (
             <p style={{
-              fontSize: 20, color: '#4a4440', marginBottom: 16,
+              fontSize: 20, color: '#6B6052', marginBottom: 16,
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
             }}>
               Price on request
@@ -349,22 +349,22 @@ export default async function StoneDetailPage({
             <div style={{ marginBottom: 14 }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
-                fontSize: 13, color: '#9d9080', marginBottom: 3,
+                fontSize: 13, color: '#5A5045', marginBottom: 3,
               }}>
                 <span>Stone</span>
                 <span>{eur.format(Number(item.selling_price))}</span>
               </div>
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
-                fontSize: 13, color: '#9d9080', marginBottom: 6,
+                fontSize: 13, color: '#5A5045', marginBottom: 6,
               }}>
                 <span>Shipping</span>
                 <span>{eur.format(cost)}</span>
               </div>
-              <div style={{ height: 1, background: '#2a2a30', marginBottom: 6 }} />
+              <div style={{ height: 1, background: '#ECE5D8', marginBottom: 6 }} />
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
-                fontSize: 14, fontWeight: 600, color: '#f5f0e8',
+                fontSize: 14, fontWeight: 600, color: '#1F1B16',
               }}>
                 <span>Total</span>
                 <span>{eur.format(Number(item.selling_price) + cost)}</span>
@@ -397,20 +397,20 @@ export default async function StoneDetailPage({
             )}
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #2a2a30', marginBottom: 24 }} />
+          <hr style={{ border: 'none', borderTop: '1px solid #ECE5D8', marginBottom: 24 }} />
 
           {/* Description */}
           {item.description && (
             <div style={{ marginBottom: 28 }}>
               <p style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
-                color: '#c9a962', textTransform: 'uppercase', marginBottom: 8,
+                color: '#7A5A22', textTransform: 'uppercase', marginBottom: 8,
                 fontFamily: 'var(--font-inter, system-ui)',
               }}>
                 Description
               </p>
               <p style={{
-                fontSize: 14, color: '#9d9080', lineHeight: 1.7,
+                fontSize: 14, color: '#5A5045', lineHeight: 1.7,
                 fontFamily: 'var(--font-inter, system-ui)',
               }}>
                 {item.description}

@@ -54,8 +54,8 @@ export function OfferPanel({
         href="/auth/login"
         style={{
           display: 'block', textAlign: 'center',
-          padding: '10px 0', border: '1px solid #2a2a30', borderRadius: 6,
-          fontSize: 13, fontWeight: 500, color: '#9d9080',
+          padding: '10px 0', border: '1px solid #ECE5D8', borderRadius: 6,
+          fontSize: 13, fontWeight: 500, color: '#5A5045',
           textDecoration: 'none', letterSpacing: '0.02em',
           fontFamily: 'var(--font-inter, system-ui)',
         }}
@@ -72,8 +72,8 @@ export function OfferPanel({
         onClick={() => { setErrorMsg(null); setPriceInput(''); setNoteInput(''); setState('form') }}
         style={{
           width: '100%', padding: '10px 0', background: 'transparent',
-          border: '1px solid #2a2a30', borderRadius: 6,
-          fontSize: 13, fontWeight: 500, color: '#c9a962',
+          border: '1px solid #ECE5D8', borderRadius: 6,
+          fontSize: 13, fontWeight: 500, color: '#7A5A22',
           cursor: 'pointer', letterSpacing: '0.04em',
           fontFamily: 'var(--font-inter, system-ui)',
         }}
@@ -105,19 +105,19 @@ export function OfferPanel({
 
     return (
       <div style={{
-        border: '1px solid #2a2a30', borderRadius: 8,
+        border: '1px solid #ECE5D8', borderRadius: 8,
         padding: '16px', display: 'flex', flexDirection: 'column', gap: 10,
-        background: '#16161a',
+        background: '#FFFFFF',
       }}>
         <p style={{
-          fontSize: 13, fontWeight: 600, color: '#c9a962', margin: 0,
+          fontSize: 13, fontWeight: 600, color: '#7A5A22', margin: 0,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Make an offer
         </p>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 14, color: '#9d9080', flexShrink: 0 }}>€</span>
+          <span style={{ fontSize: 14, color: '#5A5045', flexShrink: 0 }}>€</span>
           <input
             type="number" min="0.01" step="0.01"
             placeholder="Your price"
@@ -127,9 +127,9 @@ export function OfferPanel({
             autoFocus
             style={{
               flex: 1, padding: '8px 10px', fontSize: 14,
-              border: '1px solid #2a2a30', borderRadius: 6,
-              outline: 'none', color: '#f5f0e8',
-              background: '#1e1e24',
+              border: '1px solid #ECE5D8', borderRadius: 6,
+              outline: 'none', color: '#1F1B16',
+              background: '#F4EEE4',
               fontFamily: 'var(--font-inter, system-ui)',
             }}
           />
@@ -144,15 +144,15 @@ export function OfferPanel({
           disabled={busy}
           style={{
             padding: '8px 10px', fontSize: 13,
-            border: '1px solid #2a2a30', borderRadius: 6,
-            outline: 'none', color: '#9d9080',
-            background: '#1e1e24',
+            border: '1px solid #ECE5D8', borderRadius: 6,
+            outline: 'none', color: '#5A5045',
+            background: '#F4EEE4',
             fontFamily: 'var(--font-inter, system-ui)',
           }}
         />
 
         {errorMsg && (
-          <p style={{ fontSize: 13, color: '#f87171', margin: 0 }}>{errorMsg}</p>
+          <p style={{ fontSize: 13, color: '#B42318', margin: 0 }}>{errorMsg}</p>
         )}
 
         <div style={{ display: 'flex', gap: 8 }}>
@@ -161,9 +161,9 @@ export function OfferPanel({
             disabled={busy || !validPrice}
             style={{
               flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
-              background: busy || !validPrice ? '#1e1e24' : '#c9a962',
-              color: busy || !validPrice ? '#4a4440' : '#0e0e10',
-              border: busy || !validPrice ? '1px solid #2a2a30' : 'none',
+              background: busy || !validPrice ? '#F4EEE4' : '#7A5A22',
+              color: busy || !validPrice ? '#6B6052' : '#FBF8F3',
+              border: busy || !validPrice ? '1px solid #ECE5D8' : 'none',
               borderRadius: 6,
               cursor: busy || !validPrice ? 'default' : 'pointer',
             }}
@@ -175,8 +175,8 @@ export function OfferPanel({
             disabled={busy}
             style={{
               padding: '9px 14px', fontSize: 13, background: 'transparent',
-              border: '1px solid #2a2a30', borderRadius: 6,
-              cursor: busy ? 'default' : 'pointer', color: '#9d9080',
+              border: '1px solid #ECE5D8', borderRadius: 6,
+              cursor: busy ? 'default' : 'pointer', color: '#5A5045',
             }}
           >
             Cancel
@@ -206,33 +206,33 @@ export function OfferPanel({
 
     return (
       <div style={{
-        border: '1px solid #2a2a30', borderRadius: 8,
+        border: '1px solid #ECE5D8', borderRadius: 8,
         padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8,
-        background: '#16161a',
+        background: '#FFFFFF',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 14, color: '#f5f0e8' }}>
+          <span style={{ fontSize: 14, color: '#1F1B16' }}>
             Your offer: <strong>{offer ? eur(offer.offered_price) : '—'}</strong>
           </span>
           <span style={{
-            fontSize: 11, fontWeight: 600, color: '#c9a962',
-            background: 'rgba(201,169,98,0.12)',
-            border: '1px solid rgba(201,169,98,0.3)',
+            fontSize: 11, fontWeight: 600, color: '#7A5A22',
+            background: 'rgba(122,90,34,0.12)',
+            border: '1px solid rgba(122,90,34,0.3)',
             borderRadius: 4, padding: '2px 8px',
           }}>
             Pending
           </span>
         </div>
         {errorMsg && (
-          <p style={{ fontSize: 13, color: '#f87171', margin: 0 }}>{errorMsg}</p>
+          <p style={{ fontSize: 13, color: '#B42318', margin: 0 }}>{errorMsg}</p>
         )}
         <button
           onClick={handleWithdraw}
           disabled={busy}
           style={{
             padding: '7px 0', fontSize: 13, background: 'transparent',
-            border: '1px solid #2a2a30', borderRadius: 6,
-            cursor: busy ? 'default' : 'pointer', color: '#4a4440',
+            border: '1px solid #ECE5D8', borderRadius: 6,
+            cursor: busy ? 'default' : 'pointer', color: '#6B6052',
           }}
         >
           {busy ? 'Withdrawing…' : 'Withdraw offer'}
@@ -244,17 +244,17 @@ export function OfferPanel({
   // ── Accepted / Declined ───────────────────────────────────────────────────
   const accepted = state === 'accepted'
   const chip = accepted
-    ? { label: 'Accepted', bg: 'rgba(74,222,128,0.1)', color: '#4ade80', border: 'rgba(74,222,128,0.3)' }
-    : { label: 'Declined', bg: 'rgba(248,113,113,0.1)', color: '#f87171', border: 'rgba(248,113,113,0.3)' }
+    ? { label: 'Accepted', bg: 'rgba(22,163,74,0.08)', color: '#16A34A', border: 'rgba(22,163,74,0.25)' }
+    : { label: 'Declined', bg: 'rgba(180,35,24,0.06)', color: '#B42318', border: 'rgba(180,35,24,0.25)' }
 
   return (
     <div style={{
       border: `1px solid ${chip.border}`, borderRadius: 8,
       padding: '14px 16px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: '#16161a',
+      background: '#FFFFFF',
     }}>
-      <span style={{ fontSize: 14, color: '#f5f0e8' }}>
+      <span style={{ fontSize: 14, color: '#1F1B16' }}>
         Your offer: <strong>{offer ? eur(offer.offered_price) : '—'}</strong>
       </span>
       <span style={{

@@ -48,14 +48,14 @@ function PageTitle({ count }: { count: number }) {
   return (
     <div style={{ marginBottom: 32 }}>
       <h1 style={{
-        fontSize: 28, fontWeight: 300, color: '#f5f0e8',
+        fontSize: 28, fontWeight: 300, color: '#1F1B16',
         fontFamily: 'var(--font-cormorant, Georgia, serif)',
         marginBottom: 4,
       }}>
         Cart
       </h1>
       <p style={{
-        fontSize: 12, color: '#9d9080',
+        fontSize: 12, color: '#5A5045',
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {count} {count === 1 ? 'item' : 'items'}
@@ -76,24 +76,24 @@ export default async function CartPage() {
       <PageShell>
         <div style={{ textAlign: 'center', padding: '80px 0' }}>
           <div style={{
-            fontSize: 40, color: '#2a2a30', marginBottom: 16, lineHeight: 1,
+            fontSize: 40, color: '#ECE5D8', marginBottom: 16, lineHeight: 1,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>◇</div>
           <p style={{
-            fontSize: 18, fontWeight: 300, color: '#f5f0e8', marginBottom: 8,
+            fontSize: 18, fontWeight: 300, color: '#1F1B16', marginBottom: 8,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>
             Log in to view your cart
           </p>
           <p style={{
-            fontSize: 13, color: '#9d9080', marginBottom: 28,
+            fontSize: 13, color: '#5A5045', marginBottom: 28,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             Save stones while you browse, then buy when you&apos;re ready.
           </p>
           <Link href="/auth/login" style={{
             display: 'inline-block', padding: '11px 28px',
-            border: '1px solid rgba(201,169,98,0.5)', color: '#c9a962',
+            border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
             borderRadius: 6, textDecoration: 'none', fontSize: 12,
             fontWeight: 600, letterSpacing: '0.1em',
             fontFamily: 'var(--font-inter, system-ui)',
@@ -118,18 +118,18 @@ export default async function CartPage() {
         <PageTitle count={0} />
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <div style={{
-            fontSize: 40, color: '#2a2a30', marginBottom: 16, lineHeight: 1,
+            fontSize: 40, color: '#ECE5D8', marginBottom: 16, lineHeight: 1,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>◇</div>
           <p style={{
-            fontSize: 14, color: '#9d9080', marginBottom: 24,
+            fontSize: 14, color: '#5A5045', marginBottom: 24,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             Your cart is empty.
           </p>
           <Link href="/" style={{
             display: 'inline-block', padding: '11px 28px',
-            border: '1px solid rgba(201,169,98,0.5)', color: '#c9a962',
+            border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
             borderRadius: 6, textDecoration: 'none', fontSize: 12,
             fontWeight: 600, letterSpacing: '0.1em',
             fontFamily: 'var(--font-inter, system-ui)',
@@ -187,10 +187,10 @@ export default async function CartPage() {
       </div>
 
       {buyableCount > 0 && (
-        <div style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid #2a2a30' }}>
+        <div style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid #ECE5D8' }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between',
-            fontSize: 13, fontWeight: 600, color: '#f5f0e8',
+            fontSize: 13, fontWeight: 600, color: '#1F1B16',
             marginBottom: 16,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
@@ -216,7 +216,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
   return (
     <div style={{
       display: 'flex', gap: 20, padding: '24px 0',
-      borderBottom: '1px solid #2a2a30',
+      borderBottom: '1px solid #ECE5D8',
       alignItems: 'flex-start',
     }}>
       {/* Cover photo */}
@@ -229,18 +229,18 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
             style={{
               width: 104, height: 104, objectFit: 'cover',
               borderRadius: 8, display: 'block',
-              border: '1px solid #2a2a30',
+              border: '1px solid #ECE5D8',
             }}
           />
         ) : (
           <div style={{
             width: 104, height: 104, borderRadius: 8,
-            background: 'linear-gradient(145deg, #1e1e24 0%, #252530 100%)',
+            background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid #2a2a30',
+            border: '1px solid #ECE5D8',
           }}>
             <span style={{
-              fontSize: 36, color: '#3a3530', fontWeight: 300,
+              fontSize: 36, color: '#C5B9AF', fontWeight: 300,
               fontFamily: 'var(--font-cormorant, Georgia, serif)', lineHeight: 1,
               userSelect: 'none',
             }}>
@@ -254,7 +254,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
       <div style={{ flex: 1, minWidth: 0 }}>
         <Link href={`/stones/${itemId}`} style={{ textDecoration: 'none' }}>
           <p style={{
-            fontSize: 16, fontWeight: 300, color: '#f5f0e8',
+            fontSize: 16, fontWeight: 300, color: '#1F1B16',
             lineHeight: 1.3, marginBottom: subtitle ? 4 : 8,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>
@@ -263,7 +263,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
         </Link>
         {subtitle && (
           <p style={{
-            fontSize: 12, color: '#9d9080',
+            fontSize: 12, color: '#5A5045',
             marginBottom: shipFrom ? 3 : 8,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
@@ -272,22 +272,22 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
         )}
         {shipFrom && (
           <p style={{
-            fontSize: 12, color: '#9d9080', marginBottom: 8,
+            fontSize: 12, color: '#5A5045', marginBottom: 8,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             Ships from {shipFrom}
           </p>
         )}
         <p style={{
-          fontSize: 24, fontWeight: 400, color: '#f5f0e8',
+          fontSize: 24, fontWeight: 400, color: '#1F1B16',
           marginBottom: 16, letterSpacing: '-0.01em',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
         }}>
           {listing.sale_method === 'accept_offers'
-            ? <span style={{ fontSize: 14, fontWeight: 300, color: '#9d9080' }}>Accepting offers</span>
+            ? <span style={{ fontSize: 14, fontWeight: 300, color: '#5A5045' }}>Accepting offers</span>
             : listing.selling_price != null
               ? eur.format(listing.selling_price)
-              : <span style={{ fontSize: 14, fontWeight: 300, color: '#4a4440' }}>Price on request</span>
+              : <span style={{ fontSize: 14, fontWeight: 300, color: '#6B6052' }}>Price on request</span>
           }
         </p>
 
@@ -296,22 +296,22 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
           <div style={{ marginBottom: 16 }}>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 12, color: '#9d9080', marginBottom: 3,
+              fontSize: 12, color: '#5A5045', marginBottom: 3,
             }}>
               <span>Stone</span>
               <span>{eur.format(Number(listing.selling_price))}</span>
             </div>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 12, color: '#9d9080', marginBottom: 5,
+              fontSize: 12, color: '#5A5045', marginBottom: 5,
             }}>
               <span>Shipping</span>
               <span>{eur.format(cost)}</span>
             </div>
-            <div style={{ height: 1, background: '#2a2a30', marginBottom: 5 }} />
+            <div style={{ height: 1, background: '#ECE5D8', marginBottom: 5 }} />
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 13, fontWeight: 600, color: '#f5f0e8',
+              fontSize: 13, fontWeight: 600, color: '#1F1B16',
             }}>
               <span>Total</span>
               <span>{eur.format(Number(listing.selling_price) + cost)}</span>
@@ -345,18 +345,18 @@ function UnavailableItem({ itemId }: { itemId: string }) {
   return (
     <div style={{
       display: 'flex', gap: 20, padding: '24px 0',
-      borderBottom: '1px solid #2a2a30',
+      borderBottom: '1px solid #ECE5D8',
       alignItems: 'center',
     }}>
       {/* Placeholder */}
       <div style={{
         flexShrink: 0, width: 104, height: 104, borderRadius: 8,
-        background: '#1e1e24',
+        background: '#F4EEE4',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: '1px solid #2a2a30',
+        border: '1px solid #ECE5D8',
       }}>
         <span style={{
-          fontSize: 32, color: '#3a3530', lineHeight: 1,
+          fontSize: 32, color: '#C5B9AF', lineHeight: 1,
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
         }}>◇</span>
       </div>
@@ -364,7 +364,7 @@ function UnavailableItem({ itemId }: { itemId: string }) {
       {/* Info */}
       <div style={{ flex: 1 }}>
         <p style={{
-          fontSize: 13, color: '#9d9080', marginBottom: 12,
+          fontSize: 13, color: '#5A5045', marginBottom: 12,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           This item is no longer available

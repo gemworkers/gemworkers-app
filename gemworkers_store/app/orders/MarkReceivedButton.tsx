@@ -28,9 +28,9 @@ export function MarkReceivedButton({ orderId }: { orderId: string }) {
         disabled={loading}
         style={{
           padding: '7px 18px',
-          background: 'rgba(45,212,191,0.12)',
-          color: '#2dd4bf',
-          border: '1px solid rgba(45,212,191,0.4)',
+          background: 'rgba(15,118,110,0.08)',
+          color: '#0F766E',
+          border: '1px solid rgba(15,118,110,0.3)',
           borderRadius: 6,
           fontSize: 12,
           fontWeight: 600,
@@ -44,7 +44,7 @@ export function MarkReceivedButton({ orderId }: { orderId: string }) {
       </button>
       {err && (
         <p style={{
-          fontSize: 12, color: '#f87171', marginTop: 6,
+          fontSize: 12, color: '#B42318', marginTop: 6,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           {err}

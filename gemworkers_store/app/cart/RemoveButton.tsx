@@ -19,9 +19,9 @@ export function RemoveButton({ itemId }: { itemId: string }) {
       disabled={isPending}
       style={{
         fontSize: 12, fontWeight: 500,
-        color: isPending ? '#4a4440' : '#4a4440',
+        color: isPending ? '#6B6052' : '#6B6052',
         background: 'none',
-        border: '1px solid #2a2a30',
+        border: '1px solid #ECE5D8',
         borderRadius: 6, padding: '7px 16px',
         cursor: isPending ? 'not-allowed' : 'pointer',
         whiteSpace: 'nowrap',

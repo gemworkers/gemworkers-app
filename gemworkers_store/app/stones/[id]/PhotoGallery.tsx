@@ -16,11 +16,11 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
       <div style={{
         width: '100%', aspectRatio: '1 / 1',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(145deg, #1e1e24 0%, #252530 100%)',
+        background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
         borderRadius: 12,
       }}>
         <span style={{
-          fontSize: 96, color: '#4a4440', fontWeight: 300,
+          fontSize: 96, color: '#6B6052', fontWeight: 300,
           fontFamily: 'var(--font-cormorant, Georgia, serif)', lineHeight: 1,
           userSelect: 'none',
         }}>
@@ -33,7 +33,7 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
   // ── 1 photo ───────────────────────────────────────────────────────────────
   if (imageUrls.length === 1) {
     return (
-      <div className="photo-zoom-wrapper" style={{ borderRadius: 12, background: '#1e1e24' }}>
+      <div className="photo-zoom-wrapper" style={{ borderRadius: 12, background: '#F4EEE4' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrls[0]}
@@ -50,7 +50,7 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
     <div>
       {/* Main image */}
       <div className="photo-zoom-wrapper" style={{
-        borderRadius: 12, background: '#1e1e24', marginBottom: 10,
+        borderRadius: 12, background: '#F4EEE4', marginBottom: 10,
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -72,9 +72,9 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
               flex: '0 0 72px', height: 72,
               padding: 0, border: 'none', cursor: 'pointer',
               borderRadius: 6, overflow: 'hidden',
-              outline: i === selected ? '2px solid #c9a962' : '2px solid transparent',
+              outline: i === selected ? '2px solid #7A5A22' : '2px solid transparent',
               outlineOffset: 2,
-              background: '#1e1e24',
+              background: '#F4EEE4',
               transition: 'outline-color 0.15s ease',
             }}
           >

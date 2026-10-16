@@ -23,7 +23,7 @@ const NAV_LINKS: { label: string; href: string }[] = [
 ]
 
 const navText: CSSProperties = {
-  fontSize: 12, color: '#9d9080', letterSpacing: '0.06em', whiteSpace: 'nowrap',
+  fontSize: 12, color: '#5A5045', letterSpacing: '0.06em', whiteSpace: 'nowrap',
   fontFamily: 'var(--font-inter, system-ui)',
 }
 
@@ -79,8 +79,8 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
         position: 'sticky', top: 0, zIndex: 100,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 32px', height: 64,
-        background: '#0e0e10',
-        borderBottom: '1px solid rgba(201,169,98,0.15)',
+        background: '#FFFFFF',
+        borderBottom: '1px solid #ECE5D8',
         /* NO overflow:hidden — that was clipping the dropdown */
       }}>
 
@@ -90,7 +90,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
             <Image src="/logo-mark-white.png" alt="" width={38} height={34} style={{ display: 'block' }} />
             <span style={{
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
-              fontSize: 18, fontWeight: 400, color: '#f5f0e8',
+              fontSize: 18, fontWeight: 400, color: '#1F1B16',
               letterSpacing: '0.12em', textTransform: 'uppercase', lineHeight: 1,
             }}>
               GemWorkers
@@ -119,7 +119,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
                   transition: 'transform 0.2s ease-out', flexShrink: 0,
                   transform: shopOpen ? 'rotate(180deg)' : undefined,
                 }}>
-                  <path d="M1 1l4 4 4-4" stroke="#c9a962" strokeWidth="1.5"
+                  <path d="M1 1l4 4 4-4" stroke="#7A5A22" strokeWidth="1.5"
                     strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
@@ -127,8 +127,8 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               {shopOpen && (
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 12px)', left: 0,
-                  background: '#16161a', border: '1px solid #2a2a30',
-                  borderRadius: 6, boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
+                  background: '#FFFFFF', border: '1px solid #ECE5D8',
+                  borderRadius: 6, boxShadow: '0 16px 48px rgba(0,0,0,0.10)',
                   minWidth: 196, padding: '6px 0', zIndex: 200,
                 }}>
                   {SHOP_LINKS.map(sl => (
@@ -137,15 +137,15 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
                       onClick={() => setShopOpen(false)}
                       style={{
                         display: 'block', padding: '10px 18px',
-                        fontSize: 13, color: '#9d9080', textDecoration: 'none',
+                        fontSize: 13, color: '#5A5045', textDecoration: 'none',
                         letterSpacing: '0.03em', transition: 'color 150ms ease, background 150ms ease',
                       }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLAnchorElement).style.color = '#f5f0e8'
-                        ;(e.currentTarget as HTMLAnchorElement).style.background = '#1e1e24'
+                        (e.currentTarget as HTMLAnchorElement).style.color = '#1F1B16'
+                        ;(e.currentTarget as HTMLAnchorElement).style.background = '#F4EEE4'
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLAnchorElement).style.color = '#9d9080'
+                        (e.currentTarget as HTMLAnchorElement).style.color = '#5A5045'
                         ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
                       }}
                     >
@@ -175,15 +175,15 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
                   placeholder="Search stones…"
                   style={{
                     width: 200, height: 32, padding: '0 12px',
-                    border: '1px solid #2a2a30', borderRadius: 4,
-                    fontSize: 13, color: '#f5f0e8', background: '#16161a',
+                    border: '1px solid #ECE5D8', borderRadius: 4,
+                    fontSize: 13, color: '#1F1B16', background: '#FFFFFF',
                     outline: 'none', letterSpacing: '0.02em',
                     fontFamily: 'var(--font-inter, system-ui)',
                   }}
                 />
                 <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                    stroke="#9d9080" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    stroke="#5A5045" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                 </button>
@@ -192,7 +192,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               <button onClick={() => setSearchOpen(true)} aria-label="Open search"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-                  stroke="#9d9080" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  stroke="#5A5045" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
               </button>
@@ -205,14 +205,14 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <Link href="/orders" className="nav-link" style={navText}>My Orders</Link>
               <span style={{
-                fontSize: 11, color: '#5c5346', fontFamily: 'var(--font-inter, system-ui)',
+                fontSize: 11, color: '#6B6052', fontFamily: 'var(--font-inter, system-ui)',
                 maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {user.displayName}
               </span>
               <form action={signOut} style={{ display: 'inline' }}>
                 <button type="submit" style={{
-                  fontSize: 11, color: '#5c5346', background: 'none', border: 'none',
+                  fontSize: 11, color: '#6B6052', background: 'none', border: 'none',
                   cursor: 'pointer', padding: 0, letterSpacing: '0.04em',
                   fontFamily: 'var(--font-inter, system-ui)',
                 }}>
@@ -224,8 +224,8 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <Link href="/auth/login" className="nav-link" style={navText}>Log in</Link>
               <Link href="/auth/signup" style={{
-                fontSize: 11, fontWeight: 600, color: '#c9a962',
-                border: '1px solid rgba(201,169,98,0.45)',
+                fontSize: 11, fontWeight: 600, color: '#7A5A22',
+                border: '1px solid rgba(122,90,34,0.45)',
                 padding: '5px 14px', borderRadius: 4,
                 textDecoration: 'none', letterSpacing: '0.08em',
                 fontFamily: 'var(--font-inter, system-ui)',
@@ -289,15 +289,15 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
                 placeholder="Search stones…"
                 style={{
                   flex: 1, height: 40, padding: '0 12px',
-                  border: '1px solid #2a2a30', borderRadius: 4,
-                  fontSize: 14, color: '#f5f0e8', background: '#16161a',
+                  border: '1px solid #ECE5D8', borderRadius: 4,
+                  fontSize: 14, color: '#1F1B16', background: '#FFFFFF',
                   outline: 'none', fontFamily: 'var(--font-inter, system-ui)',
                 }}
               />
               <button type="submit" style={{
                 height: 40, padding: '0 16px', background: 'none',
-                border: '1px solid #2a2a30', borderRadius: 4,
-                cursor: 'pointer', color: '#9d9080', fontSize: 13,
+                border: '1px solid #ECE5D8', borderRadius: 4,
+                cursor: 'pointer', color: '#5A5045', fontSize: 13,
                 fontFamily: 'var(--font-inter, system-ui)',
               }}>
                 Go
@@ -314,7 +314,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               <form action={signOut}>
                 <button type="submit" style={{
                   display: 'block', padding: '12px 0', fontSize: 18, fontWeight: 300,
-                  color: '#9d9080', background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#5A5045', background: 'none', border: 'none', cursor: 'pointer',
                   fontFamily: 'var(--font-cormorant, Georgia, serif)',
                   letterSpacing: '0.04em',
                 }}>
@@ -327,7 +327,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               <Link href="/auth/login" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>Log in</Link>
               <Link href="/auth/signup" onClick={() => setMobileOpen(false)} style={{
                 display: 'inline-block', padding: '12px 28px', borderRadius: 4,
-                border: '1px solid rgba(201,169,98,0.6)', color: '#c9a962',
+                border: '1px solid rgba(122,90,34,0.6)', color: '#7A5A22',
                 fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
                 textDecoration: 'none', fontFamily: 'var(--font-inter, system-ui)',
                 alignSelf: 'flex-start', marginTop: 4,

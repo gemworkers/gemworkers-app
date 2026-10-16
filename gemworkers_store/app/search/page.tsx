@@ -49,7 +49,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
       {/* ── Heading ── */}
       <p style={{
         fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-        color: '#c9a962', marginBottom: 14,
+        color: '#7A5A22', marginBottom: 14,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         Search
@@ -57,7 +57,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
       {query ? (
         <h1 style={{
-          fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 300, color: '#f5f0e8',
+          fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 300, color: '#1F1B16',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
           letterSpacing: '0.04em', lineHeight: 1.2, marginBottom: 8,
         }}>
@@ -65,7 +65,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
         </h1>
       ) : (
         <h1 style={{
-          fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 300, color: '#4a4440',
+          fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 300, color: '#6B6052',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
           letterSpacing: '0.04em', lineHeight: 1.2, marginBottom: 0,
         }}>
@@ -75,7 +75,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
       {!query && (
         <p style={{
-          fontSize: 14, color: '#5c5346', marginTop: 12, lineHeight: 1.6,
+          fontSize: 14, color: '#6B6052', marginTop: 12, lineHeight: 1.6,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Use the search bar above to find gemstones by name, type, variety, or origin.
@@ -86,7 +86,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
         <>
           <div className="gold-rule" style={{ margin: '24px 0 28px' }} />
           <p style={{
-            fontSize: 11, color: '#4a4440', marginBottom: 28, letterSpacing: '0.06em',
+            fontSize: 11, color: '#6B6052', marginBottom: 28, letterSpacing: '0.06em',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             {items.length === 0 ? 'No results' : `${items.length} ${items.length === 1 ? 'result' : 'results'}`}
@@ -96,7 +96,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
       {hasError && (
         <p style={{
-          fontSize: 13, color: '#ef4444', marginTop: 12,
+          fontSize: 13, color: '#B42318', marginTop: 12,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Search failed — please try again.
@@ -108,17 +108,17 @@ export default async function SearchPage({ searchParams }: PageProps) {
       {query && !hasError && items.length === 0 && (
         <div style={{ textAlign: 'center', padding: '80px 0' }}>
           <div style={{
-            fontSize: 28, color: '#2a2a30', marginBottom: 16,
+            fontSize: 28, color: '#ECE5D8', marginBottom: 16,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>◇</div>
           <p style={{
-            fontSize: 15, color: '#4a4440', marginBottom: 24,
+            fontSize: 15, color: '#6B6052', marginBottom: 24,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             No stones matched &ldquo;{query}&rdquo;
           </p>
           <Link href="/" style={{
-            fontSize: 12, color: '#9d9080', letterSpacing: '0.06em',
+            fontSize: 12, color: '#5A5045', letterSpacing: '0.06em',
             textDecoration: 'none',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>

@@ -2,10 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Cormorant_Garamond, Inter } from 'next/font/google'
+import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
 import { createClient } from '@/lib/supabase/server'
 import { StoreHeader } from '@/app/components/StoreHeader'
-import { AmbientBackground } from '@/app/components/AmbientBackground'
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -14,8 +13,9 @@ const cormorant = Cormorant_Garamond({
   display: 'swap',
 })
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ['latin'],
+  weight: ['400', '500', '600'],
   variable: '--font-inter',
   display: 'swap',
 })
@@ -47,7 +47,7 @@ const CUSTOMER_CARE_LINKS = [
 
 function Footer() {
   return (
-    <footer style={{ background: '#0e0e10', marginTop: 80 }}>
+    <footer style={{ background: '#FFFFFF', marginTop: 80, borderTop: '1px solid #ECE5D8' }}>
       <div className="gold-rule" />
 
       <div style={{
@@ -73,14 +73,14 @@ function Footer() {
             <div key={col.title}>
               <p style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-                color: '#c9a962', marginBottom: 18,
+                color: '#7A5A22', marginBottom: 18,
               }}>
                 {col.title}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                 {col.links.map(l => (
                   <Link key={l.href} href={l.href} className="nav-link"
-                    style={{ fontSize: 13, color: '#9d9080', letterSpacing: '0.02em' }}>
+                    style={{ fontSize: 13, color: '#5A5045', letterSpacing: '0.02em' }}>
                     {l.label}
                   </Link>
                 ))}
@@ -95,7 +95,7 @@ function Footer() {
       </div>
       <div style={{
         maxWidth: 1400, margin: '0 auto', padding: '18px 32px',
-        fontSize: 11, color: '#4a4440', letterSpacing: '0.05em',
+        fontSize: 11, color: '#6B6052', letterSpacing: '0.05em',
       }}>
         © {new Date().getFullYear()} GemWorkers. All rights reserved.
       </div>
@@ -118,9 +118,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <html lang="en" className={`${cormorant.variable} ${inter.variable}`}>
+    <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body>
-        <AmbientBackground />
         <div style={{ position: 'relative', zIndex: 1 }}>
           <StoreHeader user={navUser} />
           {children}

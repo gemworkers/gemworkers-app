@@ -33,12 +33,12 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
       style={{
         '--fade-delay': `${Math.min(index * 70, 560)}ms`,
         display: 'block', textDecoration: 'none', color: 'inherit',
-        border: '1px solid #2a2a30', borderRadius: 8, overflow: 'hidden',
-        background: '#16161a',
+        border: '1px solid #ECE5D8', borderRadius: 8, overflow: 'hidden',
+        background: '#FFFFFF',
       } as React.CSSProperties}
     >
       {/* ── Image ── */}
-      <div style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#1e1e24' }}>
+      <div style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4EEE4' }}>
         {item.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -51,10 +51,10 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
           <div style={{
             width: '100%', height: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(145deg, #1e1e24 0%, #252530 100%)',
+            background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
           }}>
             <span style={{
-              fontSize: 52, color: '#3a3530', fontWeight: 300, lineHeight: 1,
+              fontSize: 52, color: '#C5B9AF', fontWeight: 300, lineHeight: 1,
               fontFamily: 'var(--font-cormorant, Georgia, serif)', userSelect: 'none',
             }}>
               {initial}
@@ -65,9 +65,9 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
         {hasWeight && (
           <div style={{
             position: 'absolute', top: 8, right: 8,
-            background: 'rgba(14,14,16,0.85)', backdropFilter: 'blur(6px)',
+            background: 'rgba(251,248,243,0.92)', backdropFilter: 'blur(6px)',
             borderRadius: 4, padding: '2px 8px',
-            fontSize: 10, fontWeight: 600, color: '#c9a962', letterSpacing: '0.08em',
+            fontSize: 10, fontWeight: 600, color: '#7A5A22', letterSpacing: '0.08em',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             {item.weight_value} {item.weight_unit}
@@ -78,7 +78,7 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
       {/* ── Body ── */}
       <div style={{ padding: '13px 14px 15px' }}>
         <p style={{
-          fontSize: 15, fontWeight: 500, color: '#f5f0e8',
+          fontSize: 15, fontWeight: 500, color: '#1F1B16',
           lineHeight: 1.3, marginBottom: subtitle ? 4 : 10,
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
         }}>
@@ -87,7 +87,7 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
 
         {subtitle && (
           <p style={{
-            fontSize: 11, color: '#9d9080', marginBottom: 10,
+            fontSize: 11, color: '#5A5045', marginBottom: 10,
             lineHeight: 1.4, letterSpacing: '0.04em',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
@@ -97,27 +97,27 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
 
         {item.sale_method === 'accept_offers' ? (
           <p style={{
-            fontSize: 14, color: '#c9a962', fontStyle: 'italic',
+            fontSize: 14, color: '#7A5A22', fontStyle: 'italic',
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>
             Accepting offers
           </p>
         ) : item.selling_price != null ? (
           <p style={{
-            fontSize: 19, fontWeight: 600, color: '#f5f0e8',
+            fontSize: 19, fontWeight: 600, color: '#1F1B16',
             letterSpacing: '-0.01em',
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>
             {eur.format(Number(item.selling_price))}
           </p>
         ) : (
-          <p style={{ fontSize: 13, color: '#4a4440', fontFamily: 'var(--font-inter, system-ui)' }}>—</p>
+          <p style={{ fontSize: 13, color: '#6B6052', fontFamily: 'var(--font-inter, system-ui)' }}>—</p>
         )}
 
         {cost !== null && (
           <p style={{
             fontSize: 10, marginTop: 5, letterSpacing: '0.04em',
-            color: cost === 0 ? '#7a6234' : '#5c5346',
+            color: cost === 0 ? '#B89A63' : '#6B6052',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             {cost === 0 ? 'Free shipping' : `+ €${cost.toFixed(0)} shipping`}

@@ -7,15 +7,15 @@ import { createClient } from '@/lib/supabase/client'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px', fontSize: 14,
-  color: '#f5f0e8', background: '#1e1e24',
-  border: '1px solid #2a2a30', borderRadius: 6,
+  color: '#1F1B16', background: '#F4EEE4',
+  border: '1px solid #ECE5D8', borderRadius: 6,
   boxSizing: 'border-box', outline: 'none',
   fontFamily: 'var(--font-inter, system-ui)',
 }
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 600,
-  color: '#9d9080', marginBottom: 6, letterSpacing: '0.06em',
+  color: '#5A5045', marginBottom: 6, letterSpacing: '0.06em',
   fontFamily: 'var(--font-inter, system-ui)',
 }
 
@@ -69,27 +69,27 @@ export default function SignupPage() {
     return (
       <main style={{ maxWidth: 420, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
         <div style={{
-          fontSize: 42, marginBottom: 16, color: '#c9a962',
+          fontSize: 42, marginBottom: 16, color: '#7A5A22',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
         }}>✉</div>
         <h1 style={{
-          fontSize: 24, fontWeight: 300, color: '#f5f0e8',
+          fontSize: 24, fontWeight: 300, color: '#1F1B16',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
           marginBottom: 10,
         }}>
           Check your email
         </h1>
         <p style={{
-          fontSize: 14, color: '#9d9080', lineHeight: 1.6, marginBottom: 28,
+          fontSize: 14, color: '#5A5045', lineHeight: 1.6, marginBottom: 28,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           We sent a confirmation link to{' '}
-          <strong style={{ color: '#f5f0e8' }}>{email}</strong>.
+          <strong style={{ color: '#1F1B16' }}>{email}</strong>.
           Click it to activate your account, then log in.
         </p>
         <Link href="/auth/login" style={{
           display: 'inline-block', padding: '11px 28px',
-          border: '1px solid rgba(201,169,98,0.5)', color: '#c9a962',
+          border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
           borderRadius: 6, textDecoration: 'none', fontSize: 12,
           fontWeight: 600, letterSpacing: '0.1em',
           fontFamily: 'var(--font-inter, system-ui)',
@@ -103,37 +103,37 @@ export default function SignupPage() {
   return (
     <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
       <h1 style={{
-        fontSize: 28, fontWeight: 300, color: '#f5f0e8',
+        fontSize: 28, fontWeight: 300, color: '#1F1B16',
         fontFamily: 'var(--font-cormorant, Georgia, serif)',
         marginBottom: 6,
       }}>
         Create an account
       </h1>
       <p style={{
-        fontSize: 13, color: '#9d9080', marginBottom: 28,
+        fontSize: 13, color: '#5A5045', marginBottom: 28,
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         Already have an account?{' '}
-        <Link href="/auth/login" style={{ color: '#c9a962', textDecoration: 'none' }}>
+        <Link href="/auth/login" style={{ color: '#7A5A22', textDecoration: 'none' }}>
           Log in
         </Link>
       </p>
 
       <form onSubmit={handleSubmit} style={{
-        background: '#16161a', border: '1px solid #2a2a30',
+        background: '#FFFFFF', border: '1px solid #ECE5D8',
         borderRadius: 10, padding: 28,
       }}>
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>
             Display name{' '}
-            <span style={{ fontWeight: 400, color: '#4a4440' }}>(optional)</span>
+            <span style={{ fontWeight: 400, color: '#6B6052' }}>(optional)</span>
           </label>
           <input
             type="text" autoComplete="name"
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
             placeholder="How you'll appear to sellers"
-            style={{ ...inputStyle, color: displayName ? '#f5f0e8' : '#4a4440' }}
+            style={{ ...inputStyle, color: displayName ? '#1F1B16' : '#6B6052' }}
           />
         </div>
 
@@ -150,7 +150,7 @@ export default function SignupPage() {
         <div style={{ marginBottom: 24 }}>
           <label style={labelStyle}>
             Password{' '}
-            <span style={{ fontWeight: 400, color: '#4a4440' }}>(min 6 characters)</span>
+            <span style={{ fontWeight: 400, color: '#6B6052' }}>(min 6 characters)</span>
           </label>
           <input
             type="password" required minLength={6} autoComplete="new-password"
@@ -162,9 +162,9 @@ export default function SignupPage() {
 
         {error && (
           <p style={{
-            fontSize: 13, color: '#f87171',
-            background: 'rgba(220,38,38,0.08)',
-            border: '1px solid rgba(220,38,38,0.3)',
+            fontSize: 13, color: '#B42318',
+            background: 'rgba(180,35,24,0.06)',
+            border: '1px solid rgba(180,35,24,0.25)',
             borderRadius: 6, padding: '8px 12px', marginBottom: 16,
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
@@ -177,7 +177,7 @@ export default function SignupPage() {
           disabled={loading}
           style={{
             width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
-            color: '#0e0e10', background: loading ? '#7a6234' : '#c9a962',
+            color: '#FBF8F3', background: loading ? '#B89A63' : '#7A5A22',
             border: 'none', borderRadius: 6,
             cursor: loading ? 'not-allowed' : 'pointer',
             letterSpacing: '0.06em',

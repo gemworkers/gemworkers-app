@@ -40,7 +40,7 @@ export function HeroSection({ hasHero = false }: { hasHero?: boolean }) {
           </div>
           <div style={{
             position: 'absolute', inset: 0, zIndex: 0,
-            background: 'linear-gradient(160deg, rgba(14,14,16,0.52) 0%, rgba(14,14,16,0.86) 100%)',
+            background: 'linear-gradient(160deg, rgba(31,27,22,0.30) 0%, rgba(31,27,22,0.65) 100%)',
           }} />
         </>
       )}
@@ -51,7 +51,7 @@ export function HeroSection({ hasHero = false }: { hasHero?: boolean }) {
         <div
           ref={glyphRef}
           style={{
-            fontSize: 22, color: '#c9a962', marginBottom: 28, lineHeight: 1,
+            fontSize: 22, color: '#7A5A22', marginBottom: 28, lineHeight: 1,
             fontFamily: 'var(--font-cormorant, Georgia, serif)', letterSpacing: '0.12em',
             willChange: 'transform',
           }}
@@ -61,7 +61,7 @@ export function HeroSection({ hasHero = false }: { hasHero?: boolean }) {
 
         <h1 style={{
           fontSize: 'clamp(36px, 7vw, 80px)',
-          fontWeight: 300, letterSpacing: '0.08em', color: '#f5f0e8',
+          fontWeight: 300, letterSpacing: '0.08em', color: '#1F1B16',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
           lineHeight: 1.1, marginBottom: 32, textTransform: 'uppercase',
         }}>
@@ -84,7 +84,7 @@ export function HeroSection({ hasHero = false }: { hasHero?: boolean }) {
         <p
           className="hero-sub"
           style={{
-            fontSize: 'clamp(14px, 2vw, 17px)', color: '#9d9080',
+            fontSize: 'clamp(14px, 2vw, 17px)', color: '#5A5045',
             maxWidth: 480, margin: '0 auto 44px',
             lineHeight: 1.7, letterSpacing: '0.03em',
             fontFamily: 'var(--font-inter, system-ui)',
@@ -98,9 +98,9 @@ export function HeroSection({ hasHero = false }: { hasHero?: boolean }) {
           className="hero-cta btn-vault"
           style={{
             display: 'inline-block', padding: '13px 36px',
-            border: '1px solid rgba(201,169,98,0.6)', borderRadius: 4,
+            border: '1px solid rgba(122,90,34,0.6)', borderRadius: 4,
             fontSize: 12, fontWeight: 600, letterSpacing: '0.14em',
-            textTransform: 'uppercase', color: '#c9a962',
+            textTransform: 'uppercase', color: '#7A5A22',
             textDecoration: 'none', fontFamily: 'var(--font-inter, system-ui)',
           }}
         >

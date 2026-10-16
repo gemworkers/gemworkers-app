@@ -38,7 +38,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
     return (
       <main style={{ maxWidth: 1400, margin: '0 auto', padding: '80px 32px' }}>
         <p style={{
-          fontSize: 24, fontWeight: 300, color: '#f5f0e8', marginBottom: 12,
+          fontSize: 24, fontWeight: 300, color: '#1F1B16', marginBottom: 12,
           fontFamily: 'var(--font-cormorant, Georgia, serif)', letterSpacing: '0.05em',
         }}>
           Category not found.
@@ -89,13 +89,13 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       <div style={{ marginBottom: 36 }}>
         <p style={{
           fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-          color: '#c9a962', marginBottom: 12,
+          color: '#7A5A22', marginBottom: 12,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Shop
         </p>
         <h1 style={{
-          fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 300, color: '#f5f0e8',
+          fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 300, color: '#1F1B16',
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
           letterSpacing: '0.06em', lineHeight: 1.15,
         }}>
@@ -110,9 +110,9 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 32 }}>
           <Link href={`/shop/${type}`} style={{
             fontSize: 11, padding: '5px 14px', borderRadius: 20,
-            border: `1px solid ${!gem ? '#c9a962' : '#2a2a30'}`,
-            background: !gem ? 'rgba(201,169,98,0.12)' : 'transparent',
-            color: !gem ? '#c9a962' : '#9d9080',
+            border: `1px solid ${!gem ? '#7A5A22' : '#ECE5D8'}`,
+            background: !gem ? 'rgba(122,90,34,0.12)' : 'transparent',
+            color: !gem ? '#7A5A22' : '#5A5045',
             textDecoration: 'none', letterSpacing: '0.06em',
             fontFamily: 'var(--font-inter, system-ui)',
             transition: 'border-color 200ms, color 200ms',
@@ -122,9 +122,9 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
           {gemTypes.map(g => (
             <Link key={g} href={`/shop/${type}?gem=${encodeURIComponent(g)}`} style={{
               fontSize: 11, padding: '5px 14px', borderRadius: 20,
-              border: `1px solid ${gem === g ? '#c9a962' : '#2a2a30'}`,
-              background: gem === g ? 'rgba(201,169,98,0.12)' : 'transparent',
-              color: gem === g ? '#c9a962' : '#9d9080',
+              border: `1px solid ${gem === g ? '#7A5A22' : '#ECE5D8'}`,
+              background: gem === g ? 'rgba(122,90,34,0.12)' : 'transparent',
+              color: gem === g ? '#7A5A22' : '#5A5045',
               textDecoration: 'none', letterSpacing: '0.06em',
               fontFamily: 'var(--font-inter, system-ui)',
               transition: 'border-color 200ms, color 200ms',
@@ -137,7 +137,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
 
       {/* ── Result count ── */}
       <p style={{
-        fontSize: 11, color: '#4a4440', marginBottom: 28, letterSpacing: '0.06em',
+        fontSize: 11, color: '#6B6052', marginBottom: 28, letterSpacing: '0.06em',
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         {items.length === 0
@@ -149,11 +149,11 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
           <div style={{
-            fontSize: 28, color: '#2a2a30', marginBottom: 16,
+            fontSize: 28, color: '#ECE5D8', marginBottom: 16,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
           }}>◇</div>
           <p style={{
-            fontSize: 15, color: '#4a4440', letterSpacing: '0.04em',
+            fontSize: 15, color: '#6B6052', letterSpacing: '0.04em',
             fontFamily: 'var(--font-inter, system-ui)',
           }}>
             {gem ? `No ${gem} listed in this category yet.` : 'No listings in this category yet.'}

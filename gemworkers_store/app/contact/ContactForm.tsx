@@ -6,15 +6,15 @@ import { TOPICS, type ContactState } from './contact-shared'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px', fontSize: 14,
-  color: '#f5f0e8', background: '#1e1e24',
-  border: '1px solid #2a2a30', borderRadius: 6,
+  color: '#1F1B16', background: '#F4EEE4',
+  border: '1px solid #ECE5D8', borderRadius: 6,
   boxSizing: 'border-box', outline: 'none',
   fontFamily: 'var(--font-inter, system-ui)',
 }
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 600,
-  color: '#9d9080', marginBottom: 6, letterSpacing: '0.06em',
+  color: '#5A5045', marginBottom: 6, letterSpacing: '0.06em',
   fontFamily: 'var(--font-inter, system-ui)',
 }
 
@@ -47,8 +47,8 @@ export function ContactForm({ initialTopic }: ContactFormProps) {
   if (state.ok) {
     return (
       <p style={{
-        fontSize: 15, lineHeight: 1.7, color: '#f5f0e8',
-        background: '#1e1e24', border: '1px solid #2a2a30',
+        fontSize: 15, lineHeight: 1.7, color: '#1F1B16',
+        background: '#F4EEE4', border: '1px solid #ECE5D8',
         borderRadius: 8, padding: '20px 24px',
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
@@ -59,7 +59,7 @@ export function ContactForm({ initialTopic }: ContactFormProps) {
 
   return (
     <form action={formAction} style={{
-      background: '#16161a', border: '1px solid #2a2a30',
+      background: '#FFFFFF', border: '1px solid #ECE5D8',
       borderRadius: 10, padding: 28,
     }}>
       {/* Honeypot — hidden from real users, filled only by bots */}
@@ -75,9 +75,9 @@ export function ContactForm({ initialTopic }: ContactFormProps) {
 
       {state.error && (
         <p style={{
-          fontSize: 13, color: '#f87171',
-          background: 'rgba(220,38,38,0.08)',
-          border: '1px solid rgba(220,38,38,0.3)',
+          fontSize: 13, color: '#B42318',
+          background: 'rgba(180,35,24,0.06)',
+          border: '1px solid rgba(180,35,24,0.25)',
           borderRadius: 6, padding: '8px 12px', marginBottom: 20,
           fontFamily: 'var(--font-inter, system-ui)',
         }}>
@@ -122,7 +122,7 @@ export function ContactForm({ initialTopic }: ContactFormProps) {
             ...inputStyle,
             cursor: 'pointer',
             appearance: 'none',
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239d9080' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+            backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235A5045' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'right 12px center',
             paddingRight: 32,
@@ -152,7 +152,7 @@ export function ContactForm({ initialTopic }: ContactFormProps) {
         disabled={isPending}
         style={{
           width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
-          color: '#0e0e10', background: isPending ? '#7a6234' : '#c9a962',
+          color: '#FBF8F3', background: isPending ? '#B89A63' : '#7A5A22',
           border: 'none', borderRadius: 6,
           cursor: isPending ? 'not-allowed' : 'pointer',
           letterSpacing: '0.06em',

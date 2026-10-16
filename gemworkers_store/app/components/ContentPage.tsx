@@ -21,7 +21,7 @@ export function ContentPage({ eyebrow, title, lastUpdated, children }: ContentPa
             fontWeight: 700,
             letterSpacing: '0.2em',
             textTransform: 'uppercase',
-            color: '#c9a962',
+            color: '#7A5A22',
             fontFamily: 'var(--font-inter, system-ui)',
             margin: '0 0 14px',
           }}>
@@ -33,7 +33,7 @@ export function ContentPage({ eyebrow, title, lastUpdated, children }: ContentPa
           fontFamily: 'var(--font-cormorant, Georgia, serif)',
           fontSize: 'clamp(34px, 5vw, 52px)',
           fontWeight: 400,
-          color: '#f5f0e8',
+          color: '#1F1B16',
           lineHeight: 1.1,
           letterSpacing: '0.02em',
           margin: 0,
@@ -44,7 +44,7 @@ export function ContentPage({ eyebrow, title, lastUpdated, children }: ContentPa
         {lastUpdated && (
           <p style={{
             fontSize: 12,
-            color: '#4a4440',
+            color: '#6B6052',
             fontFamily: 'var(--font-inter, system-ui)',
             letterSpacing: '0.04em',
             margin: '12px 0 0',

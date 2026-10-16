@@ -30,7 +30,7 @@ export default function AboutPage() {
       <div className="not-prose" style={{
         marginTop: 56,
         paddingTop: 40,
-        borderTop: '1px solid #2a2a30',
+        borderTop: '1px solid #ECE5D8',
         display: 'flex',
         gap: 48,
         flexWrap: 'wrap',
@@ -45,7 +45,7 @@ export default function AboutPage() {
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: '0.12em',
-              color: '#9d9080',
+              color: '#5A5045',
               textTransform: 'uppercase',
               marginBottom: 6,
               fontFamily: 'var(--font-inter, system-ui)',
@@ -55,7 +55,7 @@ export default function AboutPage() {
             <p style={{
               fontSize: 22,
               fontWeight: 400,
-              color: '#f5f0e8',
+              color: '#1F1B16',
               fontFamily: 'var(--font-cormorant, Georgia, serif)',
               margin: 0,
             }}>

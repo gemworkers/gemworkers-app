@@ -36,8 +36,8 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
         style={{
           display: 'block', textAlign: 'center',
           padding: '11px 0', fontSize: 13, fontWeight: 600,
-          color: '#c9a962',
-          border: '1px solid rgba(201,169,98,0.5)', borderRadius: 6,
+          color: '#7A5A22',
+          border: '1px solid rgba(122,90,34,0.5)', borderRadius: 6,
           textDecoration: 'none', letterSpacing: '0.06em',
           fontFamily: 'var(--font-inter, system-ui)',
         }}
@@ -54,7 +54,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
         onClick={() => setState('confirm')}
         style={{
           width: '100%', padding: '11px 0', fontSize: 13, fontWeight: 600,
-          color: '#0e0e10', background: '#c9a962',
+          color: '#FBF8F3', background: '#7A5A22',
           border: 'none', borderRadius: 6,
           cursor: 'pointer', letterSpacing: '0.06em',
           fontFamily: 'var(--font-inter, system-ui)',
@@ -80,11 +80,11 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
 
     return (
       <div style={{
-        border: '1px solid #2a2a30', borderRadius: 8,
-        padding: '16px 18px', background: '#16161a',
+        border: '1px solid #ECE5D8', borderRadius: 8,
+        padding: '16px 18px', background: '#FFFFFF',
       }}>
         <p style={{
-          fontSize: 13, fontWeight: 600, color: '#f5f0e8',
+          fontSize: 13, fontWeight: 600, color: '#1F1B16',
           marginBottom: 6, fontFamily: 'var(--font-inter, system-ui)',
         }}>
           Confirm purchase
@@ -93,34 +93,34 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
           <div style={{ marginBottom: 14 }}>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 13, color: '#9d9080', marginBottom: 3,
+              fontSize: 13, color: '#5A5045', marginBottom: 3,
             }}>
               <span>Stone</span>
               <span>{formatted}</span>
             </div>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 13, color: '#9d9080', marginBottom: 6,
+              fontSize: 13, color: '#5A5045', marginBottom: 6,
             }}>
               <span>Shipping</span>
               <span>{eur.format(shippingCost)}</span>
             </div>
-            <div style={{ height: 1, background: '#2a2a30', marginBottom: 6 }} />
+            <div style={{ height: 1, background: '#ECE5D8', marginBottom: 6 }} />
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 14, fontWeight: 700, color: '#f5f0e8',
+              fontSize: 14, fontWeight: 700, color: '#1F1B16',
             }}>
               <span>Total</span>
               <span>{eur.format(sellingPrice! + shippingCost)}</span>
             </div>
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: '#9d9080', lineHeight: 1.55, marginBottom: 4 }}>
-            Buy <strong style={{ color: '#f5f0e8' }}>{itemTitle}</strong> for{' '}
-            <strong style={{ color: '#f5f0e8' }}>{formatted}</strong>?
+          <p style={{ fontSize: 13, color: '#5A5045', lineHeight: 1.55, marginBottom: 4 }}>
+            Buy <strong style={{ color: '#1F1B16' }}>{itemTitle}</strong> for{' '}
+            <strong style={{ color: '#1F1B16' }}>{formatted}</strong>?
           </p>
         )}
-        <p style={{ fontSize: 12, color: '#4a4440', marginBottom: 18 }}>
+        <p style={{ fontSize: 12, color: '#6B6052', marginBottom: 18 }}>
           This reserves the stone — it will no longer be available to other buyers.
         </p>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -128,7 +128,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
             onClick={handleConfirm}
             style={{
               flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
-              color: '#0e0e10', background: '#c9a962',
+              color: '#FBF8F3', background: '#7A5A22',
               border: 'none', borderRadius: 6,
               cursor: 'pointer', letterSpacing: '0.04em',
             }}
@@ -139,8 +139,8 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
             onClick={() => setState('idle')}
             style={{
               flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 500,
-              color: '#9d9080',
-              background: '#1e1e24', border: '1px solid #2a2a30',
+              color: '#5A5045',
+              background: '#F4EEE4', border: '1px solid #ECE5D8',
               borderRadius: 6, cursor: 'pointer',
             }}
           >
@@ -158,7 +158,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
         disabled
         style={{
           width: '100%', padding: '11px 0', fontSize: 13, fontWeight: 600,
-          color: '#0e0e10', background: '#7a6234',
+          color: '#FBF8F3', background: '#B89A63',
           border: 'none', borderRadius: 6,
           cursor: 'not-allowed', letterSpacing: '0.06em',
         }}
@@ -171,17 +171,17 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
   // ── Error ─────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      border: '1px solid rgba(220,38,38,0.35)', borderRadius: 8,
-      padding: '16px 18px', background: 'rgba(220,38,38,0.08)',
+      border: '1px solid rgba(180,35,24,0.25)', borderRadius: 8,
+      padding: '16px 18px', background: 'rgba(180,35,24,0.06)',
     }}>
-      <p style={{ fontSize: 13, color: '#f87171', lineHeight: 1.5, marginBottom: 14 }}>
+      <p style={{ fontSize: 13, color: '#B42318', lineHeight: 1.5, marginBottom: 14 }}>
         {errorMsg ?? 'Something went wrong — please try again.'}
       </p>
       <button
         onClick={() => { setErrorMsg(null); setState('idle') }}
         style={{
-          fontSize: 13, fontWeight: 500, color: '#9d9080',
-          background: '#1e1e24', border: '1px solid #2a2a30',
+          fontSize: 13, fontWeight: 500, color: '#5A5045',
+          background: '#F4EEE4', border: '1px solid #ECE5D8',
           borderRadius: 6, padding: '7px 16px', cursor: 'pointer',
         }}
       >
