@@ -5,6 +5,7 @@ import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
+import { pillDark } from './ui';
 import { cancelPendingOrder } from '@/app/actions/commerce';
 import { countryName } from '@/lib/countries';
 
@@ -76,80 +77,53 @@ const eur = new Intl.NumberFormat('en-IE', {
   maximumFractionDigits: 0,
 });
 
-function SpecRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | null | undefined;
-}) {
+const CATEGORY: Record<ListingDetail['product_type'], { label: string; href: string }> = {
+  loose_stone: { label: 'Loose Gemstones', href: '/shop/loose_stone' },
+  specimen:    { label: 'Specimens',       href: '/shop/specimen' },
+  jewelry:     { label: 'Jewelry',         href: '/shop/jewelry' },
+};
+
+const TRUST_LINKS = [
+  { label: 'Natural gemstone, honestly described',              href: '/guarantee' },
+  { label: 'Tracked shipping, dispatched in 1–5 business days', href: '/shipping' },
+  { label: '30-day returns',                                    href: '/returns' },
+];
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (value == null || value === '') return null;
   return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start',
-      padding: '8px 12px',
-      borderBottom: '1px solid #ECE5D8',
-    }}>
-      <span style={{
-        flexShrink: 0, width: 120, paddingRight: 12,
-        color: '#5A5045', fontSize: 13,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        {label}
-      </span>
-      <span style={{
-        color: '#1F1B16', fontSize: 13,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        {String(value)}
-      </span>
+    <div className="pd-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
 
-function SpecSection({ title, children }: { title: string; children: React.ReactNode }) {
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <p style={{
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
-        color: '#7A5A22', textTransform: 'uppercase', marginBottom: 8,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        {title}
-      </p>
-      <div style={{
-        border: '1px solid #ECE5D8', borderRadius: 6, overflow: 'hidden',
-      }}>
-        {children}
-      </div>
-    </div>
+    <section>
+      <h2 className="font-serif pd-h2">{title}</h2>
+      <dl className="pd-dl">{children}</dl>
+    </section>
   );
+}
+
+function joinParts(parts: (string | null | undefined)[], sep: string): string | null {
+  return parts.filter((v): v is string => !!v && !!v.trim()).join(sep) || null;
 }
 
 // ── Not-available state ───────────────────────────────────────────────────────
 
 function NotAvailable() {
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
-      <p style={{
-        fontSize: 18, fontWeight: 300, color: '#1F1B16', marginBottom: 8,
-        fontFamily: 'var(--font-cormorant, Georgia, serif)',
-      }}>
+    <main className="pd-wrap" style={{ paddingTop: 120, paddingBottom: 120, textAlign: 'center' }}>
+      <h1 className="font-serif pd-title" style={{ marginBottom: 14 }}>
         This item is not available
-      </p>
-      <p style={{
-        fontSize: 13, color: '#5A5045', marginBottom: 36,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
+      </h1>
+      <p style={{ fontSize: 16, color: '#5A5045', marginBottom: 36, lineHeight: 1.6 }}>
         It may have been sold, unlisted, or the link may be incorrect.
       </p>
-      <Link href="/" style={{
-        display: 'inline-block', padding: '11px 28px',
-        border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
-        borderRadius: 6, textDecoration: 'none', fontSize: 12,
-        fontWeight: 600, letterSpacing: '0.1em',
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
+      <Link href="/shop/loose_stone" style={{ ...pillDark, display: 'inline-flex', width: 'auto' }}>
         Browse all stones
       </Link>
     </main>
@@ -204,6 +178,8 @@ export default async function StoneDetailPage({
 
   const item = data as ListingDetail;
   const photos = item.image_urls ?? [];
+  const category = CATEGORY[item.product_type] ?? CATEGORY.loose_stone;
+  const nextParam = encodeURIComponent(`/stones/${item.id}`);
 
   const looseStoneWeight =
     item.weight_value != null && Number(item.weight_value) > 0
@@ -227,18 +203,22 @@ export default async function StoneDetailPage({
     if (parts.length === 0) return null
     return `${parts.join(' × ')} ${item.dimension_unit ?? 'mm'}`
   })()
+  // Older listings only have the retired free-text field
+  const dimensions = structuredDimensions ?? (item.dimensions_mm?.trim() || null);
 
-  const originFull = [item.origin_country, item.origin_region]
-    .filter((v) => v && v.trim())
-    .join(', ') || null;
+  const originFull = joinParts([item.origin_country, item.origin_region], ', ');
+  const certificationLine = joinParts([item.certification_lab, item.certification_number], ' · ');
+  const metalLine = joinParts([item.metal, item.metal_purity], ' ');
 
-  const certificationLine = [item.certification_lab, item.certification_number]
-    .filter((v) => v && v.trim())
-    .join(' · ') || null;
-
-  const metalLine = [item.metal, item.metal_purity]
-    .filter((v) => v && v.trim())
-    .join(' ') || null;
+  const treatmentValue = item.treatment?.trim() ? item.treatment : (
+    <>
+      Not specified — common treatments may apply (see{' '}
+      <Link href="/guarantee" className="pd-link">Our Guarantee</Link>)
+    </>
+  );
+  const certificateValue = item.certification_lab?.trim() ? certificationLine : (
+    <Link href="/contact?topic=Certificate%20request" className="pd-link">Available on request</Link>
+  );
 
   const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
   const shippingCostDisplay =
@@ -261,214 +241,181 @@ export default async function StoneDetailPage({
     item.delivery_days_max != null ||
     item.prep_days != null;
 
+  // ── Header copy ──
+  const eyebrow =
+    joinParts([item.gem_type, item.variety], ' · ') ?? item.species ?? item.jewelry_type ?? null;
+  const metaLine = joinParts([
+    looseStoneWeight ?? specimenWeight ?? jewelryWeight,
+    item.shape || item.cut_type,
+    item.origin_country,
+  ], ' · ');
+  const shippingLine = joinParts([
+    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${eur.format(cost)} shipping`,
+    shipFromName ? `Ships from ${shipFromName}` : null,
+  ], ' · ');
+
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px' }}>
-      {/* Back to browse */}
-      <Link href="/" className="back-link" style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 12, textDecoration: 'none',
-        marginBottom: 28, letterSpacing: '0.04em',
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-        Back to browse
-      </Link>
+    <main className="pd-wrap" style={{ paddingTop: 28, paddingBottom: 96 }}>
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="pd-crumbs">
+        <Link href="/">Home</Link>
+        <span aria-hidden="true">/</span>
+        <Link href={category.href}>{category.label}</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" className="pd-crumb-current">{item.title}</span>
+      </nav>
 
       {/* Cancel-return notice */}
       {canceled === '1' && (
         <div style={{
-          marginBottom: 28,
-          padding: '12px 16px',
-          background: 'rgba(122,90,34,0.08)',
-          border: '1px solid rgba(122,90,34,0.25)',
-          borderRadius: 8,
-          fontSize: 13,
-          color: '#7A5A22',
-          fontFamily: 'var(--font-inter, system-ui)',
+          marginBottom: 32, padding: '14px 20px',
+          background: '#F4EEE4', border: '1px solid #ECE5D8', borderRadius: 18,
+          fontSize: 15, color: '#1F1B16',
         }}>
           Payment canceled — this stone is available again.
         </div>
       )}
 
       {/* ── Two-column layout ── */}
-      <div className="detail-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-        gap: 56,
-        alignItems: 'start',
-      }}>
+      <div className="pd-grid">
 
-        {/* ── Left: photo gallery ── */}
-        <PhotoGallery imageUrls={photos} title={item.title} />
+        {/* ── Left: gallery + video ── */}
+        <div style={{ minWidth: 0 }}>
+          <PhotoGallery imageUrls={photos} title={item.title} />
+          {item.video_url && <VideoPlayer url={item.video_url} />}
+        </div>
 
         {/* ── Right: info panel ── */}
-        <div>
-          {/* Title */}
-          <h1 style={{
-            fontSize: 28, fontWeight: 300, color: '#1F1B16', lineHeight: 1.2,
-            marginBottom: 10,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>
-            {item.title}
-          </h1>
+        <div className="pd-info">
+          {eyebrow && <p className="pd-eyebrow">{eyebrow}</p>}
+
+          <h1 className="font-serif pd-title">{item.title}</h1>
+
+          {metaLine && <p className="pd-meta">{metaLine}</p>}
 
           {/* Price */}
-          {item.sale_method === 'accept_offers' ? (
-            <p style={{
-              fontSize: 20, color: '#5A5045', marginBottom: 16,
-              fontFamily: 'var(--font-cormorant, Georgia, serif)',
-            }}>
-              Make an offer
-            </p>
-          ) : item.selling_price != null ? (
-            <p style={{
-              fontSize: 36, fontWeight: 400, color: '#1F1B16',
-              letterSpacing: '-0.01em', marginBottom: 16,
-              fontFamily: 'var(--font-cormorant, Georgia, serif)',
-            }}>
-              {eur.format(Number(item.selling_price))}
-            </p>
-          ) : (
-            <p style={{
-              fontSize: 20, color: '#6B6052', marginBottom: 16,
-              fontFamily: 'var(--font-cormorant, Georgia, serif)',
-            }}>
-              Price on request
-            </p>
-          )}
-
-          {/* Stone / Shipping / Total */}
-          {item.selling_price != null && cost !== null && cost > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                fontSize: 13, color: '#5A5045', marginBottom: 3,
-              }}>
-                <span>Stone</span>
-                <span>{eur.format(Number(item.selling_price))}</span>
-              </div>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                fontSize: 13, color: '#5A5045', marginBottom: 6,
-              }}>
-                <span>Shipping</span>
-                <span>{eur.format(cost)}</span>
-              </div>
-              <div style={{ height: 1, background: '#ECE5D8', marginBottom: 6 }} />
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                fontSize: 14, fontWeight: 600, color: '#1F1B16',
-              }}>
-                <span>Total</span>
-                <span>{eur.format(Number(item.selling_price) + cost)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div style={{ marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {item.sale_method !== 'accept_offers' && (
-              <BuyButton
-                itemId={item.id}
-                itemTitle={item.title}
-                sellingPrice={item.selling_price}
-                shippingCost={cost}
-                isLoggedIn={!!user}
-              />
+          <div style={{ marginTop: 24, marginBottom: 28 }}>
+            {item.sale_method === 'accept_offers' ? (
+              <p className="pd-price">Make an offer</p>
+            ) : item.selling_price != null ? (
+              <p className="pd-price">{eur.format(Number(item.selling_price))}</p>
+            ) : (
+              <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}
-            <CartButton
-              itemId={item.id}
-              isLoggedIn={!!user}
-              initialInCart={!!cartRow}
-            />
-            {item.sale_method !== 'buy_now' && (
-              <OfferPanel
-                itemId={item.id}
-                isLoggedIn={!!user}
-                initialOffer={offerRow as BuyerOffer | null}
-              />
-            )}
+            {shippingLine && <p className="pd-shipline">{shippingLine}</p>}
           </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid #ECE5D8', marginBottom: 24 }} />
-
-          {/* Description */}
-          {item.description && (
-            <div style={{ marginBottom: 28 }}>
-              <p style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: '0.18em',
-                color: '#7A5A22', textTransform: 'uppercase', marginBottom: 8,
-                fontFamily: 'var(--font-inter, system-ui)',
-              }}>
-                Description
-              </p>
-              <p style={{
-                fontSize: 14, color: '#5A5045', lineHeight: 1.7,
-                fontFamily: 'var(--font-inter, system-ui)',
-              }}>
-                {item.description}
+          {/* Actions */}
+          {user ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {item.sale_method !== 'accept_offers' && (
+                <BuyButton
+                  itemId={item.id}
+                  itemTitle={item.title}
+                  sellingPrice={item.selling_price}
+                  shippingCost={cost}
+                  isLoggedIn={!!user}
+                />
+              )}
+              <CartButton
+                itemId={item.id}
+                isLoggedIn={!!user}
+                initialInCart={!!cartRow}
+              />
+              {item.sale_method !== 'buy_now' && (
+                <OfferPanel
+                  itemId={item.id}
+                  isLoggedIn={!!user}
+                  initialOffer={offerRow as BuyerOffer | null}
+                />
+              )}
+            </div>
+          ) : (
+            <div>
+              <Link href={`/auth/login?next=${nextParam}`} style={pillDark}>
+                Log in to buy
+              </Link>
+              <p style={{ fontSize: 14, color: '#6B6052', marginTop: 12, textAlign: 'center' }}>
+                New here?{' '}
+                <Link href={`/auth/signup?next=${nextParam}`} className="pd-link">Create an account</Link>
               </p>
             </div>
           )}
 
-          {/* Type-aware specs */}
+          {/* Trust list */}
+          <ul className="pd-trust">
+            {TRUST_LINKS.map(t => (
+              <li key={t.href}><Link href={t.href}>{t.label}</Link></li>
+            ))}
+          </ul>
 
+          <Link href="/contact?topic=General%20question" className="pd-link" style={{ fontSize: 15 }}>
+            Questions about this stone? →
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Description + details ── */}
+      <div className="pd-below">
+        {item.description && (
+          <section style={{ marginBottom: 56 }}>
+            <h2 className="font-serif pd-h2">Description</h2>
+            <p className="pd-desc">{item.description}</p>
+          </section>
+        )}
+
+        <div className="pd-details-grid">
           {item.product_type === 'loose_stone' && (
-            <SpecSection title="Stone Details">
-              <SpecRow label="Gem type"      value={item.gem_type} />
-              <SpecRow label="Variety"       value={item.variety} />
-              <SpecRow label="Weight"        value={looseStoneWeight} />
-              <SpecRow label="Shape"         value={item.shape} />
-              <SpecRow label="Cut"           value={item.cut_type} />
-              <SpecRow label="Clarity"       value={item.clarity} />
-              <SpecRow label="Origin"        value={originFull} />
-              <SpecRow label="Treatment"     value={item.treatment} />
-              <SpecRow label="Dimensions"    value={structuredDimensions} />
-              <SpecRow label="Certification" value={certificationLine} />
-            </SpecSection>
+            <DetailSection title="Details">
+              <DetailRow label="Gem type"    value={item.gem_type} />
+              <DetailRow label="Variety"     value={item.variety} />
+              <DetailRow label="Weight"      value={looseStoneWeight} />
+              <DetailRow label="Shape"       value={item.shape} />
+              <DetailRow label="Cut"         value={item.cut_type} />
+              <DetailRow label="Clarity"     value={item.clarity} />
+              <DetailRow label="Origin"      value={originFull} />
+              <DetailRow label="Treatment"   value={treatmentValue} />
+              <DetailRow label="Dimensions"  value={dimensions} />
+              <DetailRow label="Certificate" value={certificateValue} />
+            </DetailSection>
           )}
 
           {item.product_type === 'specimen' && (
-            <SpecSection title="Specimen Details">
-              <SpecRow label="Species"       value={item.species} />
-              <SpecRow label="Weight"        value={specimenWeight} />
-              <SpecRow label="Locality"      value={item.locality} />
-              <SpecRow label="Origin"        value={item.origin_country} />
-              <SpecRow label="Matrix"        value={item.matrix} />
-              <SpecRow label="Treatment"     value={item.treatment} />
-              <SpecRow label="Dimensions"    value={structuredDimensions} />
-              <SpecRow label="Certification" value={certificationLine} />
-            </SpecSection>
+            <DetailSection title="Details">
+              <DetailRow label="Species"     value={item.species} />
+              <DetailRow label="Weight"      value={specimenWeight} />
+              <DetailRow label="Locality"    value={item.locality} />
+              <DetailRow label="Origin"      value={item.origin_country} />
+              <DetailRow label="Matrix"      value={item.matrix} />
+              <DetailRow label="Treatment"   value={treatmentValue} />
+              <DetailRow label="Dimensions"  value={dimensions} />
+              <DetailRow label="Certificate" value={certificateValue} />
+            </DetailSection>
           )}
 
           {item.product_type === 'jewelry' && (
-            <SpecSection title="Jewelry Details">
-              <SpecRow label="Type"          value={item.jewelry_type} />
-              <SpecRow label="Metal"         value={metalLine} />
-              <SpecRow label="Size / Length" value={item.size_or_length} />
-              <SpecRow label="Gemstones"     value={item.gemstones_used} />
-              <SpecRow label="Total weight"  value={jewelryWeight} />
-              <SpecRow label="Treatment"     value={item.treatment} />
-              <SpecRow label="Certification" value={certificationLine} />
-            </SpecSection>
+            <DetailSection title="Details">
+              <DetailRow label="Type"          value={item.jewelry_type} />
+              <DetailRow label="Metal"         value={metalLine} />
+              <DetailRow label="Size / Length" value={item.size_or_length} />
+              <DetailRow label="Gemstones"     value={item.gemstones_used} />
+              <DetailRow label="Total weight"  value={jewelryWeight} />
+              <DetailRow label="Treatment"     value={treatmentValue} />
+              <DetailRow label="Certificate"   value={certificateValue} />
+            </DetailSection>
           )}
 
           {hasShipping && (
-            <SpecSection title="Shipping">
-              <SpecRow label="Ships from" value={shipFromName} />
-              <SpecRow label="Courier"    value={item.courier} />
-              <SpecRow label="Cost"       value={shippingCostDisplay} />
-              <SpecRow label="Delivery"   value={deliveryRange} />
+            <DetailSection title="Shipping">
+              <DetailRow label="Ships from" value={shipFromName} />
+              <DetailRow label="Courier"    value={item.courier} />
+              <DetailRow label="Cost"       value={shippingCostDisplay} />
+              <DetailRow label="Delivery"   value={deliveryRange} />
               {item.prep_days != null && (
-                <SpecRow label="Handling" value={`Ready in ${item.prep_days} days`} />
+                <DetailRow label="Handling" value={`Ready in ${item.prep_days} days`} />
               )}
-            </SpecSection>
+            </DetailSection>
           )}
-
-          {item.video_url && <VideoPlayer url={item.video_url} />}
         </div>
       </div>
     </main>

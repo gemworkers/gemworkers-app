@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { safeNext } from '@/lib/safe-next'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px', fontSize: 14,
@@ -27,6 +28,12 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [checkEmail, setCheckEmail] = useState(false)
+  const [next, setNext] = useState('/')
+
+  // Read ?next= on the client (validated to a same-site relative path)
+  useEffect(() => {
+    setNext(safeNext(new URLSearchParams(window.location.search).get('next')))
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -57,7 +64,7 @@ export default function SignupPage() {
     }
 
     if (data.session) {
-      router.push('/')
+      router.push(next)
       router.refresh()
     } else {
       setCheckEmail(true)
@@ -87,7 +94,7 @@ export default function SignupPage() {
           <strong style={{ color: '#1F1B16' }}>{email}</strong>.
           Click it to activate your account, then log in.
         </p>
-        <Link href="/auth/login" style={{
+        <Link href={next === "/" ? "/auth/login" : `/auth/login?next=${encodeURIComponent(next)}`} style={{
           display: 'inline-block', padding: '11px 28px',
           border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
           borderRadius: 6, textDecoration: 'none', fontSize: 12,
@@ -114,7 +121,7 @@ export default function SignupPage() {
         fontFamily: 'var(--font-inter, system-ui)',
       }}>
         Already have an account?{' '}
-        <Link href="/auth/login" style={{ color: '#7A5A22', textDecoration: 'none' }}>
+        <Link href={next === "/" ? "/auth/login" : `/auth/login?next=${encodeURIComponent(next)}`} style={{ color: '#7A5A22', textDecoration: 'none' }}>
           Log in
         </Link>
       </p>

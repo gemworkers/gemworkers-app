@@ -7,33 +7,30 @@ interface PhotoGalleryProps {
   title: string;
 }
 
+// Square frame shared by every state, so the layout never jumps.
+const frameStyle: React.CSSProperties = {
+  width: '100%', aspectRatio: '1 / 1',
+  borderRadius: 18, background: '#F4EEE4', overflow: 'hidden',
+};
+
+const imgStyle: React.CSSProperties = {
+  width: '100%', height: '100%', objectFit: 'contain', display: 'block',
+};
+
 export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
   const [selected, setSelected] = useState(0);
 
   // ── 0 photos ──────────────────────────────────────────────────────────────
   if (imageUrls.length === 0) {
-    return (
-      <div style={{
-        width: '100%', aspectRatio: '1 / 1',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
-        borderRadius: 12,
-      }}>
-      </div>
-    );
+    return <div style={frameStyle} aria-hidden="true" />;
   }
 
   // ── 1 photo ───────────────────────────────────────────────────────────────
   if (imageUrls.length === 1) {
     return (
-      <div className="photo-zoom-wrapper" style={{ borderRadius: 12, background: '#F4EEE4' }}>
+      <div className="photo-zoom-wrapper" style={frameStyle}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrls[0]}
-          alt={title}
-          className="photo-zoom-img"
-          style={{ width: '100%', objectFit: 'cover', maxHeight: 520 }}
-        />
+        <img src={imageUrls[0]} alt={title} className="photo-zoom-img" style={imgStyle} />
       </div>
     );
   }
@@ -42,20 +39,18 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
   return (
     <div>
       {/* Main image */}
-      <div className="photo-zoom-wrapper" style={{
-        borderRadius: 12, background: '#F4EEE4', marginBottom: 10,
-      }}>
+      <div className="photo-zoom-wrapper" style={{ ...frameStyle, marginBottom: 12 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrls[selected]}
           alt={`${title} — photo ${selected + 1} of ${imageUrls.length}`}
           className="photo-zoom-img"
-          style={{ width: '100%', objectFit: 'cover', maxHeight: 520 }}
+          style={imgStyle}
         />
       </div>
 
       {/* Thumbnail strip */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: 4 }}>
         {imageUrls.map((url, i) => (
           <button
             key={i}
@@ -64,8 +59,8 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
             style={{
               flex: '0 0 72px', height: 72,
               padding: 0, border: 'none', cursor: 'pointer',
-              borderRadius: 6, overflow: 'hidden',
-              outline: i === selected ? '2px solid #7A5A22' : '2px solid transparent',
+              borderRadius: 12, overflow: 'hidden',
+              outline: i === selected ? '2px solid #1F1B16' : '2px solid transparent',
               outlineOffset: 2,
               background: '#F4EEE4',
               transition: 'outline-color 0.15s ease',

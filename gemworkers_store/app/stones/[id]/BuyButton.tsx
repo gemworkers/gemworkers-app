@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { buyNow } from '@/app/actions/commerce'
+import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from './ui'
 
 const eur = new Intl.NumberFormat('en-IE', {
   style: 'currency',
@@ -31,17 +32,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
   // ── Logged-out ────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
     return (
-      <Link
-        href="/auth/login"
-        style={{
-          display: 'block', textAlign: 'center',
-          padding: '11px 0', fontSize: 13, fontWeight: 600,
-          color: '#7A5A22',
-          border: '1px solid rgba(122,90,34,0.5)', borderRadius: 6,
-          textDecoration: 'none', letterSpacing: '0.06em',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}
-      >
+      <Link href={`/auth/login?next=${encodeURIComponent(`/stones/${itemId}`)}`} style={pillDark}>
         Log in to buy
       </Link>
     )
@@ -50,16 +41,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
   // ── Idle ──────────────────────────────────────────────────────────────────
   if (state === 'idle') {
     return (
-      <button
-        onClick={() => setState('confirm')}
-        style={{
-          width: '100%', padding: '11px 0', fontSize: 13, fontWeight: 600,
-          color: '#FBF8F3', background: '#7A5A22',
-          border: 'none', borderRadius: 6,
-          cursor: 'pointer', letterSpacing: '0.06em',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}
-      >
+      <button onClick={() => setState('confirm')} style={pillDark}>
         Buy now
       </button>
     )
@@ -79,71 +61,49 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
     }
 
     return (
-      <div style={{
-        border: '1px solid #ECE5D8', borderRadius: 8,
-        padding: '16px 18px', background: '#FFFFFF',
-      }}>
-        <p style={{
-          fontSize: 13, fontWeight: 600, color: '#1F1B16',
-          marginBottom: 6, fontFamily: 'var(--font-inter, system-ui)',
-        }}>
+      <div style={panel}>
+        <p style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', marginBottom: 10 }}>
           Confirm purchase
         </p>
         {shippingCost != null && shippingCost > 0 ? (
           <div style={{ marginBottom: 14 }}>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 13, color: '#5A5045', marginBottom: 3,
+              fontSize: 14, color: '#5A5045', marginBottom: 4,
             }}>
               <span>Stone</span>
               <span>{formatted}</span>
             </div>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 13, color: '#5A5045', marginBottom: 6,
+              fontSize: 14, color: '#5A5045', marginBottom: 8,
             }}>
               <span>Shipping</span>
               <span>{eur.format(shippingCost)}</span>
             </div>
-            <div style={{ height: 1, background: '#ECE5D8', marginBottom: 6 }} />
+            <div style={{ height: 1, background: '#ECE5D8', marginBottom: 8 }} />
             <div style={{
               display: 'flex', justifyContent: 'space-between',
-              fontSize: 14, fontWeight: 700, color: '#1F1B16',
+              fontSize: 15, fontWeight: 600, color: '#1F1B16',
             }}>
               <span>Total</span>
               <span>{eur.format(sellingPrice! + shippingCost)}</span>
             </div>
           </div>
         ) : (
-          <p style={{ fontSize: 13, color: '#5A5045', lineHeight: 1.55, marginBottom: 4 }}>
+          <p style={{ fontSize: 14, color: '#5A5045', lineHeight: 1.55, marginBottom: 6 }}>
             Buy <strong style={{ color: '#1F1B16' }}>{itemTitle}</strong> for{' '}
             <strong style={{ color: '#1F1B16' }}>{formatted}</strong>?
           </p>
         )}
-        <p style={{ fontSize: 12, color: '#6B6052', marginBottom: 18 }}>
+        <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 18, lineHeight: 1.5 }}>
           This reserves the stone — it will no longer be available to other buyers.
         </p>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={handleConfirm}
-            style={{
-              flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
-              color: '#FBF8F3', background: '#7A5A22',
-              border: 'none', borderRadius: 6,
-              cursor: 'pointer', letterSpacing: '0.04em',
-            }}
-          >
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button onClick={handleConfirm} style={{ ...pillDarkSm, flex: '1 1 160px', width: 'auto' }}>
             Confirm purchase
           </button>
-          <button
-            onClick={() => setState('idle')}
-            style={{
-              flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 500,
-              color: '#5A5045',
-              background: '#F4EEE4', border: '1px solid #ECE5D8',
-              borderRadius: 6, cursor: 'pointer',
-            }}
-          >
+          <button onClick={() => setState('idle')} style={{ ...pillOutlineSm, flex: '1 1 120px', width: 'auto' }}>
             Cancel
           </button>
         </div>
@@ -154,15 +114,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
   // ── Loading ───────────────────────────────────────────────────────────────
   if (state === 'loading') {
     return (
-      <button
-        disabled
-        style={{
-          width: '100%', padding: '11px 0', fontSize: 13, fontWeight: 600,
-          color: '#FBF8F3', background: '#B89A63',
-          border: 'none', borderRadius: 6,
-          cursor: 'not-allowed', letterSpacing: '0.06em',
-        }}
-      >
+      <button disabled style={pillDisabled}>
         Placing order…
       </button>
     )
@@ -170,20 +122,13 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
 
   // ── Error ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      border: '1px solid rgba(180,35,24,0.25)', borderRadius: 8,
-      padding: '16px 18px', background: 'rgba(180,35,24,0.06)',
-    }}>
-      <p style={{ fontSize: 13, color: '#B42318', lineHeight: 1.5, marginBottom: 14 }}>
+    <div style={errorPanel}>
+      <p style={{ fontSize: 14, color: '#B42318', lineHeight: 1.5, marginBottom: 14 }}>
         {errorMsg ?? 'Something went wrong — please try again.'}
       </p>
       <button
         onClick={() => { setErrorMsg(null); setState('idle') }}
-        style={{
-          fontSize: 13, fontWeight: 500, color: '#5A5045',
-          background: '#F4EEE4', border: '1px solid #ECE5D8',
-          borderRadius: 6, padding: '7px 16px', cursor: 'pointer',
-        }}
+        style={{ ...pillOutlineSm, width: 'auto', display: 'inline-flex' }}
       >
         Try again
       </button>

@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { submitOffer, withdrawOffer } from '@/app/actions/commerce'
+import {
+  pillOutline, pillDarkSm, pillOutlineSm, pillDisabledSm,
+  panel, inputStyle, labelStyle,
+} from './ui'
 
 export type BuyerOffer = {
   id: string
@@ -32,6 +36,10 @@ const eur = (n: number) =>
     style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
   }).format(n)
 
+const chipBase: React.CSSProperties = {
+  fontSize: 12, fontWeight: 600, borderRadius: 14, padding: '3px 12px', whiteSpace: 'nowrap',
+}
+
 export function OfferPanel({
   itemId,
   isLoggedIn,
@@ -50,16 +58,7 @@ export function OfferPanel({
   // ── Logged-out ─────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
     return (
-      <Link
-        href="/auth/login"
-        style={{
-          display: 'block', textAlign: 'center',
-          padding: '10px 0', border: '1px solid #ECE5D8', borderRadius: 6,
-          fontSize: 13, fontWeight: 500, color: '#5A5045',
-          textDecoration: 'none', letterSpacing: '0.02em',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}
-      >
+      <Link href={`/auth/login?next=${encodeURIComponent(`/stones/${itemId}`)}`} style={pillOutline}>
         Log in to make an offer
       </Link>
     )
@@ -70,13 +69,7 @@ export function OfferPanel({
     return (
       <button
         onClick={() => { setErrorMsg(null); setPriceInput(''); setNoteInput(''); setState('form') }}
-        style={{
-          width: '100%', padding: '10px 0', background: 'transparent',
-          border: '1px solid #ECE5D8', borderRadius: 6,
-          fontSize: 13, fontWeight: 500, color: '#7A5A22',
-          cursor: 'pointer', letterSpacing: '0.04em',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}
+        style={pillOutline}
       >
         Make an offer
       </button>
@@ -104,67 +97,49 @@ export function OfferPanel({
     }
 
     return (
-      <div style={{
-        border: '1px solid #ECE5D8', borderRadius: 8,
-        padding: '16px', display: 'flex', flexDirection: 'column', gap: 10,
-        background: '#FFFFFF',
-      }}>
-        <p style={{
-          fontSize: 13, fontWeight: 600, color: '#7A5A22', margin: 0,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
+      <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <p style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', margin: 0 }}>
           Make an offer
         </p>
 
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 14, color: '#5A5045', flexShrink: 0 }}>€</span>
+        <div>
+          <label style={labelStyle} htmlFor="offer-price">Your price (€)</label>
           <input
+            id="offer-price"
             type="number" min="0.01" step="0.01"
-            placeholder="Your price"
+            placeholder="e.g. 450"
             value={priceInput}
             onChange={e => setPriceInput(e.target.value)}
             disabled={busy}
             autoFocus
-            style={{
-              flex: 1, padding: '8px 10px', fontSize: 14,
-              border: '1px solid #ECE5D8', borderRadius: 6,
-              outline: 'none', color: '#1F1B16',
-              background: '#F4EEE4',
-              fontFamily: 'var(--font-inter, system-ui)',
-            }}
+            style={inputStyle}
           />
         </div>
 
-        <input
-          type="text"
-          placeholder="Add a note (optional)"
-          value={noteInput}
-          onChange={e => setNoteInput(e.target.value)}
-          maxLength={300}
-          disabled={busy}
-          style={{
-            padding: '8px 10px', fontSize: 13,
-            border: '1px solid #ECE5D8', borderRadius: 6,
-            outline: 'none', color: '#5A5045',
-            background: '#F4EEE4',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}
-        />
+        <div>
+          <label style={labelStyle} htmlFor="offer-note">Note (optional)</label>
+          <input
+            id="offer-note"
+            type="text"
+            value={noteInput}
+            onChange={e => setNoteInput(e.target.value)}
+            maxLength={300}
+            disabled={busy}
+            style={inputStyle}
+          />
+        </div>
 
         {errorMsg && (
           <p style={{ fontSize: 13, color: '#B42318', margin: 0 }}>{errorMsg}</p>
         )}
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             onClick={handleSubmit}
             disabled={busy || !validPrice}
             style={{
-              flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
-              background: busy || !validPrice ? '#F4EEE4' : '#7A5A22',
-              color: busy || !validPrice ? '#6B6052' : '#FBF8F3',
-              border: busy || !validPrice ? '1px solid #ECE5D8' : 'none',
-              borderRadius: 6,
+              ...(busy || !validPrice ? pillDisabledSm : pillDarkSm),
+              flex: '1 1 160px', width: 'auto',
               cursor: busy || !validPrice ? 'default' : 'pointer',
             }}
           >
@@ -173,11 +148,7 @@ export function OfferPanel({
           <button
             onClick={() => setState('idle')}
             disabled={busy}
-            style={{
-              padding: '9px 14px', fontSize: 13, background: 'transparent',
-              border: '1px solid #ECE5D8', borderRadius: 6,
-              cursor: busy ? 'default' : 'pointer', color: '#5A5045',
-            }}
+            style={{ ...pillOutlineSm, flex: '1 1 100px', width: 'auto', cursor: busy ? 'default' : 'pointer' }}
           >
             Cancel
           </button>
@@ -205,20 +176,14 @@ export function OfferPanel({
     }
 
     return (
-      <div style={{
-        border: '1px solid #ECE5D8', borderRadius: 8,
-        padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8,
-        background: '#FFFFFF',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 14, color: '#1F1B16' }}>
+      <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 15, color: '#1F1B16' }}>
             Your offer: <strong>{offer ? eur(offer.offered_price) : '—'}</strong>
           </span>
           <span style={{
-            fontSize: 11, fontWeight: 600, color: '#7A5A22',
-            background: 'rgba(122,90,34,0.12)',
-            border: '1px solid rgba(122,90,34,0.3)',
-            borderRadius: 4, padding: '2px 8px',
+            ...chipBase, color: '#7A5A22',
+            background: 'rgba(122,90,34,0.10)', border: '1px solid rgba(122,90,34,0.3)',
           }}>
             Pending
           </span>
@@ -229,11 +194,7 @@ export function OfferPanel({
         <button
           onClick={handleWithdraw}
           disabled={busy}
-          style={{
-            padding: '7px 0', fontSize: 13, background: 'transparent',
-            border: '1px solid #ECE5D8', borderRadius: 6,
-            cursor: busy ? 'default' : 'pointer', color: '#6B6052',
-          }}
+          style={{ ...pillOutlineSm, cursor: busy ? 'default' : 'pointer' }}
         >
           {busy ? 'Withdrawing…' : 'Withdraw offer'}
         </button>
@@ -244,24 +205,20 @@ export function OfferPanel({
   // ── Accepted / Declined ───────────────────────────────────────────────────
   const accepted = state === 'accepted'
   const chip = accepted
-    ? { label: 'Accepted', bg: 'rgba(22,163,74,0.08)', color: '#16A34A', border: 'rgba(22,163,74,0.25)' }
+    ? { label: 'Accepted', bg: 'rgba(43,122,61,0.08)', color: '#2B7A3D', border: 'rgba(43,122,61,0.3)' }
     : { label: 'Declined', bg: 'rgba(180,35,24,0.06)', color: '#B42318', border: 'rgba(180,35,24,0.25)' }
 
   return (
     <div style={{
-      border: `1px solid ${chip.border}`, borderRadius: 8,
-      padding: '14px 16px',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: '#FFFFFF',
+      ...panel, border: `1px solid ${chip.border}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     }}>
-      <span style={{ fontSize: 14, color: '#1F1B16' }}>
+      <span style={{ fontSize: 15, color: '#1F1B16' }}>
         Your offer: <strong>{offer ? eur(offer.offered_price) : '—'}</strong>
       </span>
       <span style={{
-        fontSize: 11, fontWeight: 600, color: chip.color,
-        background: chip.bg,
-        border: `1px solid ${chip.border}`,
-        borderRadius: 4, padding: '2px 8px',
+        ...chipBase, color: chip.color,
+        background: chip.bg, border: `1px solid ${chip.border}`,
       }}>
         {chip.label}
       </span>

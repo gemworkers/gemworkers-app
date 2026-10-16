@@ -75,11 +75,11 @@ export function VideoPlayer({ url }: { url: string }) {
   const resolved = resolveVideo(url);
 
   return (
-    <div style={{ marginTop: 28 }}>
-      {/* Section label — matches the SpecSection uppercase label style */}
+    <div style={{ marginTop: 32 }}>
+      {/* Section label — same eyebrow style as the info column */}
       <p style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '0.15em',
-        color: '#9ca3af', textTransform: 'uppercase', marginBottom: 10,
+        fontSize: 13, fontWeight: 500, letterSpacing: '0.14em',
+        color: '#7A5A22', textTransform: 'uppercase', marginBottom: 12,
       }}>
         Video
       </p>
@@ -88,7 +88,7 @@ export function VideoPlayer({ url }: { url: string }) {
       {(resolved.type === 'youtube' || resolved.type === 'vimeo') && (
         <div style={{
           position: 'relative', paddingTop: '56.25%',
-          overflow: 'hidden', borderRadius: 8,
+          overflow: 'hidden', borderRadius: 18,
         }}>
           <iframe
             src={resolved.embedUrl}
@@ -108,7 +108,7 @@ export function VideoPlayer({ url }: { url: string }) {
       {resolved.type === 'direct' && (
         <video
           controls
-          style={{ width: '100%', borderRadius: 8, display: 'block' }}
+          style={{ width: '100%', borderRadius: 18, display: 'block', background: '#F4EEE4' }}
         >
           <source src={resolved.src} />
         </video>
@@ -122,9 +122,9 @@ export function VideoPlayer({ url }: { url: string }) {
           rel="noopener noreferrer"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 14, color: '#374151', fontWeight: 500,
+            fontSize: 14, color: '#7A5A22', fontWeight: 500,
             textDecoration: 'none',
-            borderBottom: '1px solid #d1d5db', paddingBottom: 1,
+            borderBottom: '1px solid #ECE5D8', paddingBottom: 1,
           }}
         >
           View video ↗

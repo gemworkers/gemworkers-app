@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { addToCart, removeFromCart } from '@/app/actions/commerce'
+import { pillOutline, pillDisabled } from './ui'
 
 type Props = {
   itemId: string
@@ -12,6 +13,11 @@ type Props = {
 
 type State = 'idle' | 'loading_add' | 'in_cart' | 'loading_remove' | 'error'
 
+const barStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+  minHeight: 52, padding: '8px 24px', borderRadius: 28, boxSizing: 'border-box',
+}
+
 export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   const [state, setState] = useState<State>(initialInCart ? 'in_cart' : 'idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -19,17 +25,7 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   // ── Logged-out ─────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
     return (
-      <Link
-        href="/auth/login"
-        style={{
-          display: 'block', textAlign: 'center',
-          padding: '9px 0', fontSize: 13, fontWeight: 500,
-          color: '#5A5045', background: 'transparent',
-          border: '1px solid #ECE5D8', borderRadius: 6,
-          textDecoration: 'none', letterSpacing: '0.02em',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}
-      >
+      <Link href={`/auth/login?next=${encodeURIComponent(`/stones/${itemId}`)}`} style={pillOutline}>
         Log in to save
       </Link>
     )
@@ -49,13 +45,7 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
             setState('error')
           }
         }}
-        style={{
-          width: '100%', padding: '9px 0', fontSize: 13, fontWeight: 500,
-          color: '#5A5045', background: 'transparent',
-          border: '1px solid #ECE5D8', borderRadius: 6,
-          cursor: 'pointer', letterSpacing: '0.02em',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}
+        style={pillOutline}
       >
         Add to cart
       </button>
@@ -65,12 +55,7 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   // ── Adding ─────────────────────────────────────────────────────────────────
   if (state === 'loading_add') {
     return (
-      <button disabled style={{
-        width: '100%', padding: '9px 0', fontSize: 13, fontWeight: 500,
-        color: '#6B6052', background: 'transparent',
-        border: '1px solid #ECE5D8', borderRadius: 6,
-        cursor: 'not-allowed',
-      }}>
+      <button disabled style={pillDisabled}>
         Adding…
       </button>
     )
@@ -80,16 +65,15 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   if (state === 'in_cart') {
     return (
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '9px 12px',
-        border: '1px solid rgba(15,118,110,0.3)', borderRadius: 6,
-        background: 'rgba(15,118,110,0.08)',
+        ...barStyle,
+        border: '1px solid rgba(46,122,111,0.35)',
+        background: 'rgba(46,122,111,0.08)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#0F766E' }}>In cart</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#2E7A6F' }}>In cart</span>
           <Link href="/cart" style={{
-            fontSize: 13, color: '#5A5045',
-            textDecoration: 'underline', textUnderlineOffset: 2,
+            fontSize: 14, color: '#1F1B16',
+            textDecoration: 'underline', textUnderlineOffset: 3,
           }}>
             View cart
           </Link>
@@ -106,7 +90,7 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
             }
           }}
           style={{
-            fontSize: 12, color: '#6B6052', background: 'none', border: 'none',
+            fontSize: 14, color: '#5A5045', background: 'none', border: 'none',
             cursor: 'pointer', padding: 0,
           }}
         >
@@ -119,10 +103,7 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   // ── Removing ───────────────────────────────────────────────────────────────
   if (state === 'loading_remove') {
     return (
-      <div style={{
-        padding: '9px 12px', fontSize: 13, color: '#6B6052',
-        border: '1px solid #ECE5D8', borderRadius: 6,
-      }}>
+      <div style={{ ...barStyle, fontSize: 14, color: '#6B6052', border: '1px solid #ECE5D8' }}>
         Removing…
       </div>
     )
@@ -131,20 +112,19 @@ export function CartButton({ itemId, isLoggedIn, initialInCart }: Props) {
   // ── Error ──────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '9px 12px',
-      border: '1px solid rgba(180,35,24,0.25)', borderRadius: 6,
+      ...barStyle,
+      border: '1px solid rgba(180,35,24,0.25)',
       background: 'rgba(180,35,24,0.06)',
     }}>
-      <span style={{ fontSize: 12, color: '#B42318', flex: 1 }}>
+      <span style={{ fontSize: 13, color: '#B42318', flex: 1 }}>
         {errorMsg ?? 'Something went wrong.'}
       </span>
       <button
         onClick={() => { setErrorMsg(null); setState('idle') }}
         style={{
-          fontSize: 12, color: '#5A5045', background: 'none',
+          fontSize: 14, color: '#1F1B16', background: 'none',
           border: 'none', cursor: 'pointer', textDecoration: 'underline',
-          textUnderlineOffset: 2, whiteSpace: 'nowrap',
+          textUnderlineOffset: 3, whiteSpace: 'nowrap', padding: 0,
         }}
       >
         Try again
