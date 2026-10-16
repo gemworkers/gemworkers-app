@@ -7,11 +7,22 @@ import {
   pillOutline, pillDarkSm, pillOutlineSm, pillDisabledSm,
   panel, inputStyle, labelStyle,
 } from '@/lib/ui'
+import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
+import { PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 
 export type BuyerOffer = {
   id: string
   offered_price: number
   status: 'pending' | 'accepted' | 'declined' | 'expired'
+}
+
+// The pending_payment order created when the seller accepted this offer,
+// still inside its payment window. Loaded server-side under the buyer's RLS.
+export type PayableOrder = {
+  orderTotal: number
+  dueAt: string
+  // false when < 35 min remain (computed server-side) — Pay button hidden
+  canPay: boolean
 }
 
 type State =
@@ -22,12 +33,14 @@ type State =
   | 'withdrawing'
   | 'accepted'
   | 'declined'
+  | 'expired'
   | 'error'
 
 function initState(offer: BuyerOffer | null): State {
   if (!offer) return 'idle'
   if (offer.status === 'pending') return 'pending'
   if (offer.status === 'accepted') return 'accepted'
+  if (offer.status === 'expired') return 'expired'
   return 'declined'
 }
 
@@ -44,10 +57,12 @@ export function OfferPanel({
   itemId,
   isLoggedIn,
   initialOffer,
+  payable = null,
 }: {
   itemId: string
   isLoggedIn: boolean
   initialOffer: BuyerOffer | null
+  payable?: PayableOrder | null
 }) {
   const [state, setState] = useState<State>(initState(initialOffer))
   const [offer, setOffer] = useState<BuyerOffer | null>(initialOffer)
@@ -202,7 +217,37 @@ export function OfferPanel({
     )
   }
 
-  // ── Accepted / Declined ───────────────────────────────────────────────────
+  // ── Accepted, payable → pay for the offer ─────────────────────────────────
+  if (state === 'accepted' && payable && offer) {
+    return (
+      <div style={{ ...panel, border: '1px solid rgba(43,122,61,0.3)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <p style={{ fontSize: 15, color: '#1F1B16', lineHeight: 1.5, margin: 0 }}>
+          Your offer of <strong>{eur(offer.offered_price)}</strong> was accepted.
+        </p>
+        {payable.canPay ? (
+          <>
+            <PayOfferButton offerId={offer.id} label={`Pay ${eur(payable.orderTotal)}`} />
+            <PaymentDeadline dueAt={payable.dueAt} style={{ margin: 0, textAlign: 'center' }} />
+          </>
+        ) : (
+          <p style={{ fontSize: 14, color: '#5A5045', lineHeight: 1.6, margin: 0 }}>
+            {PAY_WINDOW_CLOSING_MESSAGE}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  // ── Expired ───────────────────────────────────────────────────────────────
+  if (state === 'expired') {
+    return (
+      <div style={panel}>
+        <p style={{ fontSize: 15, color: '#5A5045', margin: 0 }}>This offer has expired.</p>
+      </div>
+    )
+  }
+
+  // ── Accepted (not payable) / Declined ─────────────────────────────────────
   const accepted = state === 'accepted'
   const chip = accepted
     ? { label: 'Accepted', bg: 'rgba(43,122,61,0.08)', color: '#2B7A3D', border: 'rgba(43,122,61,0.3)' }

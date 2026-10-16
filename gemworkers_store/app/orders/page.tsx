@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { MarkReceivedButton } from './MarkReceivedButton'
 import { pillOutline } from '@/lib/ui'
+import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
+import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,6 +19,8 @@ type BuyerOrder = {
   shipped_at: string | null;
   received_at: string | null;
   checkout_group_id: string | null;
+  offer_id: string | null;
+  payment_due_at: string | null;
   order_items: {
     inventory_item_id: string;
   }[];
@@ -69,14 +73,14 @@ function groupStatus(orders: BuyerOrder[]): string {
 
 // ── Small pieces ──────────────────────────────────────────────────────────────
 
-function StatusPill({ status, small = false }: { status: string; small?: boolean }) {
+function StatusPill({ status, small = false, label }: { status: string; small?: boolean; label?: string }) {
   return (
     <span className="order-pill" style={{
       color: statusColor(status),
       fontSize: small ? 11 : 12,
       padding: small ? '2px 8px' : '4px 12px',
     }}>
-      {statusLabel(status)}
+      {label ?? statusLabel(status)}
     </span>
   )
 }
@@ -135,6 +139,13 @@ function SingleOrderCard({
     ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
     : null
 
+  // Accepted-offer order still inside its payment window
+  const awaitingOfferPayment =
+    order.status === 'pending_payment' &&
+    order.offer_id != null &&
+    order.payment_due_at != null &&
+    new Date(order.payment_due_at).getTime() > Date.now()
+
   return (
     <article className="order-card">
       {/* Card header */}
@@ -143,7 +154,10 @@ function SingleOrderCard({
           <p className="order-number">{order.order_number}</p>
           <p className="order-muted">{formatDate(order.order_date)}</p>
         </div>
-        <StatusPill status={order.status} />
+        <StatusPill
+          status={order.status}
+          label={awaitingOfferPayment ? 'Awaiting payment' : undefined}
+        />
       </div>
 
       {/* Stone row */}
@@ -158,6 +172,18 @@ function SingleOrderCard({
             <div style={{ marginTop: 12 }}><MarkReceivedButton orderId={order.id} /></div>
           )}
           {order.status === 'received' && <Received />}
+          {awaitingOfferPayment && (
+            <div style={{ marginTop: 14, maxWidth: 320 }}>
+              {canStartOfferPayment(order.payment_due_at!) ? (
+                <>
+                  <PayOfferButton offerId={order.offer_id!} label="Pay now" />
+                  <PaymentDeadline dueAt={order.payment_due_at!} style={{ marginTop: 8 }} />
+                </>
+              ) : (
+                <p className="order-muted">{PAY_WINDOW_CLOSING_MESSAGE}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -270,6 +296,7 @@ export default async function BuyerOrdersPage() {
     .select(`
       id, order_number, status, order_date, order_total, shipping_cost,
       tracking_number, shipped_at, received_at, checkout_group_id,
+      offer_id, payment_due_at,
       order_items ( inventory_item_id )
     `)
     .order('created_at', { ascending: false })

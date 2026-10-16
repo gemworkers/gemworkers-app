@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { PhotoGallery } from './PhotoGallery';
 import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
-import { OfferPanel, type BuyerOffer } from './OfferPanel';
+import { OfferPanel, type BuyerOffer, type PayableOrder } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
 import { pillDark } from '@/lib/ui';
 import { cancelPendingOrder } from '@/app/actions/commerce';
 import { countryName } from '@/lib/countries';
 import { TrustList } from '@/app/components/TrustList';
+import { canStartOfferPayment } from '@/lib/offer-payment';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ export default async function StoneDetailPage({
   }
 
   const supabase = await createClient();
-  const [{ data: { user } }, { data, error }, { data: cartRow }, { data: offerRow }] =
+  const [{ data: { user } }, { data, error }, { data: cartRow }] =
     await Promise.all([
       supabase.auth.getUser(),
       supabase
@@ -161,18 +162,48 @@ export default async function StoneDetailPage({
         .select('id')
         .eq('inventory_item_id', id)
         .maybeSingle(),
-      supabase
-        .from('storefront_offers')
-        .select('id, offered_price, status')
-        .eq('inventory_item_id', id)
-        .in('status', ['pending', 'accepted', 'declined', 'expired'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
     ]);
 
   if (error || !data) {
     return <NotAvailable />;
+  }
+
+  // ── This buyer's latest offer + its payable order (buyer's own RLS) ──
+  // Filtered by buyer_id: a logged-in seller could otherwise read other
+  // buyers' offers on their own stone via offers_seller_select.
+  let offerRow: BuyerOffer | null = null;
+  let payable: PayableOrder | null = null;
+  let payableOrderId: string | null = null;
+  if (user) {
+    const { data: offer } = await supabase
+      .from('storefront_offers')
+      .select('id, offered_price, status')
+      .eq('inventory_item_id', id)
+      .eq('buyer_id', user.id)
+      .in('status', ['pending', 'accepted', 'declined', 'expired'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    offerRow = offer as BuyerOffer | null;
+
+    if (offerRow?.status === 'accepted') {
+      const { data: offerOrder } = await supabase
+        .from('orders')
+        .select('id, order_total, payment_due_at')
+        .eq('offer_id', offerRow.id)
+        .eq('buyer_id', user.id)
+        .eq('status', 'pending_payment')
+        .gt('payment_due_at', new Date().toISOString())
+        .maybeSingle();
+      if (offerOrder?.payment_due_at) {
+        payable = {
+          orderTotal: Number(offerOrder.order_total),
+          dueAt: offerOrder.payment_due_at,
+          canPay: canStartOfferPayment(offerOrder.payment_due_at),
+        };
+        payableOrderId = offerOrder.id;
+      }
+    }
   }
 
   const item = data as ListingDetail;
@@ -272,7 +303,9 @@ export default async function StoneDetailPage({
           background: '#F4EEE4', border: '1px solid #ECE5D8', borderRadius: 18,
           fontSize: 15, color: '#1F1B16',
         }}>
-          Payment canceled — this stone is available again.
+          {payableOrderId && payableOrderId === canceledOrderId
+            ? 'Payment not completed — your accepted offer is still held for you until the deadline below.'
+            : 'Payment canceled — this stone is available again.'}
         </div>
       )}
 
@@ -306,7 +339,15 @@ export default async function StoneDetailPage({
           </div>
 
           {/* Actions */}
-          {isReserved ? (
+          {isReserved && payable ? (
+            // The buyer whose accepted offer reserved this stone: pay instead of Reserved.
+            <OfferPanel
+              itemId={item.id}
+              isLoggedIn={!!user}
+              initialOffer={offerRow}
+              payable={payable}
+            />
+          ) : isReserved ? (
             <div style={{
               padding: '18px 20px', borderRadius: 18,
               background: '#F4EEE4', border: '1px solid #ECE5D8',
@@ -342,7 +383,8 @@ export default async function StoneDetailPage({
                 <OfferPanel
                   itemId={item.id}
                   isLoggedIn={!!user}
-                  initialOffer={offerRow as BuyerOffer | null}
+                  initialOffer={offerRow}
+                  payable={payable}
                 />
               )}
             </div>

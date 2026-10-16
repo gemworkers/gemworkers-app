@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe/server'
+import type Stripe from 'stripe'
+import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 
 // Calls the create_platform_order SECURITY DEFINER RPC as the logged-in buyer,
 // then creates a Stripe Checkout Session for the authoritative order total.
@@ -91,6 +93,171 @@ export async function buyNow(
     const message = err instanceof Error ? err.message : 'Payment setup failed — please try again.'
     return { error: message }
   }
+}
+
+// Opens a Stripe Checkout Session for the order created when a seller accepted
+// this buyer's offer (respond_to_offer → pending_payment, payment_due_at = +48h).
+//
+// The order is looked up under the buyer's own RLS and must be theirs, still
+// 'pending_payment', and inside its payment window. The amount always comes
+// from orders.order_total — the client only sends the offer id.
+//
+// Double-payment guard: the latest session id is stored on the order
+// (orders.stripe_checkout_session_id — see sql/orders_stripe_session_id.sql).
+// A previous open session is expired before a new one is created, and the new
+// id is written with a compare-and-set so two concurrent clicks can't both win.
+// If that column doesn't exist yet, the guard is skipped (payment still works).
+export async function payAcceptedOffer(
+  offerId: string
+): Promise<{ checkoutUrl: string } | { error: string }> {
+  const NOT_PAYABLE = 'This offer is no longer payable.'
+  const SETUP_FAILED = 'Payment setup failed — please try again.'
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'You must be logged in to pay.' }
+
+  const { data: order, error: orderErr } = await supabase
+    .from('orders')
+    .select('id, order_total, payment_due_at, order_items ( inventory_item_id )')
+    .eq('offer_id', offerId)
+    .eq('buyer_id', user.id)
+    .eq('status', 'pending_payment')
+    .gt('payment_due_at', new Date().toISOString())
+    .maybeSingle()
+
+  if (orderErr) {
+    console.error('[payAcceptedOffer] order lookup failed:', orderErr.message)
+    return { error: SETUP_FAILED }
+  }
+  if (!order || !order.payment_due_at) return { error: NOT_PAYABLE }
+
+  // Too close to the deadline: a Stripe session (30 min minimum) could outlive it.
+  if (!canStartOfferPayment(order.payment_due_at)) {
+    return { error: PAY_WINDOW_CLOSING_MESSAGE }
+  }
+
+  const amountCents = Math.round(Number(order.order_total) * 100)
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    return { error: 'Invalid order amount' }
+  }
+
+  const itemId = (order.order_items as { inventory_item_id: string }[] | null)?.[0]?.inventory_item_id
+  if (!itemId) return { error: SETUP_FAILED }
+
+  // Session lifetime: until the payment deadline, capped at Stripe's 24 h
+  // maximum (1 min margin). The 35 min check above keeps dueSec past the
+  // 30 min minimum; Math.max is only a belt-and-braces floor.
+  const nowSec = Math.floor(Date.now() / 1000)
+  const dueSec = Math.floor(new Date(order.payment_due_at).getTime() / 1000)
+  const expiresAt = Math.max(nowSec + 31 * 60, Math.min(nowSec + 24 * 60 * 60 - 60, dueSec))
+
+  // ── Double-payment guard: expire the previous open session ──────────────────
+  const admin = createAdminClient()
+  let trackSession = true
+  let prevSessionId: string | null = null
+
+  const { data: tracked, error: trackErr } = await admin
+    .from('orders')
+    .select('stripe_checkout_session_id')
+    .eq('id', order.id)
+    .single()
+
+  if (trackErr) {
+    if (trackErr.code === '42703') {
+      // Column not added yet (sql/orders_stripe_session_id.sql not applied).
+      console.error('[payAcceptedOffer] stripe_checkout_session_id column missing — double-payment guard disabled')
+      trackSession = false
+    } else {
+      console.error('[payAcceptedOffer] session lookup failed:', trackErr.message)
+      return { error: SETUP_FAILED }
+    }
+  } else {
+    prevSessionId = (tracked as { stripe_checkout_session_id: string | null }).stripe_checkout_session_id
+  }
+
+  if (prevSessionId) {
+    try {
+      const prev = await stripe.checkout.sessions.retrieve(prevSessionId)
+      if (prev.status === 'complete') {
+        return { error: 'This offer has already been paid — it will appear in your orders shortly.' }
+      }
+      if (prev.status === 'open') {
+        await stripe.checkout.sessions.expire(prevSessionId)
+      }
+    } catch (err) {
+      // Expire can fail if the session completed a moment ago — re-check.
+      const again = await stripe.checkout.sessions.retrieve(prevSessionId).catch(() => null)
+      if (again?.status === 'complete') {
+        return { error: 'This offer has already been paid — it will appear in your orders shortly.' }
+      }
+      if (again?.status !== 'expired') {
+        console.error('[payAcceptedOffer] could not expire previous session:',
+          err instanceof Error ? err.message : String(err))
+        return { error: SETUP_FAILED }
+      }
+    }
+  }
+
+  // ── New session — same shape as buyNow ──────────────────────────────────────
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
+  let session: Stripe.Checkout.Session
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'eur',
+            unit_amount: amountCents,
+            product_data: {
+              name: `GemWorkers order ${order.id.substring(0, 8).toUpperCase()}`,
+            },
+          },
+        },
+      ],
+      shipping_address_collection: {
+        allowed_countries: ['NL','BE','DE','FR','GB','IE','IT','ES','PT','AT','SE','DK','FI','PL','US','CA','AU','AE','SA','TH','PK','IN','SG','JP'],
+      },
+      phone_number_collection: { enabled: true },
+      expires_at: expiresAt,
+      success_url: `${base}/orders?paid=1&order=${order.id}`,
+      cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${order.id}`,
+      // CRITICAL: the webhook uses this to advance the order to 'confirmed'.
+      metadata: { order_id: order.id },
+    })
+  } catch (err) {
+    // The order stays pending_payment inside its window; the buyer can retry.
+    const message = err instanceof Error ? err.message : SETUP_FAILED
+    return { error: message }
+  }
+
+  if (!session.url) return { error: SETUP_FAILED }
+
+  // ── Record the new session (compare-and-set on the previous value) ──────────
+  if (trackSession) {
+    let update = admin
+      .from('orders')
+      .update({ stripe_checkout_session_id: session.id })
+      .eq('id', order.id)
+      .eq('status', 'pending_payment')
+    update = prevSessionId
+      ? update.eq('stripe_checkout_session_id', prevSessionId)
+      : update.is('stripe_checkout_session_id', null)
+
+    const { data: updated, error: updErr } = await update.select('id')
+    if (updErr || !updated || updated.length === 0) {
+      // Another click recorded its session first — don't leave a second one open.
+      await stripe.checkout.sessions.expire(session.id).catch(() => {})
+      if (updErr) console.error('[payAcceptedOffer] session record failed:', updErr.message)
+      return { error: 'A payment for this offer is already being set up — please try again in a moment.' }
+    }
+  }
+
+  return { checkoutUrl: session.url }
 }
 
 // Immediately releases a pending_payment order and restores the stone to
