@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-// Shared presentation for the stone detail page actions.
+// Shared button, panel and input styles (stone page, cart, orders, auth).
 
 const pillBase: CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { markOrderReceived } from '@/app/actions/commerce'
+import { pillOutlineSm, pillDisabledSm } from '@/lib/ui'
 
 export function MarkReceivedButton({ orderId }: { orderId: string }) {
   const router = useRouter()
@@ -27,26 +28,14 @@ export function MarkReceivedButton({ orderId }: { orderId: string }) {
         onClick={handleClick}
         disabled={loading}
         style={{
-          padding: '7px 18px',
-          background: 'rgba(15,118,110,0.08)',
-          color: '#0F766E',
-          border: '1px solid rgba(15,118,110,0.3)',
-          borderRadius: 6,
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: loading ? 'not-allowed' : 'pointer',
-          letterSpacing: '0.04em',
-          opacity: loading ? 0.6 : 1,
-          fontFamily: 'var(--font-inter, system-ui)',
+          ...(loading ? pillDisabledSm : pillOutlineSm),
+          width: 'auto', display: 'inline-flex', height: 40, padding: '0 20px',
         }}
       >
-        {loading ? 'Confirming…' : 'Mark as Received'}
+        {loading ? 'Confirming…' : 'Mark as received'}
       </button>
       {err && (
-        <p style={{
-          fontSize: 12, color: '#B42318', marginTop: 6,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
+        <p style={{ fontSize: 13, color: '#B42318', marginTop: 8 }}>
           {err}
         </p>
       )}

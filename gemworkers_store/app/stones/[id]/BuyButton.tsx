@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { buyNow } from '@/app/actions/commerce'
-import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from './ui'
+import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from '@/lib/ui'
 
 const eur = new Intl.NumberFormat('en-IE', {
   style: 'currency',

@@ -6,7 +6,7 @@ import { submitOffer, withdrawOffer } from '@/app/actions/commerce'
 import {
   pillOutline, pillDarkSm, pillOutlineSm, pillDisabledSm,
   panel, inputStyle, labelStyle,
-} from './ui'
+} from '@/lib/ui'
 
 export type BuyerOffer = {
   id: string

@@ -5,9 +5,10 @@ import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
-import { pillDark } from './ui';
+import { pillDark } from '@/lib/ui';
 import { cancelPendingOrder } from '@/app/actions/commerce';
 import { countryName } from '@/lib/countries';
+import { TrustList } from '@/app/components/TrustList';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,12 +83,6 @@ const CATEGORY: Record<ListingDetail['product_type'], { label: string; href: str
   specimen:    { label: 'Specimens',       href: '/shop/specimen' },
   jewelry:     { label: 'Jewelry',         href: '/shop/jewelry' },
 };
-
-const TRUST_LINKS = [
-  { label: 'Natural gemstone, honestly described',              href: '/guarantee' },
-  { label: 'Tracked shipping, dispatched in 1–5 business days', href: '/shipping' },
-  { label: '30-day returns',                                    href: '/returns' },
-];
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (value == null || value === '') return null;
@@ -343,11 +338,7 @@ export default async function StoneDetailPage({
           )}
 
           {/* Trust list */}
-          <ul className="pd-trust">
-            {TRUST_LINKS.map(t => (
-              <li key={t.href}><Link href={t.href}>{t.label}</Link></li>
-            ))}
-          </ul>
+          <TrustList />
 
           <Link href="/contact?topic=General%20question" className="pd-link" style={{ fontSize: 15 }}>
             Questions about this stone? →

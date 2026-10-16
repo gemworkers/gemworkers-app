@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { addToCart, removeFromCart } from '@/app/actions/commerce'
-import { pillOutline, pillDisabled } from './ui'
+import { pillOutline, pillDisabled } from '@/lib/ui'
 
 type Props = {
   itemId: string

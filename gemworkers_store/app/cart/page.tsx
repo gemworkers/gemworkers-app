@@ -3,7 +3,9 @@ import Link from 'next/link'
 import { BuyButton } from '@/app/stones/[id]/BuyButton'
 import { RemoveButton } from './RemoveButton'
 import { BuyAllButton } from './BuyAllButton'
+import { TrustList } from '@/app/components/TrustList'
 import { countryName } from '@/lib/countries'
+import { pillDark, pillOutline } from '@/lib/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,11 +36,22 @@ const eurDecimal = new Intl.NumberFormat('en-IE', {
   maximumFractionDigits: 2,
 })
 
+function isBuyable(listing: CartListing | null): listing is CartListing {
+  return listing !== null &&
+    listing.sale_method !== 'accept_offers' &&
+    listing.selling_price !== null
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <main style={{ maxWidth: 780, margin: '0 auto', padding: '40px 32px 80px' }}>
+    <main className="pd-wrap browse-main">
+      <nav aria-label="Breadcrumb" className="pd-crumbs">
+        <Link href="/">Home</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Cart</span>
+      </nav>
       {children}
     </main>
   )
@@ -46,21 +59,10 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 function PageTitle({ count }: { count: number }) {
   return (
-    <div style={{ marginBottom: 32 }}>
-      <h1 style={{
-        fontSize: 28, fontWeight: 300, color: '#1F1B16',
-        fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        marginBottom: 4,
-      }}>
-        Cart
-      </h1>
-      <p style={{
-        fontSize: 12, color: '#5A5045',
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        {count} {count === 1 ? 'item' : 'items'}
-      </p>
-    </div>
+    <>
+      <h1 className="font-serif browse-title">Cart</h1>
+      <p className="browse-count">{count} {count === 1 ? 'item' : 'items'}</p>
+    </>
   )
 }
 
@@ -74,26 +76,10 @@ export default async function CartPage() {
   if (!user) {
     return (
       <PageShell>
-        <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <p style={{
-            fontSize: 18, fontWeight: 300, color: '#1F1B16', marginBottom: 8,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>
-            Log in to view your cart
-          </p>
-          <p style={{
-            fontSize: 13, color: '#5A5045', marginBottom: 28,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Save stones while you browse, then buy when you&apos;re ready.
-          </p>
-          <Link href="/auth/login" style={{
-            display: 'inline-block', padding: '11px 28px',
-            border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
-            borderRadius: 6, textDecoration: 'none', fontSize: 12,
-            fontWeight: 600, letterSpacing: '0.1em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
+        <h1 className="font-serif browse-title">Cart</h1>
+        <div className="browse-empty">
+          <p>Log in to view your cart. Save stones while you browse, then buy when you&apos;re ready.</p>
+          <Link href="/auth/login?next=%2Fcart" style={{ ...pillDark, display: 'inline-flex', width: 'auto', marginTop: 12 }}>
             Log in
           </Link>
         </div>
@@ -112,21 +98,10 @@ export default async function CartPage() {
     return (
       <PageShell>
         <PageTitle count={0} />
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <p style={{
-            fontSize: 14, color: '#5A5045', marginBottom: 24,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Your cart is empty.
-          </p>
-          <Link href="/" style={{
-            display: 'inline-block', padding: '11px 28px',
-            border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
-            borderRadius: 6, textDecoration: 'none', fontSize: 12,
-            fontWeight: 600, letterSpacing: '0.1em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Browse stones
+        <div className="browse-empty">
+          <p>Your cart is empty.</p>
+          <Link href="/shop/loose_stone" style={{ ...pillOutline, display: 'inline-flex', width: 'auto', marginTop: 12 }}>
+            Browse loose gemstones
           </Link>
         </div>
       </PageShell>
@@ -149,54 +124,69 @@ export default async function CartPage() {
     listing: listingMap.get(row.inventory_item_id) ?? null,
   }))
 
-  const buyableCount = cartItems.filter(({ listing }) =>
-    listing !== null &&
-    listing.sale_method !== 'accept_offers' &&
-    listing.selling_price !== null
-  ).length
+  const buyableCount = cartItems.filter(({ listing }) => isBuyable(listing)).length
 
   const grandTotal = cartItems.reduce((sum, { listing }) => {
-    if (
-      listing === null ||
-      listing.sale_method === 'accept_offers' ||
-      listing.selling_price === null
-    ) return sum
+    if (!isBuyable(listing)) return sum
     return sum + Number(listing.selling_price) + Number(listing.shipping_cost ?? 0)
   }, 0)
+
+  // Display-only split of grandTotal for the summary box
+  const shippingTotal = cartItems.reduce((sum, { listing }) => {
+    if (!isBuyable(listing)) return sum
+    return sum + Number(listing.shipping_cost ?? 0)
+  }, 0)
+  const subtotal = grandTotal - shippingTotal
 
   return (
     <PageShell>
       <PageTitle count={cartItems.length} />
 
-      <div>
-        {cartItems.map(({ itemId, listing }) =>
-          listing ? (
-            <AvailableItem key={itemId} itemId={itemId} listing={listing} />
-          ) : (
-            <UnavailableItem key={itemId} itemId={itemId} />
-          )
-        )}
-      </div>
-
-      {buyableCount > 0 && (
-        <div style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid #ECE5D8' }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between',
-            fontSize: 13, fontWeight: 600, color: '#1F1B16',
-            marginBottom: 16,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            <span>Total for all available items</span>
-            <span>{eurDecimal.format(grandTotal)}</span>
-          </div>
-          <BuyAllButton />
+      <div className="cart-grid">
+        <div className="cart-list">
+          {cartItems.map(({ itemId, listing }) =>
+            listing ? (
+              <AvailableItem key={itemId} itemId={itemId} listing={listing} />
+            ) : (
+              <UnavailableItem key={itemId} itemId={itemId} />
+            )
+          )}
         </div>
-      )}
+
+        <aside className="cart-aside">
+          {buyableCount > 0 && (
+            <div className="cart-summary">
+              <h2 className="font-serif" style={{ fontSize: 26, fontWeight: 500, marginBottom: 16 }}>
+                Summary
+              </h2>
+              <div className="cart-sum-row">
+                <span>Subtotal</span>
+                <span>{eurDecimal.format(subtotal)}</span>
+              </div>
+              <div className="cart-sum-row">
+                <span>Shipping</span>
+                <span>{shippingTotal === 0 ? 'Free' : eurDecimal.format(shippingTotal)}</span>
+              </div>
+              <div className="cart-sum-row cart-sum-total">
+                <span>Total</span>
+                <span>{eurDecimal.format(grandTotal)}</span>
+              </div>
+              {buyableCount < cartItems.length && (
+                <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 16, lineHeight: 1.5 }}>
+                  For the {buyableCount} available {buyableCount === 1 ? 'item' : 'items'} with a fixed price.
+                </p>
+              )}
+              <BuyAllButton />
+            </div>
+          )}
+          <TrustList style={{ marginTop: buyableCount > 0 ? 24 : 0, borderTop: 'none', paddingTop: 0 }} />
+        </aside>
+      </div>
     </PageShell>
   )
 }
 
-// ── Available item card ───────────────────────────────────────────────────────
+// ── Available item row ────────────────────────────────────────────────────────
 
 function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListing }) {
   const subtitle = [listing.variety, listing.gem_type]
@@ -206,115 +196,42 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
   const shipFrom = countryName(listing.seller_country)
 
   return (
-    <div style={{
-      display: 'flex', gap: 20, padding: '24px 0',
-      borderBottom: '1px solid #ECE5D8',
-      alignItems: 'flex-start',
-    }}>
+    <div className="cart-row">
       {/* Cover photo */}
-      <Link href={`/stones/${itemId}`} style={{ flexShrink: 0, display: 'block' }}>
-        {listing.image_url ? (
+      <Link href={`/stones/${itemId}`} className="cart-thumb">
+        {listing.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={listing.image_url}
-            alt={listing.title}
-            style={{
-              width: 104, height: 104, objectFit: 'cover',
-              borderRadius: 8, display: 'block',
-              border: '1px solid #ECE5D8',
-            }}
-          />
-        ) : (
-          <div style={{
-            width: 104, height: 104, borderRadius: 8,
-            background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid #ECE5D8',
-          }}>
-            <span style={{
-              fontSize: 36, color: '#C5B9AF', fontWeight: 300,
-              fontFamily: 'var(--font-cormorant, Georgia, serif)', lineHeight: 1,
-              userSelect: 'none',
-            }}>
-              {listing.gem_type?.charAt(0).toUpperCase() ?? ''}
-            </span>
-          </div>
+          <img src={listing.image_url} alt={listing.title} />
         )}
       </Link>
 
       {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <Link href={`/stones/${itemId}`} style={{ textDecoration: 'none' }}>
-          <p style={{
-            fontSize: 16, fontWeight: 300, color: '#1F1B16',
-            lineHeight: 1.3, marginBottom: subtitle ? 4 : 8,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>
-            {listing.title}
-          </p>
-        </Link>
-        {subtitle && (
-          <p style={{
-            fontSize: 12, color: '#5A5045',
-            marginBottom: shipFrom ? 3 : 8,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            {subtitle}
-          </p>
-        )}
-        {shipFrom && (
-          <p style={{
-            fontSize: 12, color: '#5A5045', marginBottom: 8,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Ships from {shipFrom}
-          </p>
-        )}
-        <p style={{
-          fontSize: 24, fontWeight: 400, color: '#1F1B16',
-          marginBottom: 16, letterSpacing: '-0.01em',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        }}>
-          {listing.sale_method === 'accept_offers'
-            ? <span style={{ fontSize: 14, fontWeight: 300, color: '#5A5045' }}>Accepting offers</span>
-            : listing.selling_price != null
-              ? eur.format(listing.selling_price)
-              : <span style={{ fontSize: 14, fontWeight: 300, color: '#6B6052' }}>Price on request</span>
-          }
-        </p>
-
-        {/* Stone / Shipping / Total */}
-        {cost !== null && cost > 0 && listing.selling_price != null && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              fontSize: 12, color: '#5A5045', marginBottom: 3,
-            }}>
-              <span>Stone</span>
-              <span>{eur.format(Number(listing.selling_price))}</span>
-            </div>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              fontSize: 12, color: '#5A5045', marginBottom: 5,
-            }}>
-              <span>Shipping</span>
-              <span>{eur.format(cost)}</span>
-            </div>
-            <div style={{ height: 1, background: '#ECE5D8', marginBottom: 5 }} />
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              fontSize: 13, fontWeight: 600, color: '#1F1B16',
-            }}>
-              <span>Total</span>
-              <span>{eur.format(Number(listing.selling_price) + cost)}</span>
-            </div>
+      <div className="cart-info">
+        <div className="cart-info-top">
+          <div style={{ minWidth: 0 }}>
+            <Link href={`/stones/${itemId}`} className="cart-name">{listing.title}</Link>
+            {subtitle && <p className="cart-sub">{subtitle}</p>}
+            {shipFrom && <p className="cart-sub">Ships from {shipFrom}</p>}
           </div>
-        )}
+          <div className="cart-price">
+            {listing.sale_method === 'accept_offers'
+              ? <span style={{ fontSize: 14, fontWeight: 500, color: '#7A5A22' }}>Accepting offers</span>
+              : listing.selling_price != null
+                ? eur.format(listing.selling_price)
+                : <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}>Price on request</span>
+            }
+            {cost !== null && listing.selling_price != null && listing.sale_method !== 'accept_offers' && (
+              <span className="cart-sub" style={{ display: 'block', fontWeight: 400 }}>
+                {cost === 0 ? 'Free shipping' : `+ ${eur.format(cost)} shipping`}
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div className="cart-actions">
           {listing.sale_method !== 'accept_offers' && (
-            <div style={{ flex: 1 }}>
+            <div className="cart-buy">
               <BuyButton
                 itemId={itemId}
                 itemTitle={listing.title}
@@ -331,30 +248,14 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
   )
 }
 
-// ── Unavailable item card ─────────────────────────────────────────────────────
+// ── Unavailable item row ──────────────────────────────────────────────────────
 
 function UnavailableItem({ itemId }: { itemId: string }) {
   return (
-    <div style={{
-      display: 'flex', gap: 20, padding: '24px 0',
-      borderBottom: '1px solid #ECE5D8',
-      alignItems: 'center',
-    }}>
-      {/* Placeholder */}
-      <div style={{
-        flexShrink: 0, width: 104, height: 104, borderRadius: 8,
-        background: '#F4EEE4',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: '1px solid #ECE5D8',
-      }}>
-      </div>
-
-      {/* Info */}
-      <div style={{ flex: 1 }}>
-        <p style={{
-          fontSize: 13, color: '#5A5045', marginBottom: 12,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
+    <div className="cart-row">
+      <div className="cart-thumb" aria-hidden="true" />
+      <div className="cart-info">
+        <p className="cart-sub" style={{ fontSize: 15, marginBottom: 8 }}>
           This item is no longer available
         </p>
         <RemoveButton itemId={itemId} />

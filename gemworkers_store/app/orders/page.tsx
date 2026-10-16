@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { MarkReceivedButton } from './MarkReceivedButton'
+import { pillOutline } from '@/lib/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,13 +36,12 @@ type DisplayEntry =
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STATUS_COLOR: Record<string, string> = {
-  confirmed: '#2563EB',
-  shipped:   '#C2410C',
-  received:  '#0F766E',
-  paid:      '#16A34A',
-  cancelled: '#B42318',
-};
+// Pill text colour; background is always neutral #F4EEE4
+function statusColor(s: string): string {
+  if (s === 'cancelled') return '#B42318'
+  if (s === 'pending_payment') return '#7A5A22'
+  return '#2B7A3D'
+}
 
 const eur = new Intl.NumberFormat('en-IE', {
   style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
@@ -55,7 +55,8 @@ function formatDate(dateStr: string) {
 }
 
 function statusLabel(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  const words = s.replace(/_/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 const STATUS_ORDER = [
@@ -66,52 +67,50 @@ function groupStatus(orders: BuyerOrder[]): string {
   return STATUS_ORDER.find(s => orders.some(o => o.status === s)) ?? orders[0].status
 }
 
-// ── Stone thumbnail ───────────────────────────────────────────────────────────
+// ── Small pieces ──────────────────────────────────────────────────────────────
 
-function StoneThumb({
-  stone,
-  fallbackInitial,
-  size,
-}: {
-  stone: StoneDetails | null
-  fallbackInitial: string
-  size: number
-}) {
-  const initial = stone?.gem_type?.charAt(0).toUpperCase()
-    ?? fallbackInitial.charAt(0).toUpperCase()
-
-  if (stone?.image_url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={stone.image_url}
-        alt={stone.title}
-        style={{
-          width: size, height: size, objectFit: 'cover',
-          borderRadius: 8, flexShrink: 0, display: 'block',
-          border: '1px solid #ECE5D8',
-        }}
-      />
-    )
-  }
-
+function StatusPill({ status, small = false }: { status: string; small?: boolean }) {
   return (
-    <div style={{
-      width: size, height: size, flexShrink: 0, borderRadius: 8,
-      background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: '1px solid #ECE5D8',
+    <span className="order-pill" style={{
+      color: statusColor(status),
+      fontSize: small ? 11 : 12,
+      padding: small ? '2px 8px' : '4px 12px',
     }}>
-      <span style={{
-        fontSize: Math.round(size * 0.4),
-        color: '#C5B9AF', fontWeight: 300,
-        fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        lineHeight: 1, userSelect: 'none',
-      }}>
-        {initial}
-      </span>
+      {statusLabel(status)}
+    </span>
+  )
+}
+
+function StoneThumb({ stone, size }: { stone: StoneDetails | null; size: number }) {
+  return (
+    <div className="order-thumb" style={{ width: size, height: size }}>
+      {stone?.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={stone.image_url} alt={stone.title} />
+      )}
     </div>
   )
+}
+
+function Tracking({ number }: { number: string }) {
+  return (
+    <p className="order-muted" style={{ marginTop: 6 }}>
+      Tracking:{' '}
+      <span style={{ fontFamily: 'monospace', color: '#1F1B16' }}>{number}</span>
+    </p>
+  )
+}
+
+function Received() {
+  return (
+    <p style={{ fontSize: 14, fontWeight: 600, color: '#2B7A3D', marginTop: 8 }}>
+      ✓ Received
+    </p>
+  )
+}
+
+function AwaitingShipment() {
+  return <p className="order-muted" style={{ marginTop: 8 }}>Awaiting shipment</p>
 }
 
 // ── Single-order card ─────────────────────────────────────────────────────────
@@ -123,7 +122,6 @@ function SingleOrderCard({
   order: BuyerOrder
   listingMap: Map<string, StoneDetails>
 }) {
-  const color       = STATUS_COLOR[order.status] ?? '#5A5045'
   const rawTotal    = order.order_total   == null ? null : Number(order.order_total)
   const rawShipping = order.shipping_cost == null ? null : Number(order.shipping_cost)
   const rawStone    = rawTotal != null ? rawTotal - (rawShipping ?? 0) : null
@@ -138,111 +136,42 @@ function SingleOrderCard({
     : null
 
   return (
-    <div style={{
-      background: '#FFFFFF', border: '1px solid #ECE5D8',
-      borderRadius: 10, padding: '20px 24px',
-    }}>
+    <article className="order-card">
       {/* Card header */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', marginBottom: 16,
-      }}>
-        <span style={{
-          fontSize: 11, color: '#5A5045',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          {formatDate(order.order_date)}
-        </span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-          color, border: `1px solid ${color}33`, borderRadius: 5,
-          padding: '3px 10px', background: `${color}1a`,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          {statusLabel(order.status)}
-        </span>
+      <div className="order-head">
+        <div>
+          <p className="order-number">{order.order_number}</p>
+          <p className="order-muted">{formatDate(order.order_date)}</p>
+        </div>
+        <StatusPill status={order.status} />
       </div>
 
       {/* Stone row */}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 14 }}>
-        <StoneThumb stone={stone} fallbackInitial={displayTitle} size={72} />
-
+      <div className="order-item">
+        <StoneThumb stone={stone} size={72} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{
-            fontSize: 16, fontWeight: 300, color: '#1F1B16',
-            marginBottom: subtitle ? 3 : 6, lineHeight: 1.3,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>
-            {displayTitle}
-          </p>
-          {subtitle && (
-            <p style={{
-              fontSize: 12, color: '#5A5045', marginBottom: 6,
-              fontFamily: 'var(--font-inter, system-ui)',
-            }}>
-              {subtitle}
-            </p>
+          <p className="order-name">{displayTitle}</p>
+          {subtitle && <p className="order-muted">{subtitle}</p>}
+          {order.tracking_number && <Tracking number={order.tracking_number} />}
+          {order.status === 'confirmed' && <AwaitingShipment />}
+          {order.status === 'shipped' && (
+            <div style={{ marginTop: 12 }}><MarkReceivedButton orderId={order.id} /></div>
           )}
-          <p style={{
-            fontSize: 10, color: '#6B6052', fontFamily: 'monospace',
-            letterSpacing: '0.04em',
-          }}>
-            {order.order_number}
-          </p>
+          {order.status === 'received' && <Received />}
         </div>
-
-        {rawTotal != null && (
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <span style={{
-              fontSize: 17, fontWeight: 400, color: '#1F1B16',
-              fontFamily: 'var(--font-cormorant, Georgia, serif)',
-            }}>
-              {eur.format(rawTotal)}
-            </span>
-            {rawShipping != null && rawShipping > 0 && (
-              <div style={{
-                fontSize: 11, color: '#6B6052', marginTop: 2,
-                fontFamily: 'var(--font-inter, system-ui)',
-              }}>
-                {eur.format(rawStone!)} + {eur.format(rawShipping)} shipping
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {order.tracking_number && (
-        <p style={{
-          fontSize: 12, color: '#5A5045', marginBottom: 10,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          Tracking:{' '}
-          <span style={{ fontFamily: 'monospace', color: '#1F1B16' }}>
-            {order.tracking_number}
+      {rawTotal != null && (
+        <div className="order-total">
+          <span className="order-muted">
+            {rawShipping != null && rawShipping > 0
+              ? `${eur.format(rawStone!)} + ${eur.format(rawShipping)} shipping`
+              : 'Total'}
           </span>
-        </p>
+          <span className="order-total-amount">{eur.format(rawTotal)}</span>
+        </div>
       )}
-
-      {order.status === 'confirmed' && (
-        <p style={{
-          fontSize: 12, color: '#5A5045', fontStyle: 'italic',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          Awaiting shipment
-        </p>
-      )}
-      {order.status === 'shipped' && (
-        <MarkReceivedButton orderId={order.id} />
-      )}
-      {order.status === 'received' && (
-        <p style={{
-          fontSize: 12, fontWeight: 600, color: '#0F766E',
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          ✓ Received
-        </p>
-      )}
-    </div>
+    </article>
   )
 }
 
@@ -259,40 +188,25 @@ function GroupedOrderCard({
 }) {
   void groupId
   const status        = groupStatus(orders)
-  const color         = STATUS_COLOR[status] ?? '#5A5045'
   const combinedTotal = orders.reduce((sum, o) => sum + Number(o.order_total ?? 0), 0)
   const date          = orders[0].order_date
   const allSameStatus = orders.every(o => o.status === status)
 
   return (
-    <div style={{
-      background: '#FFFFFF', border: '1px solid #ECE5D8',
-      borderRadius: 10, padding: '20px 24px',
-    }}>
+    <article className="order-card">
       {/* Group header */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', marginBottom: 16,
-      }}>
-        <span style={{
-          fontSize: 14, fontWeight: 300, color: '#1F1B16',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        }}>
-          Order placed {formatDate(date)}&nbsp;&middot;&nbsp;{orders.length}{' '}
-          {orders.length === 1 ? 'item' : 'items'}
-        </span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-          color, border: `1px solid ${color}33`, borderRadius: 5,
-          padding: '3px 10px', background: `${color}1a`,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          {statusLabel(status)}
-        </span>
+      <div className="order-head">
+        <div>
+          <p className="order-number">
+            {orders.length} {orders.length === 1 ? 'item' : 'items'}
+          </p>
+          <p className="order-muted">Placed {formatDate(date)}</p>
+        </div>
+        <StatusPill status={status} />
       </div>
 
       {/* Per-order stone rows */}
-      <div style={{ borderTop: '1px solid #ECE5D8' }}>
+      <div>
         {orders.map(o => {
           const oi           = o.order_items[0]
           const itemId       = oi?.inventory_item_id ?? ''
@@ -303,80 +217,27 @@ function GroupedOrderCard({
             ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
             : null
           const oTotal       = o.order_total != null ? Number(o.order_total) : null
-          const rowColor     = STATUS_COLOR[o.status] ?? '#5A5045'
 
           return (
-            <div key={o.id} style={{
-              display: 'flex', gap: 14, alignItems: 'flex-start',
-              padding: '12px 0', borderBottom: '1px solid #ECE5D8',
-            }}>
-              <StoneThumb stone={stone} fallbackInitial={displayTitle} size={60} />
+            <div key={o.id} className="order-item order-item-ruled">
+              <StoneThumb stone={stone} size={64} />
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{
-                  fontSize: 15, fontWeight: 300, color: '#1F1B16',
-                  marginBottom: subtitle ? 3 : 4, lineHeight: 1.3,
-                  fontFamily: 'var(--font-cormorant, Georgia, serif)',
-                }}>
-                  {displayTitle}
-                </p>
-                {subtitle && (
-                  <p style={{
-                    fontSize: 12, color: '#5A5045', marginBottom: 4,
-                    fontFamily: 'var(--font-inter, system-ui)',
-                  }}>
-                    {subtitle}
-                  </p>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    fontSize: 10, color: '#6B6052', fontFamily: 'monospace',
-                  }}>
-                    {o.order_number}
-                  </span>
-                  {!allSameStatus && o.status !== status && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
-                      color: rowColor, border: `1px solid ${rowColor}33`,
-                      borderRadius: 4, padding: '1px 5px', background: `${rowColor}1a`,
-                      fontFamily: 'var(--font-inter, system-ui)',
-                    }}>
-                      {statusLabel(o.status)}
-                    </span>
-                  )}
+                <p className="order-name">{displayTitle}</p>
+                {subtitle && <p className="order-muted">{subtitle}</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  <span className="order-muted" style={{ fontFamily: 'monospace' }}>{o.order_number}</span>
+                  {!allSameStatus && o.status !== status && <StatusPill status={o.status} small />}
                 </div>
-                {o.tracking_number && (
-                  <p style={{
-                    fontSize: 11, color: '#5A5045', marginTop: 3,
-                    fontFamily: 'var(--font-inter, system-ui)',
-                  }}>
-                    Tracking:{' '}
-                    <span style={{ fontFamily: 'monospace', color: '#1F1B16' }}>
-                      {o.tracking_number}
-                    </span>
-                  </p>
-                )}
+                {o.tracking_number && <Tracking number={o.tracking_number} />}
                 {o.status === 'shipped' && (
-                  <div style={{ marginTop: 6 }}>
-                    <MarkReceivedButton orderId={o.id} />
-                  </div>
+                  <div style={{ marginTop: 12 }}><MarkReceivedButton orderId={o.id} /></div>
                 )}
-                {o.status === 'received' && (
-                  <p style={{
-                    fontSize: 12, fontWeight: 600, color: '#0F766E', marginTop: 4,
-                    fontFamily: 'var(--font-inter, system-ui)',
-                  }}>
-                    ✓ Received
-                  </p>
-                )}
+                {o.status === 'received' && <Received />}
               </div>
 
               {oTotal != null && (
-                <span style={{
-                  fontSize: 14, fontWeight: 400, color: '#1F1B16',
-                  flexShrink: 0, paddingTop: 2,
-                  fontFamily: 'var(--font-cormorant, Georgia, serif)',
-                }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', flexShrink: 0 }}>
                   {eur.format(oTotal)}
                 </span>
               )}
@@ -385,38 +246,15 @@ function GroupedOrderCard({
         })}
       </div>
 
-      {/* Combined total footer */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        fontSize: 12, color: '#5A5045', marginTop: 12,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        <span>{formatDate(date)}</span>
-        <span style={{
-          fontWeight: 600, color: '#1F1B16', fontSize: 14,
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        }}>
-          Total {eur.format(combinedTotal)}
-        </span>
-      </div>
+      {allSameStatus && status === 'confirmed' && <AwaitingShipment />}
+      {allSameStatus && status === 'received' && <Received />}
 
-      {allSameStatus && status === 'confirmed' && (
-        <p style={{
-          fontSize: 12, color: '#5A5045', fontStyle: 'italic', marginTop: 10,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          Awaiting shipment
-        </p>
-      )}
-      {allSameStatus && status === 'received' && (
-        <p style={{
-          fontSize: 12, fontWeight: 600, color: '#0F766E', marginTop: 10,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
-          ✓ Received
-        </p>
-      )}
-    </div>
+      {/* Combined total footer */}
+      <div className="order-total">
+        <span className="order-muted">Total</span>
+        <span className="order-total-amount">{eur.format(combinedTotal)}</span>
+      </div>
+    </article>
   )
 }
 
@@ -473,40 +311,25 @@ export default async function BuyerOrdersPage() {
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px 80px' }}>
-      <h1 style={{
-        fontSize: 28, fontWeight: 300, color: '#1F1B16', marginBottom: 6,
-        fontFamily: 'var(--font-cormorant, Georgia, serif)',
-      }}>
-        My Orders
-      </h1>
-      <p style={{
-        fontSize: 13, color: '#5A5045', marginBottom: 32,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        Your purchase history from GemWorkers.
-      </p>
+    <main className="pd-wrap browse-main">
+      <nav aria-label="Breadcrumb" className="pd-crumbs">
+        <Link href="/">Home</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Orders</span>
+      </nav>
+
+      <h1 className="font-serif browse-title">My orders</h1>
+      <p className="browse-count">Your purchase history from GemWorkers.</p>
 
       {entries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <p style={{
-            fontSize: 14, color: '#5A5045', marginBottom: 28,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            You have no orders yet.
-          </p>
-          <Link href="/" style={{
-            display: 'inline-block', padding: '11px 28px',
-            border: '1px solid rgba(122,90,34,0.5)', color: '#7A5A22',
-            borderRadius: 6, textDecoration: 'none', fontSize: 12,
-            fontWeight: 600, letterSpacing: '0.1em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Browse stones
+        <div className="browse-empty">
+          <p>You have no orders yet.</p>
+          <Link href="/shop/loose_stone" style={{ ...pillOutline, display: 'inline-flex', width: 'auto', marginTop: 12 }}>
+            Browse loose gemstones
           </Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="order-list">
           {entries.map(entry =>
             entry.type === 'solo'
               ? <SingleOrderCard

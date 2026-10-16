@@ -1,22 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', fontSize: 14,
-  color: '#1F1B16', background: '#F4EEE4',
-  border: '1px solid #ECE5D8', borderRadius: 6,
-  boxSizing: 'border-box', outline: 'none',
-  fontFamily: 'var(--font-inter, system-ui)',
-}
-
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 600,
-  color: '#5A5045', marginBottom: 6, letterSpacing: '0.06em',
-  fontFamily: 'var(--font-inter, system-ui)',
-}
+import { AuthShell, authErrorStyle } from '@/app/components/AuthShell'
+import { inputStyle, labelStyle, pillDark, pillDisabled } from '@/lib/ui'
 
 export default function SellerAcceptInvitePage() {
   const [sessionReady, setSessionReady] = useState(false)
@@ -96,117 +83,53 @@ export default function SellerAcceptInvitePage() {
   // ── STATE A — invalid/expired link ─────────────────────────────────────────
   if (sessionError) {
     return (
-      <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
-        <div style={{
-          background: '#FFFFFF', border: '1px solid #ECE5D8',
-          borderRadius: 10, padding: 28,
-        }}>
-          <h1 style={{
-            fontSize: 22, fontWeight: 300, color: '#1F1B16',
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-            marginBottom: 12, marginTop: 0,
-          }}>
-            Invitation link problem
-          </h1>
-          <p style={{
-            fontSize: 14, color: '#5A5045', lineHeight: 1.6, margin: 0,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            {sessionError}
-          </p>
-        </div>
-      </main>
+      <AuthShell title="Invitation link problem">
+        <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, margin: 0 }}>
+          {sessionError}
+        </p>
+      </AuthShell>
     )
   }
 
   // ── STATE B — password set successfully ────────────────────────────────────
   if (success) {
     return (
-      <main style={{ maxWidth: 420, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
-        <div style={{
-          fontSize: 42, marginBottom: 16, color: '#7A5A22',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        }}>✓</div>
-        <h1 style={{
-          fontSize: 24, fontWeight: 300, color: '#1F1B16',
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          marginBottom: 10,
-        }}>
-          Password set
-        </h1>
-        <p style={{
-          fontSize: 14, color: '#5A5045', lineHeight: 1.6, marginBottom: 8,
-          fontFamily: 'var(--font-inter, system-ui)',
-        }}>
+      <AuthShell title="Password set" center>
+        <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, marginBottom: 10 }}>
           Your account is ready. Head to your seller dashboard to start listing your stones.
         </p>
         {sellerEmail && (
-          <p style={{
-            fontSize: 13, color: '#5A5045', lineHeight: 1.6, marginBottom: 28,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
+          <p style={{ fontSize: 14, color: '#5A5045', lineHeight: 1.6, marginBottom: 24 }}>
             Sign in with{' '}
             <strong style={{ color: '#1F1B16' }}>{sellerEmail}</strong>{' '}
             and the password you just chose.
           </p>
         )}
-        <a
-          href="https://sell.gemworkers.com"
-          style={{
-            display: 'inline-block', padding: '11px 28px',
-            background: '#7A5A22', color: '#FBF8F3',
-            border: 'none', borderRadius: 6,
-            textDecoration: 'none', fontSize: 12, fontWeight: 600,
-            letterSpacing: '0.1em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}
-        >
+        <a href="https://sell.gemworkers.com" style={{ ...pillDark, marginTop: sellerEmail ? 0 : 14 }}>
           Go to Seller Dashboard
         </a>
-      </main>
+      </AuthShell>
     )
   }
 
   // ── STATE D — session not yet established ──────────────────────────────────
   if (!sessionReady) {
     return (
-      <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
-        <div style={{
-          background: '#FFFFFF', border: '1px solid #ECE5D8',
-          borderRadius: 10, padding: 28, textAlign: 'center',
-        }}>
-          <p style={{
-            fontSize: 14, color: '#5A5045', margin: 0,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            Verifying your invitation…
-          </p>
-        </div>
-      </main>
+      <AuthShell title="Welcome" center>
+        <p style={{ fontSize: 15, color: '#5A5045', margin: 0 }}>
+          Verifying your invitation…
+        </p>
+      </AuthShell>
     )
   }
 
   // ── STATE C — session ready, show set-password form ────────────────────────
   return (
-    <main style={{ maxWidth: 420, margin: '64px auto', padding: '0 24px 80px' }}>
-      <h1 style={{
-        fontSize: 28, fontWeight: 300, color: '#1F1B16',
-        fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        marginBottom: 6,
-      }}>
-        Set your password
-      </h1>
-      <p style={{
-        fontSize: 13, color: '#5A5045', marginBottom: 28,
-        fontFamily: 'var(--font-inter, system-ui)',
-      }}>
-        Welcome to GemWorkers. Choose a password to activate your seller account.
-      </p>
-
-      <form onSubmit={handleSubmit} style={{
-        background: '#FFFFFF', border: '1px solid #ECE5D8',
-        borderRadius: 10, padding: 28,
-      }}>
+    <AuthShell
+      title="Set your password"
+      intro="Welcome to GemWorkers. Choose a password to activate your seller account."
+    >
+      <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>Password</label>
           <input
@@ -227,33 +150,12 @@ export default function SellerAcceptInvitePage() {
           />
         </div>
 
-        {formError && (
-          <p style={{
-            fontSize: 13, color: '#B42318',
-            background: 'rgba(180,35,24,0.06)',
-            border: '1px solid rgba(180,35,24,0.25)',
-            borderRadius: 6, padding: '8px 12px', marginBottom: 16,
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}>
-            {formError}
-          </p>
-        )}
+        {formError && <p style={authErrorStyle}>{formError}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
-            color: '#FBF8F3', background: loading ? '#B89A63' : '#7A5A22',
-            border: 'none', borderRadius: 6,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            letterSpacing: '0.06em',
-            fontFamily: 'var(--font-inter, system-ui)',
-          }}
-        >
+        <button type="submit" disabled={loading} style={loading ? pillDisabled : pillDark}>
           {loading ? 'Setting…' : 'Set password'}
         </button>
       </form>
-    </main>
+    </AuthShell>
   )
 }
