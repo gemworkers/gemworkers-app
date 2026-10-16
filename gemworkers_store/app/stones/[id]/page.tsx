@@ -131,10 +131,6 @@ function SpecSection({ title, children }: { title: string; children: React.React
 function NotAvailable() {
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 32px', textAlign: 'center' }}>
-      <div style={{
-        fontSize: 52, color: '#ECE5D8', marginBottom: 18, lineHeight: 1,
-        fontFamily: 'var(--font-cormorant, Georgia, serif)',
-      }}>◇</div>
       <p style={{
         fontSize: 18, fontWeight: 300, color: '#1F1B16', marginBottom: 8,
         fontFamily: 'var(--font-cormorant, Georgia, serif)',

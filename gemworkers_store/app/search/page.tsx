@@ -107,10 +107,6 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
       {query && !hasError && items.length === 0 && (
         <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <div style={{
-            fontSize: 28, color: '#ECE5D8', marginBottom: 16,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>◇</div>
           <p style={{
             fontSize: 15, color: '#6B6052', marginBottom: 24,
             fontFamily: 'var(--font-inter, system-ui)',

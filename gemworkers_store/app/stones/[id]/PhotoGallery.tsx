@@ -19,13 +19,6 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
         background: 'linear-gradient(145deg, #F4EEE4 0%, #EAE3D8 100%)',
         borderRadius: 12,
       }}>
-        <span style={{
-          fontSize: 96, color: '#6B6052', fontWeight: 300,
-          fontFamily: 'var(--font-cormorant, Georgia, serif)', lineHeight: 1,
-          userSelect: 'none',
-        }}>
-          ◇
-        </span>
       </div>
     );
   }

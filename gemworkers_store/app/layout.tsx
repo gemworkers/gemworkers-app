@@ -25,6 +25,13 @@ export const metadata: Metadata = {
   description: 'Curated gemstones, minerals and jewelry, direct from specialist sellers.',
 }
 
+const TRUST_POINTS = [
+  '100% natural gemstones',
+  'Tracked shipping worldwide',
+  '30-day returns',
+  'Certificates on request',
+]
+
 const SHOP_LINKS = [
   { label: 'Loose Gemstones', href: '/shop/loose_stone' },
   { label: 'Mineral Specimens', href: '/shop/specimen' },
@@ -121,6 +128,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body>
         <div style={{ position: 'relative', zIndex: 1 }}>
+          <div className="trust-strip">
+            {TRUST_POINTS.map(t => <span key={t}>{t}</span>)}
+          </div>
           <StoreHeader user={navUser} />
           {children}
           <Footer />

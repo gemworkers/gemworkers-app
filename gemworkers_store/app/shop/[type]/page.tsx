@@ -148,10 +148,6 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       {/* ── Grid or empty state ── */}
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <div style={{
-            fontSize: 28, color: '#ECE5D8', marginBottom: 16,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>◇</div>
           <p style={{
             fontSize: 15, color: '#6B6052', letterSpacing: '0.04em',
             fontFamily: 'var(--font-inter, system-ui)',

@@ -75,10 +75,6 @@ export default async function CartPage() {
     return (
       <PageShell>
         <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <div style={{
-            fontSize: 40, color: '#ECE5D8', marginBottom: 16, lineHeight: 1,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>◇</div>
           <p style={{
             fontSize: 18, fontWeight: 300, color: '#1F1B16', marginBottom: 8,
             fontFamily: 'var(--font-cormorant, Georgia, serif)',
@@ -117,10 +113,6 @@ export default async function CartPage() {
       <PageShell>
         <PageTitle count={0} />
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div style={{
-            fontSize: 40, color: '#ECE5D8', marginBottom: 16, lineHeight: 1,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>◇</div>
           <p style={{
             fontSize: 14, color: '#5A5045', marginBottom: 24,
             fontFamily: 'var(--font-inter, system-ui)',
@@ -244,7 +236,7 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
               fontFamily: 'var(--font-cormorant, Georgia, serif)', lineHeight: 1,
               userSelect: 'none',
             }}>
-              {listing.gem_type?.charAt(0).toUpperCase() ?? '◇'}
+              {listing.gem_type?.charAt(0).toUpperCase() ?? ''}
             </span>
           </div>
         )}
@@ -355,10 +347,6 @@ function UnavailableItem({ itemId }: { itemId: string }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         border: '1px solid #ECE5D8',
       }}>
-        <span style={{
-          fontSize: 32, color: '#C5B9AF', lineHeight: 1,
-          fontFamily: 'var(--font-cormorant, Georgia, serif)',
-        }}>◇</span>
       </div>
 
       {/* Info */}

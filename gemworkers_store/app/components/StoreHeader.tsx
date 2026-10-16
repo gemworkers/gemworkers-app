@@ -86,15 +86,8 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
 
         {/* ── Left: logo + desktop nav ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
-          <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <Image src="/logo-mark-white.png" alt="" width={38} height={34} style={{ display: 'block' }} />
-            <span style={{
-              fontFamily: 'var(--font-cormorant, Georgia, serif)',
-              fontSize: 18, fontWeight: 400, color: '#1F1B16',
-              letterSpacing: '0.12em', textTransform: 'uppercase', lineHeight: 1,
-            }}>
-              GemWorkers
-            </span>
+          <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <Image src="/logo-horizontal-black.png" alt="GemWorkers" width={3801} height={607} priority className="header-logo" />
           </Link>
 
           <nav className="header-nav-desktop">

@@ -79,7 +79,6 @@ function StoneThumb({
 }) {
   const initial = stone?.gem_type?.charAt(0).toUpperCase()
     ?? fallbackInitial.charAt(0).toUpperCase()
-    ?? '◇'
 
   if (stone?.image_url) {
     return (
@@ -490,10 +489,6 @@ export default async function BuyerOrdersPage() {
 
       {entries.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <div style={{
-            fontSize: 44, color: '#ECE5D8', marginBottom: 14, lineHeight: 1,
-            fontFamily: 'var(--font-cormorant, Georgia, serif)',
-          }}>◇</div>
           <p style={{
             fontSize: 14, color: '#5A5045', marginBottom: 28,
             fontFamily: 'var(--font-inter, system-ui)',

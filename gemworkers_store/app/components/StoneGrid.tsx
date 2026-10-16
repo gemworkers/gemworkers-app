@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { StoneCard, type StoneCardItem } from './StoneCard'
 
-export function StoneGrid({ items }: { items: StoneCardItem[] }) {
+export function StoneGrid({ items, className = 'stones-grid' }: { items: StoneCardItem[]; className?: string }) {
   const gridRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function StoneGrid({ items }: { items: StoneCardItem[] }) {
   }, [])
 
   return (
-    <div ref={gridRef} className="stones-grid">
+    <div ref={gridRef} className={className}>
       {items.map((item, i) => <StoneCard key={item.id} item={item} index={i} />)}
     </div>
   )
