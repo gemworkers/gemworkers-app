@@ -4,6 +4,7 @@ import '../../core/services/user_profile_service.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import 'add_edit_order_page.dart';
+import 'order_status.dart';
 
 class OrderDetailPage extends StatefulWidget {
   final String orderId;
@@ -272,11 +273,14 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 tooltip: 'Edit',
                 onPressed: _actionInProgress ? null : _openEdit,
               ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete',
-              onPressed: _actionInProgress ? null : _deleteOrder,
-            ),
+            // pending_payment orders are released automatically when the
+            // payment deadline passes, so they can't be deleted by hand.
+            if (order.status != 'pending_payment')
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete',
+                onPressed: _actionInProgress ? null : _deleteOrder,
+              ),
           ],
         ],
       ),
@@ -562,7 +566,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   Widget? _buildActionBar(Order order) {
     final status = order.status;
-    if (status == 'cancelled') return null;
+    if (status == 'cancelled' || status == 'pending_payment') return null;
 
     final showPayoutButton = UserProfileService.instance.isOwner &&
         order.saleChannel == 'platform' &&
@@ -793,14 +797,7 @@ class _StatusBadge extends StatelessWidget {
   final String status;
   const _StatusBadge(this.status);
 
-  Color get _color => switch (status) {
-        'paid'      => Colors.green,
-        'confirmed' => Colors.blue,
-        'shipped'   => Colors.orange,
-        'received'  => Colors.teal,
-        'cancelled' => Colors.red,
-        _           => Colors.grey,
-      };
+  Color get _color => orderStatusColor(status);
 
   @override
   Widget build(BuildContext context) {
@@ -812,7 +809,7 @@ class _StatusBadge extends StatelessWidget {
         border: Border.all(color: _color.withValues(alpha: 0.5)),
       ),
       child: Text(
-        status,
+        orderStatusLabel(status),
         style: TextStyle(
             color: _color,
             fontWeight: FontWeight.w600,

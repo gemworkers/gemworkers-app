@@ -5,6 +5,7 @@ import '../../models/order.dart';
 import '../../repositories/customer_repository.dart';
 import '../../repositories/order_repository.dart';
 import '../orders/order_detail_page.dart';
+import '../orders/order_status.dart';
 import 'add_edit_customer_page.dart';
 
 class CustomerDetailPage extends StatefulWidget {
@@ -364,12 +365,7 @@ class _StatusChip extends StatelessWidget {
   final String status;
   const _StatusChip(this.status);
 
-  Color get _color => switch (status) {
-        'paid'      => Colors.green,
-        'confirmed' => Colors.blue,
-        'cancelled' => Colors.red,
-        _           => Colors.grey,
-      };
+  Color get _color => orderStatusColor(status);
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +377,7 @@ class _StatusChip extends StatelessWidget {
         border: Border.all(color: _color.withValues(alpha: 0.4)),
       ),
       child: Text(
-        status,
+        orderStatusLabel(status),
         style: TextStyle(
             fontSize: 11, color: _color, fontWeight: FontWeight.w600),
       ),

@@ -87,7 +87,7 @@ class _OffersPageState extends State<OffersPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
             accepted
-                ? 'Offer accepted — stone reserved and order created.'
+                ? 'Offer accepted. The buyer has 48 hours to pay — the stone is reserved until then.'
                 : 'Offer declined.',
           ),
         ));

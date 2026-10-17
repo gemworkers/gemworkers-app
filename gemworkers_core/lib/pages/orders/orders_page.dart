@@ -5,6 +5,7 @@ import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import 'add_edit_order_page.dart';
 import 'order_detail_page.dart';
+import 'order_status.dart';
 
 class OrdersPage extends StatefulWidget {
   final String? initialStatusFilter;
@@ -21,7 +22,7 @@ class _OrdersPageState extends State<OrdersPage> {
   bool _loading = true;
   String? _statusFilter;
 
-  static const _statuses = ['draft', 'confirmed', 'shipped', 'received', 'paid', 'cancelled'];
+  static const _statuses = ['draft', 'pending_payment', 'confirmed', 'shipped', 'received', 'paid', 'cancelled'];
 
   @override
   void initState() {
@@ -89,9 +90,9 @@ class _OrdersPageState extends State<OrdersPage> {
                   },
                 ),
                 ..._statuses.map((s) => _FilterChip(
-                      label: _capitalise(s),
+                      label: orderStatusLabel(s),
                       selected: _statusFilter == s,
-                      color: _statusColor(s),
+                      color: orderStatusColor(s),
                       onTap: () {
                         setState(() => _statusFilter = s);
                         _load();
@@ -129,18 +130,6 @@ class _OrdersPageState extends State<OrdersPage> {
       ),
     );
   }
-
-  static String _capitalise(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-
-  static Color _statusColor(String s) => switch (s) {
-        'paid'      => Colors.green,
-        'confirmed' => Colors.blue,
-        'shipped'   => Colors.orange,
-        'received'  => Colors.teal,
-        'cancelled' => Colors.red,
-        _           => Colors.grey,
-      };
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
@@ -218,12 +207,7 @@ class _OrderCard extends StatelessWidget {
   final Future<void> Function(Order) onTap;
   const _OrderCard(this.order, {required this.onTap});
 
-  Color get _statusColor => switch (order.status) {
-        'paid' => Colors.green,
-        'confirmed' => Colors.blue,
-        'cancelled' => Colors.red,
-        _ => Colors.grey,
-      };
+  Color get _statusColor => orderStatusColor(order.status);
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +256,7 @@ class _OrderCard extends StatelessWidget {
                     color: _statusColor.withValues(alpha: 0.4)),
               ),
               child: Text(
-                order.status,
+                orderStatusLabel(order.status),
                 style: TextStyle(
                     fontSize: 11,
                     color: _statusColor,
