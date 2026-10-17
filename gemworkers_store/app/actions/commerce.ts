@@ -76,6 +76,8 @@ export async function buyNow(
         allowed_countries: ['NL','BE','DE','FR','GB','IE','IT','ES','PT','AT','SE','DK','FI','PL','US','CA','AU','AE','SA','TH','PK','IN','SG','JP'],
       },
       phone_number_collection: { enabled: true },
+      // Stripe minimum is 30 min; our sweep cancels the order at 30 min.
+      expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       success_url: `${base}/orders?paid=1&order=${orderId}`,
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${orderId}`,
       // CRITICAL: the webhook uses this to advance the order to 'confirmed'.
@@ -447,6 +449,8 @@ export async function checkoutCart(): Promise<
         allowed_countries: ['NL','BE','DE','FR','GB','IE','IT','ES','PT','AT','SE','DK','FI','PL','US','CA','AU','AE','SA','TH','PK','IN','SG','JP'],
       },
       phone_number_collection: { enabled: true },
+      // Stripe minimum is 30 min; our sweep cancels the orders at 30 min.
+      expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       success_url: `${base}/orders?paid=1&group=${groupId}`,
       cancel_url:  `${base}/cart?canceled=1&group=${groupId}`,
       // CRITICAL: the webhook uses this to confirm all orders in the group.

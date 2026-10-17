@@ -6,6 +6,11 @@ import { stripe } from '@/lib/stripe/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
 import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
+import {
+  sendLatePaymentOwnerEmail,
+  sendLatePaymentBuyerEmail,
+  type RefundedOrderLine,
+} from '@/lib/email/sendLatePaymentRefundEmails'
 
 // ── Email notification helpers ─────────────────────────────────────────────────
 // Called after order confirmation + address write. Always best-effort — callers
@@ -86,7 +91,7 @@ async function notifySingleOrder(admin: AdminClient, orderId: string): Promise<v
   })
 }
 
-async function notifyGroupOrders(admin: AdminClient, groupId: string): Promise<void> {
+async function notifyGroupOrders(admin: AdminClient, groupId: string, orderIdsInScope: string[]): Promise<void> {
   const ownerEmail = process.env.OWNER_EMAIL?.trim() ?? ''
 
   // 1. All orders in the group (shipping is shared — same buyer checkout).
@@ -94,6 +99,7 @@ async function notifyGroupOrders(admin: AdminClient, groupId: string): Promise<v
     .from('orders')
     .select('id, order_number, order_total, seller_id, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('checkout_group_id', groupId)
+    .in('id', orderIdsInScope)
   const orders = (ordersData as OrderRow[] | null) ?? []
   if (orders.length === 0) return
 
@@ -237,6 +243,7 @@ async function notifyCustomerSingleOrder(
 async function notifyCustomerGroupOrder(
   admin: AdminClient,
   groupId: string,
+  orderIdsInScope: string[],
   stripeEmail: string | null,
 ): Promise<void> {
   type GroupOrderRow = {
@@ -250,6 +257,7 @@ async function notifyCustomerGroupOrder(
     .from('orders')
     .select('id, buyer_id, order_number, order_total, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('checkout_group_id', groupId)
+    .in('id', orderIdsInScope)
   const orders = (ordersData as GroupOrderRow[] | null) ?? []
   if (orders.length === 0) return
 
@@ -306,6 +314,110 @@ async function notifyCustomerGroupOrder(
   }))
 
   await sendOrderConfirmationEmail({ to: [customerEmail], orders: lines, shipping })
+}
+
+// ── Late payment (order no longer pending) ────────────────────────────────────
+// A Stripe payment can complete after the order was cancelled (reservation
+// expired, session expired, offer window closed). The stone may already be
+// released, so we refund instead of confirming.
+
+// Statuses that mean the order was already paid for — never refund these.
+const PAID_STATUSES = ['confirmed', 'shipped', 'received', 'paid']
+
+function isLateStatus(status: string): boolean {
+  return status !== 'pending_payment' && !PAID_STATUSES.includes(status)
+}
+
+function paymentIntentId(session: Stripe.Checkout.Session): string | null {
+  const pi = session.payment_intent
+  if (!pi) return null
+  return typeof pi === 'string' ? pi : pi.id
+}
+
+// Refunds one order's share of the payment. Returns false if a late refund for
+// this order already exists (duplicate delivery). Double-guarded: the Stripe
+// idempotency key covers retries within 24h; the metadata lookup covers
+// redeliveries after the key has expired.
+async function refundLateOrder(
+  paymentIntent: string,
+  orderId: string,
+  amountCents?: number,   // omitted = full refund
+): Promise<boolean> {
+  const existing = await stripe.refunds.list({ payment_intent: paymentIntent, limit: 100 })
+  if (existing.data.some(r => r.metadata?.order_id === orderId && r.metadata?.reason === 'late_payment')) {
+    return false
+  }
+  await stripe.refunds.create(
+    {
+      payment_intent: paymentIntent,
+      ...(amountCents !== undefined ? { amount: amountCents } : {}),
+      metadata: { order_id: orderId, reason: 'late_payment' },
+    },
+    { idempotencyKey: `refund-late-${orderId}` },
+  )
+  return true
+}
+
+// Order number / title / total for the refund emails.
+async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<RefundedOrderLine[]> {
+  const { data: ordersData } = await admin
+    .from('orders').select('id, order_number, order_total').in('id', orderIds)
+  const orders = (ordersData as { id: string; order_number: string; order_total: string | number }[] | null) ?? []
+
+  const { data: itemsData } = await admin
+    .from('order_items').select('order_id, inventory_item_id').in('order_id', orderIds)
+  const items = (itemsData as { order_id: string; inventory_item_id: string }[] | null) ?? []
+  const invIds = [...new Set(items.map(i => i.inventory_item_id))]
+  const { data: invData } = await admin
+    .from('inventory_items').select('id, title').in('id', invIds)
+  const invMap = new Map(((invData as { id: string; title: string }[] | null) ?? []).map(i => [i.id, i.title]))
+  const titleMap = new Map<string, string>()
+  for (const it of items) {
+    if (!titleMap.has(it.order_id)) titleMap.set(it.order_id, invMap.get(it.inventory_item_id) ?? 'Stone')
+  }
+
+  return orderIds.map(id => {
+    const o = orders.find(x => x.id === id)
+    return {
+      orderId:     id,
+      orderNumber: o?.order_number ?? id,
+      itemTitle:   titleMap.get(id) ?? 'Stone',
+      orderTotal:  Number(o?.order_total ?? 0),
+    }
+  })
+}
+
+// Owner + buyer notices. Best-effort — each send is isolated.
+async function notifyLatePayment(
+  admin: AdminClient,
+  orderIds: string[],
+  refundedTotal: number,
+  buyerEmail: string | null,
+  sessionId: string,
+  paymentIntent: string,
+): Promise<void> {
+  const lines = await loadRefundedLines(admin, orderIds)
+  const ownerEmail = process.env.OWNER_EMAIL?.trim() ?? ''
+
+  if (ownerEmail) {
+    try {
+      await sendLatePaymentOwnerEmail({ to: ownerEmail, orders: lines, refundedTotal, buyerEmail, sessionId, paymentIntent })
+    } catch (e) {
+      console.error('[webhook] late-payment owner email failed for', orderIds, ':', e instanceof Error ? e.message : String(e))
+    }
+  } else {
+    console.error('[webhook] late-payment owner email: OWNER_EMAIL not set')
+  }
+
+  if (buyerEmail) {
+    try {
+      await sendLatePaymentBuyerEmail({ to: buyerEmail, orders: lines, refundedTotal })
+    } catch (e) {
+      console.error('[webhook] late-payment buyer email failed for', orderIds, ':', e instanceof Error ? e.message : String(e))
+    }
+  } else {
+    console.error('[webhook] late-payment buyer email: no customer email on session', sessionId)
+  }
 }
 
 // ── Webhook handler ────────────────────────────────────────────────────────────
@@ -376,13 +488,73 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
       }
 
-      // Persist address to every order in the group. Non-fatal if it fails —
+      // confirm_order_group swallows per-order failures, so re-read the group
+      // to see which orders actually got confirmed.
+      const { data: groupData, error: groupErr } = await supabase
+        .from('orders')
+        .select('id, status, order_total')
+        .eq('checkout_group_id', groupId)
+      if (groupErr) {
+        console.error('[webhook] re-read of group', groupId, 'failed:', groupErr.message)
+        return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+      }
+      const groupOrders = (groupData as { id: string; status: string; order_total: string | number }[] | null) ?? []
+
+      // Still pending = confirm failed for an unexpected reason. Retry the
+      // whole event (confirm is idempotent; nothing has been sent yet).
+      const stillPending = groupOrders.filter(o => o.status === 'pending_payment')
+      if (stillPending.length > 0) {
+        console.error('[webhook] confirm_order_group left orders pending in group', groupId, ':', stillPending.map(o => o.id))
+        return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+      }
+
+      const paidIds    = groupOrders.filter(o => PAID_STATUSES.includes(o.status)).map(o => o.id)
+      const lateOrders = groupOrders.filter(o => isLateStatus(o.status))
+
+      // Refund late orders first: if a refund fails we return 500 before any
+      // address write or email, so the retry doesn't duplicate them.
+      if (lateOrders.length > 0) {
+        const pi = paymentIntentId(session)
+        if (!pi) {
+          console.error('[webhook] late payment in group', groupId, 'but session has no payment_intent — cannot refund')
+          return NextResponse.json({ error: 'Refund failed' }, { status: 500 })
+        }
+        const newlyRefunded: string[] = []
+        let refundedTotal = 0
+        for (const o of lateOrders) {
+          try {
+            const created = await refundLateOrder(pi, o.id, Math.round(Number(o.order_total) * 100))
+            if (created) {
+              newlyRefunded.push(o.id)
+              refundedTotal += Number(o.order_total)
+            }
+          } catch (e) {
+            console.error('[webhook] late-payment refund failed for order', o.id, 'in group', groupId, ':', e instanceof Error ? e.message : String(e))
+            return NextResponse.json({ error: 'Refund failed' }, { status: 500 })
+          }
+        }
+        console.error('[webhook] late payment in group', groupId, '— refunded orders:', newlyRefunded, '— already refunded:', lateOrders.length - newlyRefunded.length)
+        if (newlyRefunded.length > 0) {
+          try {
+            await notifyLatePayment(supabase, newlyRefunded, refundedTotal, custEmail, session.id, pi)
+          } catch (e) {
+            console.error('[webhook] late-payment emails threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
+          }
+        }
+      }
+
+      if (paidIds.length === 0) {
+        return NextResponse.json({ received: true })
+      }
+
+      // Persist address to the confirmed orders only. Non-fatal if it fails —
       // payment and confirmation already succeeded; don't cause Stripe to retry.
       try {
         const { data: updated, error: addrErr } = await supabase
           .from('orders')
           .update(shippingData)
           .eq('checkout_group_id', groupId)
+          .in('id', paidIds)
           .select('id')
         if (addrErr) {
           console.error('[webhook] address update failed for group', groupId, ':', addrErr.message)
@@ -395,14 +567,14 @@ export async function POST(req: NextRequest) {
 
       // Send new-order notification emails — best-effort, never fails the webhook.
       try {
-        await notifyGroupOrders(supabase, groupId)
+        await notifyGroupOrders(supabase, groupId, paidIds)
       } catch (e) {
         console.error('[webhook] email notification threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
       }
 
       // Customer order confirmation email — best-effort.
       try {
-        await notifyCustomerGroupOrder(supabase, groupId, custEmail)
+        await notifyCustomerGroupOrder(supabase, groupId, paidIds, custEmail)
       } catch (e) {
         console.error('[webhook] customer confirmation email threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
       }
@@ -421,8 +593,40 @@ export async function POST(req: NextRequest) {
           // Order already confirmed — idempotent duplicate delivery, safe to ack.
           console.error('[webhook] confirm_order_paid: order already confirmed (dup delivery), acking', orderId)
         } else {
-          console.error('[webhook] confirm_order_paid failed for order', orderId, ':', error.message)
-          return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+          // Late payment? Check the order's current status rather than parsing
+          // the error text (also rules out transient errors on a pending order).
+          const { data: stData } = await supabase
+            .from('orders').select('status').eq('id', orderId).maybeSingle()
+          const status = (stData as { status: string } | null)?.status
+
+          if (!status || !isLateStatus(status)) {
+            console.error('[webhook] confirm_order_paid failed for order', orderId, ':', error.message)
+            return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
+          }
+
+          // Paid, but the order is no longer pending (e.g. cancelled) — refund
+          // in full. No address write, no normal order emails.
+          const pi = paymentIntentId(session)
+          if (!pi) {
+            console.error('[webhook] late payment for order', orderId, `(status '${status}') but session has no payment_intent — cannot refund`)
+            return NextResponse.json({ error: 'Refund failed' }, { status: 500 })
+          }
+          let created: boolean
+          try {
+            created = await refundLateOrder(pi, orderId)
+          } catch (e) {
+            console.error('[webhook] late-payment refund failed for order', orderId, ':', e instanceof Error ? e.message : String(e))
+            return NextResponse.json({ error: 'Refund failed' }, { status: 500 })
+          }
+          console.error('[webhook] late payment for order', orderId, `(status '${status}') —`, created ? 'refunded in full' : 'already refunded (dup delivery)')
+          if (created) {
+            try {
+              await notifyLatePayment(supabase, [orderId], (session.amount_total ?? 0) / 100, custEmail, session.id, pi)
+            } catch (e) {
+              console.error('[webhook] late-payment emails threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
+            }
+          }
+          return NextResponse.json({ received: true })
         }
       }
 
