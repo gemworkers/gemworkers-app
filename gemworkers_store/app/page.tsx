@@ -38,7 +38,7 @@ const PROMISES = [
   { title: 'Certificate promise',
     body: 'If an independent lab disagrees with our description, you get a full refund, lab fee included.' },
   { title: 'Generations of knowledge',
-    body: 'A family rooted in the gem valleys of Kunar, trading stones for over thirty years.' },
+    body: 'A family in the gem trade for over thirty years, sourcing from mines around the world.' },
 ]
 
 function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel: string; href: string }) {
@@ -80,7 +80,7 @@ export default async function HomePage() {
       {/* ── 1. Hero ── */}
       <section className="home-wrap home-hero">
         <div>
-          <p className="home-eyebrow">From Kunar to your hands</p>
+          <p className="home-eyebrow">From the mine to your hands</p>
           <h1 className="font-serif home-h1">
             Natural gemstones, chosen by a family of gem traders.
           </h1>
@@ -154,8 +154,8 @@ export default async function HomePage() {
             A family story, generations deep.
           </h2>
           <p className="home-lead" style={{ marginBottom: 28 }}>
-            From the mountains of Kunar to a small circle of trusted cutters in Pakistan,
-            Thailand and the Netherlands. Every piece is chosen by hand.
+            From the mines of Afghanistan and Pakistan to trusted partners in Thailand, Africa,
+            the Americas and Europe. Every piece is chosen by hand.
           </p>
           <Link href="/about" className="home-text-link">Read our story →</Link>
         </div>

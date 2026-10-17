@@ -28,8 +28,9 @@ export default function FaqPage() {
 
       <h3>Where do your stones come from?</h3>
       <p>
-        We work with a small circle of experienced gem cutters and specialists in Thailand,
-        Pakistan and the Netherlands. Each product page shows where the piece ships from.
+        From mines around the world, including Afghanistan, Pakistan, Africa and the Americas,
+        often via trusted partners in Thailand. Each product page shows the stone&apos;s origin
+        and where it ships from.
       </p>
 
       <h3>How long does shipping take?</h3>

@@ -6,20 +6,20 @@ export default function AboutPage() {
     <ContentPage eyebrow="About" title="Our Story">
       <p>GemWorkers is a family story, generations deep.</p>
       <p>
-        It begins in the mountains of Kunar, in eastern Afghanistan, a region prized by
-        collectors for its kunzite, tourmaline and aquamarine. Our founder Zakaria's family
-        has worked with these stones for generations, as have many families in the valley.
-        More than thirty years ago, his father and uncles began trading gemstones themselves.
+        It began in Kunar, in eastern Afghanistan, where Zakaria&apos;s family has worked with
+        gemstones for generations. More than thirty years ago, his father and uncles began
+        trading gemstones themselves.
       </p>
       <p>
         Zakaria grew up in that world. In 2015 he began selling gemstones across Afghanistan
-        and Pakistan, and after moving to the Netherlands he founded GemWorkers to bring the
-        stones he knows so well to collectors and jewelry lovers around the world.
+        and Pakistan, and after moving to the Netherlands he founded GemWorkers to bring
+        fine gemstones to collectors and jewelry lovers around the world.
       </p>
       <p>
-        Today we work with a small circle of trusted gem cutters and specialists in Pakistan,
-        Thailand and the Netherlands, many of them family. Every piece is chosen by hand,
-        described honestly, and shipped with care.
+        Today we source from mines across Afghanistan and Pakistan, through trusted partners
+        in Thailand, and from Africa, the Americas and Europe. We work with a small circle of
+        experienced cutters and specialists, many of them family. Every piece is chosen by
+        hand, described honestly, and shipped with care.
       </p>
       <p>
         Our promise is simple: natural stones, honest descriptions, and the kind of knowledge
@@ -38,7 +38,7 @@ export default function AboutPage() {
         {[
           { label: 'Founded', value: '2015' },
           { label: 'Makers',  value: '5+' },
-          { label: 'Roots',   value: 'Kunar' },
+          { label: 'Sourced', value: 'Worldwide' },
         ].map(stat => (
           <div key={stat.label}>
             <p style={{
