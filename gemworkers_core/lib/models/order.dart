@@ -1,3 +1,5 @@
+import '../core/utils/commission.dart';
+
 class OrderItem {
   final String? id;
   final String? orderId;
@@ -221,11 +223,11 @@ class Order {
           ? DateTime.parse(map['created_at'])
           : null,
       saleChannel: map['sale_channel']?.toString() ?? 'manual',
-      commissionRate:   (map['commission_rate']   as num?)?.toDouble() ?? 0,
-      commissionAmount: (map['commission_amount'] as num?)?.toDouble() ?? 0,
-      sellerPayout:     (map['seller_payout']     as num?)?.toDouble() ?? 0,
-      orderTotal:       (map['order_total']        as num?)?.toDouble() ?? 0,
-      shippingCost:     (map['shipping_cost']      as num?)?.toDouble(),
+      commissionRate:   parseNumeric(map['commission_rate']) ?? 0,
+      commissionAmount: parseNumeric(map['commission_amount']) ?? 0,
+      sellerPayout:     parseNumeric(map['seller_payout']) ?? 0,
+      orderTotal:       parseNumeric(map['order_total']) ?? 0,
+      shippingCost:     parseNumeric(map['shipping_cost']),
       trackingNumber: map['tracking_number']?.toString(),
       shippedAt: map['shipped_at'] != null
           ? DateTime.parse(map['shipped_at'])

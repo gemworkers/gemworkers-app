@@ -11,6 +11,7 @@ import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
 import 'widgets/origin_country_field.dart';
+import 'widgets/price_field.dart';
 
 class EditInventoryPage extends StatefulWidget {
   final InventoryItem item;
@@ -34,7 +35,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late final TextEditingController _weightValue;
   late final TextEditingController _quantity;
   late final TextEditingController _costPrice;
-  late final TextEditingController _salePrice;
+  late final TextEditingController _sellingPrice;
   late final TextEditingController _barcode;
   late final TextEditingController _notes;
 
@@ -124,7 +125,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _weightValue = TextEditingController(text: i.weightValue.toString());
     _quantity = TextEditingController(text: i.quantity.toString());
     _costPrice = TextEditingController(text: i.costPrice.toString());
-    _salePrice = TextEditingController(text: i.salePrice.toString());
+    _sellingPrice = TextEditingController(
+        text: i.sellingPrice != null && i.sellingPrice! > 0
+            ? i.sellingPrice!.toStringAsFixed(2)
+            : '');
     _barcode = TextEditingController(text: i.barcode);
     _notes = TextEditingController(text: i.notes);
     _weightUnit = i.weightUnit;
@@ -171,7 +175,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   void dispose() {
     for (final c in [
       _title, _gemType, _variety, _originCountry, _originRegion,
-      _weightValue, _quantity, _costPrice, _salePrice,
+      _weightValue, _quantity, _costPrice, _sellingPrice,
       _barcode, _notes,
       _shapeOther, _cutTypeOther,
       _description, _certificationLab, _certificationNumber, _treatment,
@@ -200,6 +204,15 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
   String? _validate() {
     if (_title.text.trim().isEmpty) return 'Title is required.';
+    final priceText = _sellingPrice.text.trim();
+    if (priceText.isNotEmpty && parsePrice(priceText) == null) {
+      return 'Price must be a number.';
+    }
+    if (widget.item.isListed &&
+        widget.item.saleMethod != 'accept_offers' &&
+        (parsePrice(priceText) ?? 0) <= 0) {
+      return 'A listed item needs a price — or unlist it first.';
+    }
     if (_productType == 'loose_stone' &&
         double.tryParse(_weightValue.text) == null) {
       return 'Weight must be a number.';
@@ -216,9 +229,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     }
     if (double.tryParse(_costPrice.text) == null) {
       return 'Cost price must be a number.';
-    }
-    if (double.tryParse(_salePrice.text) == null) {
-      return 'Sale price must be a number.';
     }
     if (int.tryParse(_quantity.text) == null) {
       return 'Quantity must be a whole number.';
@@ -292,7 +302,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         weightUnit: isLooseStone ? _weightUnit : widget.item.weightUnit,
         quantity: int.parse(_quantity.text),
         costPrice: double.parse(_costPrice.text),
-        salePrice: double.parse(_salePrice.text),
+        salePrice: widget.item.salePrice, // legacy column — no longer edited
         barcode: _barcode.text.trim(),
         qrCode: widget.item.qrCode,
         status: _status,
@@ -302,7 +312,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         supplierName: supplierName,
         locationId: _locationId,
         isListed: widget.item.isListed,
-        sellingPrice: widget.item.sellingPrice,
+        sellingPrice: switch (parsePrice(_sellingPrice.text)) {
+          final p? when p > 0 => p,
+          _ => null,
+        },
         listedAt: widget.item.listedAt,
         createdAt: widget.item.createdAt,
         productType: _productType,
@@ -562,6 +575,13 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           ReadOnlyFormField('SKU', widget.item.sku),
           FormTextField('Title *', _title),
 
+          const FormSection('Price'),
+          PriceField(
+            controller: _sellingPrice,
+            sellerId: widget.item.sellerId ?? svc.effectiveSellerId,
+            enabled: !_saving,
+          ),
+
           ..._buildTypeSpecificFields(),
 
           const FormSection('Description & Certification'),
@@ -570,9 +590,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Certification Number', _certificationNumber),
           FormTextField('Treatment', _treatment),
 
-          const FormSection('Pricing'),
+          const FormSection('Private — only you see this'),
           FormTextField('Cost Price *', _costPrice, keyboardType: TextInputType.number),
-          FormTextField('Sale Price *', _salePrice, keyboardType: TextInputType.number),
 
           const FormSection('Supplier'),
           _buildSupplierPicker(),

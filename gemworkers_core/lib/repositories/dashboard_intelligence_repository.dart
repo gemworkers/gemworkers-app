@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/utils/commission.dart';
+
 // ── Enums & data classes ──────────────────────────────────────────────────────
 
 enum DashboardTimeRange { thisMonth, vsLastMonth, last12Months, allTime }
@@ -204,7 +206,7 @@ class DashboardIntelligenceRepository {
         title: row['title']?.toString() ?? '',
         sku: row['sku']?.toString() ?? '',
         daysInStock: now.difference(createdAt).inDays,
-        costPrice: (row['cost_price'] as num?)?.toDouble() ?? 0,
+        costPrice: parseNumeric(row['cost_price']) ?? 0,
         isListed: (row['is_listed'] as bool?) ?? false,
       );
     }).toList()
@@ -212,7 +214,7 @@ class DashboardIntelligenceRepository {
 
     // ── Customers ─────────────────────────────────────────────────────────────
     final customers = customersRaw.map((row) {
-      final spent = (row['total_spent'] as num?)?.toDouble() ?? 0;
+      final spent = parseNumeric(row['total_spent']) ?? 0;
       return CustomerRanking(
         name: row['name']?.toString() ?? '',
         totalSpent: spent,
@@ -292,12 +294,12 @@ class DashboardIntelligenceRepository {
   ProfitPeriod _computeProfit(List<Map<String, dynamic>> orders) {
     double revenue = 0, cost = 0, commission = 0;
     for (final order in orders) {
-      commission += (order['commission_amount'] as num?)?.toDouble() ?? 0;
+      commission += parseNumeric(order['commission_amount']) ?? 0;
       for (final item in (order['order_items'] as List? ?? [])) {
         final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-        revenue += ((item['price_at_sale'] as num?)?.toDouble() ?? 0) * qty;
+        revenue += (parseNumeric(item['price_at_sale']) ?? 0) * qty;
         final inv = item['inventory_items'] as Map<String, dynamic>?;
-        cost += ((inv?['cost_price'] as num?)?.toDouble() ?? 0) * qty;
+        cost += (parseNumeric(inv?['cost_price']) ?? 0) * qty;
       }
     }
     return ProfitPeriod(revenue: revenue, cost: cost, commission: commission);
@@ -312,9 +314,9 @@ class DashboardIntelligenceRepository {
       double rev = 0, cst = 0;
       for (final item in (order['order_items'] as List? ?? [])) {
         final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-        rev += ((item['price_at_sale'] as num?)?.toDouble() ?? 0) * qty;
+        rev += (parseNumeric(item['price_at_sale']) ?? 0) * qty;
         final inv = item['inventory_items'] as Map<String, dynamic>?;
-        cst += ((inv?['cost_price'] as num?)?.toDouble() ?? 0) * qty;
+        cst += (parseNumeric(inv?['cost_price']) ?? 0) * qty;
       }
       final e = map[key];
       map[key] = e == null
@@ -345,8 +347,8 @@ class DashboardIntelligenceRepository {
             (inv['suppliers'] as Map<String, dynamic>?)?['name']?.toString() ??
                 'Unknown';
         final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-        final sale = (item['price_at_sale'] as num?)?.toDouble() ?? 0;
-        final cost = (inv['cost_price'] as num?)?.toDouble() ?? 0;
+        final sale = parseNumeric(item['price_at_sale']) ?? 0;
+        final cost = parseNumeric(inv['cost_price']) ?? 0;
         final profit = (sale - cost) * qty;
         final e = map[supplierId];
         map[supplierId] = e == null
@@ -373,12 +375,12 @@ class DashboardIntelligenceRepository {
     for (final order in orders) {
       final sid = order['seller_id']?.toString();
       if (sid == null) continue;
-      final comm = (order['commission_amount'] as num?)?.toDouble() ?? 0;
+      final comm = parseNumeric(order['commission_amount']) ?? 0;
       int count = 0;
       double rev = 0;
       for (final item in (order['order_items'] as List? ?? [])) {
         final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-        rev += ((item['price_at_sale'] as num?)?.toDouble() ?? 0) * qty;
+        rev += (parseNumeric(item['price_at_sale']) ?? 0) * qty;
         count += qty;
       }
       final e = map[sid];

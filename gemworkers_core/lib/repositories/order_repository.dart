@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/services/user_profile_service.dart';
+import '../core/utils/commission.dart';
 import '../models/order.dart';
 
 class OrderRepository {
@@ -36,6 +37,47 @@ class OrderRepository {
     if (statuses != null) query = query.inFilter('status', statuses);
     final response = await query.order('created_at', ascending: false);
     return response.map<Order>((row) => Order.fromMap(row)).toList();
+  }
+
+  /// The actual sale of an inventory item: its line in the most recent
+  /// non-cancelled order. Null if the item was never sold through an order.
+  ///
+  /// [received] = order seller_payout when the item is the order's only line;
+  /// otherwise the item's price minus its share of commission
+  /// (ROUND(price × order commission_rate, 2)).
+  Future<({String orderNumber, double soldFor, double received})?>
+      getItemSale(String inventoryItemId) async {
+    final rows = await supabase
+        .from('order_items')
+        .select('price_at_sale, quantity, '
+            'orders!inner(order_number, status, created_at, commission_rate, '
+            'commission_amount, seller_payout, order_items(id))')
+        .eq('inventory_item_id', inventoryItemId)
+        .neq('orders.status', 'cancelled');
+    if (rows.isEmpty) return null;
+
+    rows.sort((a, b) => (b['orders']['created_at']?.toString() ?? '')
+        .compareTo(a['orders']['created_at']?.toString() ?? ''));
+    final line = rows.first;
+    final order = line['orders'] as Map<String, dynamic>;
+    final qty = (parseNumeric(line['quantity']) ?? 1).toInt();
+    final soldFor = (parseNumeric(line['price_at_sale']) ?? 0) * qty;
+    final lineCount = (order['order_items'] as List?)?.length ?? 1;
+
+    final double received;
+    if (lineCount <= 1 && order['seller_payout'] != null) {
+      received = parseNumeric(order['seller_payout']) ?? soldFor;
+    } else if (lineCount <= 1) {
+      received = soldFor - (parseNumeric(order['commission_amount']) ?? 0);
+    } else {
+      final rate = parseCommissionRate(order['commission_rate']) ?? 0;
+      received = soldFor - commissionFee(soldFor, rate);
+    }
+    return (
+      orderNumber: order['order_number']?.toString() ?? '',
+      soldFor: soldFor,
+      received: received,
+    );
   }
 
   /// Order count per status. Pass [sellerId] to scope to a single seller.

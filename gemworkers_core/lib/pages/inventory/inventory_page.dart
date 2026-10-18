@@ -138,7 +138,7 @@ class _InventoryPageState extends State<InventoryPage>
           _allLocations = locs;
           if (!_priceRangeInitialized && items.isNotEmpty) {
             final max =
-                items.map((e) => e.salePrice).reduce((a, b) => a > b ? a : b);
+                items.map((e) => e.sellingPrice ?? 0).reduce((a, b) => a > b ? a : b);
             _maxPrice = max < 1 ? 10000 : max;
             _priceRange = RangeValues(0, _maxPrice);
             _priceRangeInitialized = true;
@@ -402,8 +402,8 @@ class _InventoryPageState extends State<InventoryPage>
           return false;
         }
       }
-      if (item.salePrice < _priceRange.start ||
-          item.salePrice > _priceRange.end) {
+      if ((item.sellingPrice ?? 0) < _priceRange.start ||
+          (item.sellingPrice ?? 0) > _priceRange.end) {
         return false;
       }
       return true;
@@ -422,9 +422,11 @@ class _InventoryPageState extends State<InventoryPage>
       case _SortOrder.nameAZ:
         sorted.sort((a, b) => a.title.compareTo(b.title));
       case _SortOrder.priceLow:
-        sorted.sort((a, b) => a.salePrice.compareTo(b.salePrice));
+        sorted.sort((a, b) =>
+            (a.sellingPrice ?? 0).compareTo(b.sellingPrice ?? 0));
       case _SortOrder.priceHigh:
-        sorted.sort((a, b) => b.salePrice.compareTo(a.salePrice));
+        sorted.sort((a, b) =>
+            (b.sellingPrice ?? 0).compareTo(a.sellingPrice ?? 0));
     }
     return sorted;
   }
@@ -1139,8 +1141,9 @@ class _ListingRow extends StatelessWidget {
         item.originCountry,
       ].where((s) => s.isNotEmpty).join(' · ');
 
-  bool get _hasListedPrice => item.isListed && item.sellingPrice != null;
-  double get _price => _hasListedPrice ? item.sellingPrice! : item.costPrice;
+  /// Buyer price only — cost is private and never shown in the list.
+  double? get _price =>
+      (item.sellingPrice ?? 0) > 0 ? item.sellingPrice : null;
 
   @override
   Widget build(BuildContext context) {
@@ -1207,18 +1210,12 @@ class _ListingRow extends StatelessWidget {
       ],
     );
 
-    final priceBlock = Column(
-      crossAxisAlignment:
-          wide ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('€${_price.toStringAsFixed(2)}',
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-        if (!_hasListedPrice)
-          Text('cost',
-              style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
-      ],
-    );
+    final price = _price;
+    final priceBlock = price != null
+        ? Text('€${price.toStringAsFixed(2)}',
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600))
+        : Text('No price yet',
+            style: textTheme.bodySmall?.copyWith(color: AppColors.muted));
 
     final moreMenu = PopupMenuButton<_RowAction>(
       tooltip: 'More actions',

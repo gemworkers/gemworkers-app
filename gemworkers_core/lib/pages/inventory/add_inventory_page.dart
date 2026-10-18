@@ -10,6 +10,7 @@ import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
 import 'widgets/origin_country_field.dart';
+import 'widgets/price_field.dart';
 import 'listing_sheet.dart';
 
 class AddInventoryPage extends StatefulWidget {
@@ -35,6 +36,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final _weightValue = TextEditingController();
   final _quantity = TextEditingController(text: '1');
   final _costPrice = TextEditingController();
+  final _sellingPrice = TextEditingController();
   final _barcode = TextEditingController();
   final _notes = TextEditingController();
 
@@ -125,7 +127,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   void dispose() {
     for (final c in [
       _title, _gemType, _variety, _originCountry, _originRegion,
-      _weightValue, _quantity, _costPrice,
+      _weightValue, _quantity, _costPrice, _sellingPrice,
       _barcode, _notes,
       _shapeOther, _cutTypeOther,
       _description, _certificationLab, _certificationNumber, _treatment,
@@ -157,6 +159,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
   String? _validate() {
     if (_title.text.trim().isEmpty) return 'Title is required.';
+    if (_sellingPrice.text.trim().isNotEmpty &&
+        parsePrice(_sellingPrice.text) == null) {
+      return 'Price must be a number.';
+    }
     if (widget.productType == 'loose_stone' &&
         _weightValue.text.isNotEmpty &&
         double.tryParse(_weightValue.text) == null) {
@@ -245,7 +251,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         supplierName: supplierName,
         locationId: _locationId,
         isListed: false,
-        sellingPrice: null,
+        sellingPrice: switch (parsePrice(_sellingPrice.text)) {
+          final p? when p > 0 => p,
+          _ => null,
+        },
         listedAt: null,
         productType: widget.productType,
         certificationLab: _orNull(_certificationLab),
@@ -537,6 +546,12 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               ),
               FormTextField('Title *', _title),
 
+              const FormSection('Price'),
+              PriceField(
+                controller: _sellingPrice,
+                sellerId: svc.effectiveSellerId,
+              ),
+
               ..._buildTypeSpecificFields(),
 
               const FormSection('Description & Certification'),
@@ -545,7 +560,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               FormTextField('Certification Number', _certificationNumber),
               FormTextField('Treatment', _treatment),
 
-              const FormSection('Pricing'),
+              const FormSection('Private — only you see this'),
               FormTextField(
                 'Cost Price',
                 _costPrice,

@@ -1,3 +1,5 @@
+import '../core/utils/commission.dart';
+
 class _Omitted {
   const _Omitted();
 }
@@ -60,10 +62,10 @@ class Seller {
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
       notes: map['notes'] ?? '',
-      commissionRate: (map['commission_rate'] as num?)?.toDouble(),
-      userFee: (map['user_fee'] as num?)?.toDouble(),
+      commissionRate: parseCommissionRate(map['commission_rate']),
+      userFee: parseNumeric(map['user_fee']),
       userFeePeriod: map['user_fee_period']?.toString(),
-      startingFee: (map['starting_fee'] as num?)?.toDouble(),
+      startingFee: parseNumeric(map['starting_fee']),
       joinedDate: map['joined_date'] != null
           ? DateTime.parse(map['joined_date'].toString())
           : null,

@@ -176,8 +176,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return items.fold(0.0, (sum, e) => sum + (e.sellingPrice ?? 0));
   }
 
-  double get _totalValue =>
-      _filteredItems.fold(0.0, (sum, e) => sum + e.salePrice);
+  // Active listings only (listed + available) — same as "listed value" on
+  // Listings.
+  double get _totalValue => _filteredItems
+      .where((e) => e.isListed && e.status == 'available')
+      .fold(0.0, (sum, e) => sum + (e.sellingPrice ?? 0));
 
   List<InventoryItem> get _recentItems => _filteredItems.take(5).toList();
 
@@ -513,7 +516,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '€${item.salePrice.toStringAsFixed(2)}',
+                        item.sellingPrice != null
+                            ? '€${item.sellingPrice!.toStringAsFixed(2)}'
+                            : 'No price yet',
                         style:
                             const TextStyle(fontWeight: FontWeight.w600),
                       ),

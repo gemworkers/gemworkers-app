@@ -31,17 +31,21 @@ class SellEngineService {
   /// Records a manual sale.
   ///
   /// [items]           List of inventory item IDs + agreed sale prices.
-  /// [commissionRate]  Decimal fraction (e.g. 0.10 = 10 %).
+  /// [commissionRate]  Decimal fraction (e.g. 0.01 = 1 %); 0 = no commission.
+  /// [sellerId]        Seller the order belongs to — pass the items' seller
+  ///                  when they all share one; null = logged-in seller.
   /// [buyerName/Email/Phone]  All optional; if email or phone provided the
   ///                  engine finds-or-creates a customer and updates their stats.
   Future<SaleResult> recordSale({
     required List<({String inventoryItemId, double priceAtSale})> items,
     required double commissionRate,
+    String? sellerId,
     String? buyerName,
     String? buyerEmail,
     String? buyerPhone,
   }) async {
-    final sellerId = UserProfileService.instance.effectiveSellerId;
+    final orderSellerId =
+        sellerId ?? UserProfileService.instance.effectiveSellerId;
 
     // ── 1. Compute financials ──────────────────────────────────────────────
     final orderTotal = items.fold(0.0, (s, i) => s + i.priceAtSale);
@@ -55,7 +59,7 @@ class SellEngineService {
       status: 'paid',
       orderDate: DateTime.now(),
       notes: '',
-      sellerId: sellerId,
+      sellerId: orderSellerId,
       saleChannel: 'manual',
       commissionRate: commissionRate,
       commissionAmount: commissionAmount,

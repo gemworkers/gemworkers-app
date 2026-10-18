@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../core/services/sell_engine_service.dart';
 import '../../core/services/user_profile_service.dart';
+import '../../core/utils/commission.dart';
 import '../../models/inventory_item.dart';
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -40,7 +39,9 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  double _commissionRate = 0.10;
+  double _commissionRate = kDefaultCommissionRate;
+  CommissionRateSource _rateSource = CommissionRateSource.seller;
+  bool _mixedSellers = false;
   bool _loadingRate = true;
   bool _saving = false;
   bool _showBuyer = false;
@@ -50,7 +51,7 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
     super.initState();
     _priceControllers = widget.items.map((item) {
       final price =
-          item.sellingPrice ?? (item.salePrice > 0 ? item.salePrice : item.costPrice);
+          item.sellingPrice ?? item.costPrice;
       return TextEditingController(text: price.toStringAsFixed(2));
     }).toList();
     _loadCommissionRate();
@@ -67,23 +68,28 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
     super.dispose();
   }
 
+  /// The items' seller when they all share one; null → the order falls back
+  /// to the logged-in seller (no seller on the items, or mixed sellers).
+  String? get _itemsSellerId {
+    final ids = widget.items.map((i) => i.sellerId).whereType<String>().toSet();
+    return ids.length == 1 ? ids.first : null;
+  }
+
+  /// Rate of the seller the order will belong to, so commission and order
+  /// attribution always match.
   Future<void> _loadCommissionRate() async {
-    final sellerId = UserProfileService.instance.effectiveSellerId;
-    try {
-      final row = await Supabase.instance.client
-          .from('sellers')
-          .select('commission_rate')
-          .eq('id', sellerId)
-          .maybeSingle();
-      final rate = (row?['commission_rate'] as num?)?.toDouble();
-      if (mounted) {
-        setState(() {
-          if (rate != null) _commissionRate = rate;
-          _loadingRate = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingRate = false);
+    final itemSellers =
+        widget.items.map((i) => i.sellerId).whereType<String>().toSet();
+    final sellerId =
+        _itemsSellerId ?? UserProfileService.instance.effectiveSellerId;
+    final r = await loadSellerCommissionRate(sellerId);
+    if (mounted) {
+      setState(() {
+        _commissionRate = r.rate;
+        _rateSource = r.source;
+        _mixedSellers = itemSellers.length > 1;
+        _loadingRate = false;
+      });
     }
   }
 
@@ -115,6 +121,7 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
       final result = await SellEngineService().recordSale(
         items: saleItems,
         commissionRate: _commissionRate,
+        sellerId: _itemsSellerId,
         buyerName:  _nameController.text.trim().isEmpty  ? null : _nameController.text.trim(),
         buyerEmail: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         buyerPhone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
@@ -237,10 +244,21 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
                 ),
                 if (!_loadingRate) ...[
                   _SummaryRow(
-                    label:
-                        'Commission (${(_commissionRate * 100).toStringAsFixed(0)}%)',
+                    label: 'Commission (${commissionLabel(_commissionRate)})',
                     value: '−€${_commissionAmount.toStringAsFixed(2)}',
                   ),
+                  if (_mixedSellers || commissionRateNote(_rateSource) != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        _mixedSellers
+                            ? 'Items belong to different sellers — the order '
+                                "and commission use your own seller."
+                            : commissionRateNote(_rateSource)!,
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ),
                   _SummaryRow(
                     label: 'Seller payout',
                     value: '€${_sellerPayout.toStringAsFixed(2)}',

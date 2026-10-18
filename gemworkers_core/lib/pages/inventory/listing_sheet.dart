@@ -4,9 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/inventory_item.dart';
 import '../../repositories/inventory_repository.dart';
-import '../../repositories/seller_repository.dart';
-
-const _kDefaultCommission = 0.10;
+import 'widgets/price_field.dart';
 
 /// Returned by [showListingSheet] when the user takes an action.
 class ListingResult {
@@ -46,7 +44,7 @@ class _ListingSheet extends StatefulWidget {
 }
 
 class _ListingSheetState extends State<_ListingSheet> {
-  final _payoutCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
   final _courierCtrl = TextEditingController();
   final _shippingCostCtrl = TextEditingController();
   final _deliveryMinCtrl = TextEditingController();
@@ -55,6 +53,7 @@ class _ListingSheetState extends State<_ListingSheet> {
   final _videoUrlCtrl = TextEditingController();
 
   double? _commissionRate; // null = still loading
+  CommissionRateSource _rateSource = CommissionRateSource.seller;
   bool _saving = false;
   late String _saleMethod;
   String? _shippingMode; // null = seller has not yet chosen
@@ -63,9 +62,11 @@ class _ListingSheetState extends State<_ListingSheet> {
   void initState() {
     super.initState();
     _saleMethod = widget.item.saleMethod;
-    // Pre-fill is deferred to _loadCommissionRate so we can reverse-compute
-    // payout from selling_price using the actual per-seller rate.
-    _payoutCtrl.addListener(() => setState(() {}));
+    final existing = widget.item.sellingPrice;
+    if (existing != null && existing > 0) {
+      _priceCtrl.text = existing.toStringAsFixed(2);
+    }
+    _priceCtrl.addListener(() => setState(() {}));
     if (widget.item.videoUrl != null) {
       _videoUrlCtrl.text = widget.item.videoUrl!;
     }
@@ -75,7 +76,7 @@ class _ListingSheetState extends State<_ListingSheet> {
 
   @override
   void dispose() {
-    _payoutCtrl.dispose();
+    _priceCtrl.dispose();
     _courierCtrl.dispose();
     _shippingCostCtrl.dispose();
     _deliveryMinCtrl.dispose();
@@ -85,38 +86,13 @@ class _ListingSheetState extends State<_ListingSheet> {
     super.dispose();
   }
 
-  // Reverses selling_price → payout using the loaded rate and pre-fills the
-  // field. Only runs once (guards on the field being empty).
-  void _prefillPayout(double rate) {
-    if (_payoutCtrl.text.isNotEmpty) return;
-    final existing = widget.item.sellingPrice;
-    if (existing == null || existing <= 0) return;
-    final fee = double.parse((existing * rate).toStringAsFixed(2));
-    _payoutCtrl.text = (existing - fee).toStringAsFixed(2);
-  }
-
   Future<void> _loadCommissionRate() async {
-    final sellerId = widget.item.sellerId;
-    if (sellerId == null) {
-      if (mounted) {
-        setState(() => _commissionRate = _kDefaultCommission);
-        _prefillPayout(_kDefaultCommission);
-      }
-      return;
-    }
-    try {
-      final seller = await SellerRepository().getSeller(sellerId);
-      final rate = seller.commissionRate;
-      if (mounted) {
-        final resolved = rate ?? _kDefaultCommission;
-        setState(() => _commissionRate = resolved);
-        _prefillPayout(resolved);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _commissionRate = _kDefaultCommission);
-        _prefillPayout(_kDefaultCommission);
-      }
+    final r = await loadSellerCommissionRate(widget.item.sellerId);
+    if (mounted) {
+      setState(() {
+        _commissionRate = r.rate;
+        _rateSource = r.source;
+      });
     }
   }
 
@@ -196,35 +172,16 @@ class _ListingSheetState extends State<_ListingSheet> {
 
   // ── Computed ──────────────────────────────────────────────────────────────
 
-  double get _commission => _commissionRate ?? _kDefaultCommission;
+  double get _commission => _commissionRate ?? kDefaultCommissionRate;
 
-  /// Seller's desired payout as typed.
-  double get _payout =>
-      double.tryParse(_payoutCtrl.text.replaceAll(',', '.')) ?? 0;
+  /// Buyer-facing price (selling_price) as typed, rounded to cents.
+  double get _buyerPrice => parsePrice(_priceCtrl.text) ?? 0;
 
-  /// Buyer-facing price derived from the seller's desired payout.
-  /// Returns 0 when rate >= 1 (divide-by-zero guard).
-  double get _buyerPrice {
-    if (_commission >= 1) return 0;
-    return double.parse((_payout / (1 - _commission)).toStringAsFixed(2));
-  }
-
-  /// Platform fee the buyer's price carries (mirrors deployed order math).
-  double get _fee =>
-      double.parse((_buyerPrice * _commission).toStringAsFixed(2));
-
-  double get _receive => _buyerPrice - _fee;
+  double get _receive => payoutAfterCommission(_buyerPrice, _commission);
   double get _profit => _receive - widget.item.costPrice;
   bool get _hasNoCost => widget.item.costPrice == 0;
-  bool get _isLosing => !_hasNoCost && _payout > 0 && _profit < 0;
+  bool get _isLosing => !_hasNoCost && _buyerPrice > 0 && _profit < 0;
   bool get _needsPrice => _saleMethod != 'accept_offers';
-
-  String get _commissionLabel {
-    final pct = _commission * 100;
-    return pct % 1 == 0
-        ? '${pct.toInt()}%'
-        : '${pct.toStringAsFixed(1)}%';
-  }
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -369,9 +326,9 @@ class _ListingSheetState extends State<_ListingSheet> {
               ],
               const SizedBox(height: 14),
 
-              // ── Payout input ───────────────────────────────────────────
+              // ── Price input (what the buyer pays) ─────────────────────
               TextField(
-                controller: _payoutCtrl,
+                controller: _priceCtrl,
                 autofocus: !isListed,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -379,32 +336,21 @@ class _ListingSheetState extends State<_ListingSheet> {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                 ],
                 decoration: const InputDecoration(
-                  labelText: 'Your payout (what you receive)',
+                  labelText: 'Price',
+                  helperText: 'What the buyer pays',
                   prefixText: '€ ',
-                  border: OutlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: 8),
+              PayoutLine(
+                price: _buyerPrice,
+                rate: _commission,
+                source: _rateSource,
               ),
               const SizedBox(height: 16),
 
-              // ── Live calculator (only when payout entered) ─────────────
+              // ── Profit (only when a price is entered) ──────────────────
               if (canList) ...[
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-                _calcRow(
-                  'Buyer pays',
-                  '€${_buyerPrice.toStringAsFixed(2)}',
-                  muted: true,
-                ),
-                _calcRow(
-                  'Platform fee ($_commissionLabel)',
-                  '−€${_fee.toStringAsFixed(2)}',
-                  muted: true,
-                ),
-                _calcRow(
-                  'You receive',
-                  '€${_receive.toStringAsFixed(2)}',
-                  bold: true,
-                ),
                 if (!_hasNoCost) ...[
                   const SizedBox(height: 8),
                   const Divider(height: 1),

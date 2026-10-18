@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../core/services/seller_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/item_movement.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
+import '../../repositories/order_repository.dart';
+import '../../theme/app_theme.dart';
 import 'edit_inventory_page.dart';
 import 'listing_sheet.dart';
 import 'widgets/item_photo_manager.dart';
+import 'widgets/price_field.dart';
 import 'lot_sort_page.dart';
 import 'record_sale_sheet.dart';
 
@@ -36,23 +38,48 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   String _locationBreadcrumb = '';
   bool _movementsLoading = false;
 
+  /// Seller's commission rate (NULL / no seller = 0%). Null while loading.
+  double? _commissionRate;
+
+  /// Actual sale from the order, for sold items.
+  ({String orderNumber, double soldFor, double received})? _sale;
+
   @override
   void initState() {
     super.initState();
     _item = widget.item;
     _photoItems = _item.imageUrls.map(PhotoItem.existing).toList();
     _loadLocationAndMovements();
+    _loadCommissionRate();
+    _loadSale();
+  }
+
+  Future<void> _loadCommissionRate() async {
+    final r = await loadSellerCommissionRate(_item.sellerId);
+    if (mounted) setState(() => _commissionRate = r.rate);
+  }
+
+  Future<void> _loadSale() async {
+    if (_item.id == null || _item.status != 'sold') return;
+    try {
+      final sale = await OrderRepository().getItemSale(_item.id!);
+      if (mounted) setState(() => _sale = sale);
+    } catch (e) {
+      debugPrint('Sale lookup failed: $e');
+    }
   }
 
   Future<void> _loadLocationAndMovements() async {
     if (_item.id == null) return;
     setState(() => _movementsLoading = true);
     try {
-      final sellerId = _item.sellerId ?? kCurrentSellerId;
+      // Breadcrumb is resolved across all visible locations (RLS scopes them)
+      // — scoping to the item's seller left the raw id when the item has no
+      // seller or the location belongs to another seller.
       final futures = <Future>[
         _movementRepo.getMovementsForItem(_item.id!),
         if (_item.locationId != null)
-          _locationRepo.getBreadcrumb(_item.locationId!, sellerId),
+          _locationRepo.getBreadcrumb(_item.locationId!),
       ];
       final results = await Future.wait(futures);
       if (mounted) {
@@ -77,6 +104,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     if (result == null || !mounted) return;
 
     setState(() => _item = _item.copyWith(status: 'sold', isListed: false));
+    _loadSale();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -296,6 +324,70 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     );
   }
 
+  static String _eur(double v) =>
+      '${v < 0 ? '−' : ''}€${v.abs().toStringAsFixed(2)}';
+
+  /// Cost and profit — owner/seller-only info, never shown to buyers.
+  /// Sold items show the actual sale from the order; unsold items an
+  /// estimate from price × commission rate.
+  Widget _buildPrivateCard() {
+    final cost = _item.costPrice;
+    final hasCost = cost > 0;
+    final sale = _sale;
+    final List<Widget> rows;
+
+    if (sale != null) {
+      rows = [
+        _row('Sold for',
+            '${_eur(sale.soldFor)}'
+                '${sale.orderNumber.isNotEmpty ? '  (${sale.orderNumber})' : ''}'),
+        _row('You received', _eur(sale.received)),
+        _row('Cost price', hasCost ? _eur(cost) : ''),
+        if (hasCost) _row('Profit', _eur(sale.received - cost)),
+      ];
+    } else {
+      final price = _item.sellingPrice;
+      final rate = _commissionRate;
+      final payout = price != null && price > 0 && rate != null
+          ? payoutAfterCommission(price, rate)
+          : null;
+      rows = [
+        _row('Cost price', hasCost ? _eur(cost) : ''),
+        if (payout != null) _row('You receive', _eur(payout)),
+        if (payout != null && hasCost)
+          _row('Profit after commission', _eur(payout - cost)),
+      ];
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.lock_outline, size: 16, color: AppColors.muted),
+              SizedBox(width: 6),
+              Text(
+                'Private — only you see this',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted,
+                ),
+              ),
+            ],
+          ),
+          ...rows,
+        ],
+      ),
+    );
+  }
+
   Widget _sectionLabel(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 20, bottom: 8),
@@ -455,10 +547,6 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           _row('Weight', '${_item.weightValue} ${_item.weightUnit}'),
           _row('Quantity', _item.quantity.toString()),
 
-          _sectionLabel('Pricing'),
-          _row('Cost Price', '€${_item.costPrice.toStringAsFixed(2)}'),
-          _row('Sale Price', '€${_item.salePrice.toStringAsFixed(2)}'),
-
           if (_item.isUnsortedLot) ...[
             _sectionLabel('Lot'),
             _row('Stones remaining', '~${_item.lotRemainingCount ?? 0}'),
@@ -490,7 +578,9 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                 ? 'No location set'
                 : _locationBreadcrumb.isNotEmpty
                     ? _locationBreadcrumb
-                    : _item.locationId!,
+                    : _movementsLoading
+                        ? 'Loading…'
+                        : 'Unknown location',
           ),
 
           _sectionLabel('Marketplace'),
@@ -525,20 +615,11 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                       ),
             ],
           ),
-          if (_item.isListed && _item.sellingPrice != null) ...[
-            _row('Selling Price',
-                '€${_item.sellingPrice!.toStringAsFixed(2)}'),
-            _row(
-              'Margin',
-              () {
-                final m = _item.sellingPrice! - _item.costPrice;
-                final p = _item.costPrice > 0
-                    ? m / _item.costPrice * 100
-                    : 0.0;
-                return '${m >= 0 ? '+' : ''}€${m.toStringAsFixed(2)} (${p.toStringAsFixed(1)}%)';
-              }(),
-            ),
-          ],
+          if (_item.isListed && _item.sellingPrice != null)
+            _row('Price', '€${_item.sellingPrice!.toStringAsFixed(2)}'),
+
+          const SizedBox(height: 16),
+          _buildPrivateCard(),
 
           _sectionLabel('Other'),
           _row('Status', _item.status),
