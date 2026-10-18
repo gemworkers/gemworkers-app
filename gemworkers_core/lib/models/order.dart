@@ -146,6 +146,10 @@ class Order {
   /// Set when the order was created by accepting an offer.
   final String? offerId;
 
+  /// When payment was confirmed (trigger orders_set_paid_at; backfilled with
+  /// created_at for older orders).
+  final DateTime? paidAt;
+
   /// Deadline for the buyer to pay an accepted offer.
   final DateTime? paymentDueAt;
 
@@ -188,6 +192,7 @@ class Order {
     this.payoutMethod,
     this.payoutReference,
     this.offerId,
+    this.paidAt,
     this.paymentDueAt,
     this.buyerEmail,
     this.buyerName,
@@ -251,6 +256,9 @@ class Order {
       payoutMethod:    map['payout_method']?.toString(),
       payoutReference: map['payout_reference']?.toString(),
       offerId: map['offer_id']?.toString(),
+      paidAt: map['paid_at'] != null
+          ? DateTime.parse(map['paid_at'].toString())
+          : null,
       paymentDueAt: map['payment_due_at'] != null
           ? DateTime.parse(map['payment_due_at'].toString())
           : null,
@@ -373,6 +381,7 @@ class Order {
       payoutReference: identical(payoutReference, _omitted)
           ? this.payoutReference : payoutReference as String?,
       offerId: offerId,
+      paidAt: paidAt,
       paymentDueAt: paymentDueAt,
       buyerEmail: buyerEmail,
       buyerName: buyerName,

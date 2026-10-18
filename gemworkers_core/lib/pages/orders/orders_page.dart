@@ -316,6 +316,7 @@ class _OrderCard extends StatelessWidget {
   // ── Derived display values ────────────────────────────────────────────────
 
   String get _dateLine => switch (order.status) {
+        _ when order.paidAt != null => 'Paid ${_date(order.paidAt!)}',
         'confirmed' when order.saleChannel == 'platform' &&
                 order.offerId == null =>
           'Paid ${_date(order.orderDate)}',
@@ -351,13 +352,14 @@ class _OrderCard extends StatelessWidget {
 
   double get _total => order.orderTotal > 0 ? order.orderTotal : order.total;
 
-  /// Order date + the largest prep_days among its items (default 3).
+  /// Paid date (fallback: order date) + the largest prep_days among its
+  /// items (default 3).
   DateTime get _shipBy {
     final prep = order.items
         .map((i) => i.itemPrepDays)
         .whereType<int>()
         .fold<int?>(null, (m, d) => m == null || d > m ? d : m);
-    final base = order.orderDate.toLocal();
+    final base = (order.paidAt ?? order.orderDate).toLocal();
     return DateTime(base.year, base.month, base.day)
         .add(Duration(days: prep ?? _kDefaultPrepDays));
   }

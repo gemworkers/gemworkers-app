@@ -29,7 +29,7 @@ class OrderRepository {
     var query = supabase.from('orders').select(
         'id, order_number, status, order_date, created_at, notes, '
         'customer_id, seller_id, sale_channel, order_total, '
-        'shipping_name, shipping_country, offer_id, payment_due_at, '
+        'shipping_name, shipping_country, offer_id, payment_due_at, paid_at, '
         'shipped_at, received_at, '
         'customers(name), sellers(name), buyers(email, display_name), '
         'order_items(id, price_at_sale, quantity, '
