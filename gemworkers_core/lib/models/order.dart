@@ -10,12 +10,18 @@ class OrderItem {
   final double priceAtSale;
   final int quantity;
 
+  // Join-derived (list view) — first image and prep days of the inventory item.
+  final String? itemImageUrl;
+  final int? itemPrepDays;
+
   const OrderItem({
     this.id,
     this.orderId,
     required this.inventoryItemId,
     this.itemTitle = '',
     this.itemSku = '',
+    this.itemImageUrl,
+    this.itemPrepDays,
     required this.priceAtSale,
     required this.quantity,
   });
@@ -30,6 +36,11 @@ class OrderItem {
       inventoryItemId: map['inventory_item_id']?.toString() ?? '',
       itemTitle: inv?['title']?.toString() ?? '',
       itemSku: inv?['sku']?.toString() ?? '',
+      itemImageUrl: switch (inv?['image_urls']) {
+        List urls when urls.isNotEmpty => urls.first.toString(),
+        _ => null,
+      },
+      itemPrepDays: (inv?['prep_days'] as num?)?.toInt(),
       priceAtSale: (map['price_at_sale'] ?? 0).toDouble(),
       quantity: (map['quantity'] ?? 1) as int,
     );
@@ -129,6 +140,17 @@ class Order {
   final String? shippingCountry;
   final String? shippingPhone;
 
+  // ── Storefront (join-derived / read-only, list view) ──────────────────────
+  /// Set when the order was created by accepting an offer.
+  final String? offerId;
+
+  /// Deadline for the buyer to pay an accepted offer.
+  final DateTime? paymentDueAt;
+
+  /// From buyers(email, display_name) via buyer_id.
+  final String? buyerEmail;
+  final String? buyerName;
+
   const Order({
     this.id,
     this.customerId,
@@ -163,6 +185,10 @@ class Order {
     this.payoutPaidAt,
     this.payoutMethod,
     this.payoutReference,
+    this.offerId,
+    this.paymentDueAt,
+    this.buyerEmail,
+    this.buyerName,
   });
 
   /// Computed from loaded items — use orderTotal for the stored, authoritative value.
@@ -222,6 +248,13 @@ class Order {
           : null,
       payoutMethod:    map['payout_method']?.toString(),
       payoutReference: map['payout_reference']?.toString(),
+      offerId: map['offer_id']?.toString(),
+      paymentDueAt: map['payment_due_at'] != null
+          ? DateTime.parse(map['payment_due_at'].toString())
+          : null,
+      buyerEmail: (map['buyers'] as Map<String, dynamic>?)?['email']?.toString(),
+      buyerName:
+          (map['buyers'] as Map<String, dynamic>?)?['display_name']?.toString(),
     );
   }
 
@@ -337,6 +370,10 @@ class Order {
           ? this.payoutMethod : payoutMethod as String?,
       payoutReference: identical(payoutReference, _omitted)
           ? this.payoutReference : payoutReference as String?,
+      offerId: offerId,
+      paymentDueAt: paymentDueAt,
+      buyerEmail: buyerEmail,
+      buyerName: buyerName,
     );
   }
 }

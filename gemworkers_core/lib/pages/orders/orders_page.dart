@@ -1,11 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
+import '../../theme/app_theme.dart';
 import 'add_edit_order_page.dart';
+import 'mark_shipped_dialog.dart';
 import 'order_detail_page.dart';
 import 'order_status.dart';
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+enum _OrdersTab {
+  toShip('To ship', ['confirmed'], 'Nothing to ship right now.'),
+  awaitingPayment(
+      'Awaiting payment', ['pending_payment'], 'No orders awaiting payment.'),
+  shipped('Shipped', ['shipped'], 'No shipped orders yet.'),
+  completed('Completed', ['received', 'paid'], 'No completed orders yet.'),
+  all('All', null, 'No orders yet.');
+
+  final String label;
+
+  /// Statuses shown in this tab; null = every status.
+  final List<String>? statuses;
+  final String emptyMessage;
+  const _OrdersTab(this.label, this.statuses, this.emptyMessage);
+
+  static _OrdersTab forStatus(String? status) => switch (status) {
+        'confirmed' => toShip,
+        'pending_payment' => awaitingPayment,
+        'shipped' => shipped,
+        'received' || 'paid' => completed,
+        _ => all,
+      };
+}
+
+/// Prep days assumed when none of an order's items has prep_days set.
+const _kDefaultPrepDays = 3;
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 class OrdersPage extends StatefulWidget {
   final String? initialStatusFilter;
@@ -15,42 +50,80 @@ class OrdersPage extends StatefulWidget {
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends State<OrdersPage> {
+class _OrdersPageState extends State<OrdersPage>
+    with SingleTickerProviderStateMixin {
   final _repository = OrderRepository();
+  late final TabController _tabController;
 
   List<Order> _orders = [];
+  Map<String, int> _statusCounts = {};
   bool _loading = true;
-  String? _statusFilter;
-
-  static const _statuses = ['draft', 'pending_payment', 'confirmed', 'shipped', 'received', 'paid', 'cancelled'];
+  _OrdersTab _tab = _OrdersTab.toShip;
+  final Set<String> _shippingIds = {};
 
   @override
   void initState() {
     super.initState();
-    _statusFilter = widget.initialStatusFilter;
+    _tab = _OrdersTab.forStatus(widget.initialStatusFilter ?? 'confirmed');
+    _tabController = TabController(
+      length: _OrdersTab.values.length,
+      vsync: this,
+      initialIndex: _tab.index,
+    )..addListener(() {
+        if (!_tabController.indexIsChanging &&
+            _tabController.index != _tab.index) {
+          setState(() => _tab = _OrdersTab.values[_tabController.index]);
+          _load();
+        }
+      });
     _load();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+
   Future<void> _load() async {
     setState(() => _loading = true);
+    final tab = _tab;
     try {
-      var orders =
-          await _repository.getOrders(statusFilter: _statusFilter);
       final svc = UserProfileService.instance;
+      final results = await Future.wait([
+        _repository.getShopOrders(statuses: tab.statuses),
+        _repository.getStatusCounts(
+            sellerId: svc.shouldFilterBySeller ? svc.sellerId : null),
+      ]);
+      var orders = results[0] as List<Order>;
       if (svc.shouldFilterBySeller) {
         orders = orders.where((o) => o.sellerId == svc.sellerId).toList();
       }
-      if (mounted) {
+      // Ignore a stale response if the tab changed while loading.
+      if (mounted && tab == _tab) {
         setState(() {
           _orders = orders;
+          _statusCounts = results[1] as Map<String, int>;
           _loading = false;
         });
       }
     } catch (e) {
       debugPrint(e.toString());
-      if (mounted) setState(() => _loading = false);
+      if (mounted && tab == _tab) setState(() => _loading = false);
     }
   }
+
+  int _countFor(_OrdersTab tab) {
+    final statuses = tab.statuses;
+    if (statuses == null) {
+      return _statusCounts.values.fold(0, (a, b) => a + b);
+    }
+    return statuses.fold(0, (sum, s) => sum + (_statusCounts[s] ?? 0));
+  }
+
+  // ── Navigation & actions ──────────────────────────────────────────────────
 
   Future<void> _openAdd() async {
     final added = await Navigator.push<bool>(
@@ -69,134 +142,148 @@ class _OrdersPageState extends State<OrdersPage> {
     _load();
   }
 
+  /// Same flow as the detail page: confirm dialog + mark_order_shipped RPC
+  /// (which validates server-side).
+  Future<void> _markShipped(Order order) async {
+    final id = order.id;
+    if (id == null) return;
+    final result = await showMarkShippedDialog(context);
+    if (result == null || !mounted) return;
+    setState(() => _shippingIds.add(id));
+    try {
+      await _repository.markShipped(id, trackingNumber: result.tracking);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${order.orderNumber} marked as shipped')));
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        final msg = e is PostgrestException ? e.message : e.toString();
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } finally {
+      if (mounted) setState(() => _shippingIds.remove(id));
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final gutter = wide ? 32.0 : 16.0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Orders'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: Row(
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  selected: _statusFilter == null,
-                  onTap: () {
-                    setState(() => _statusFilter = null);
-                    _load();
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(gutter, wide ? 28 : 20, gutter, 20),
+              sliver: SliverToBoxAdapter(child: _buildTop(wide)),
+            ),
+            if (_loading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_orders.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyState(message: _tab.emptyMessage),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 32),
+                sliver: SliverList.separated(
+                  itemCount: _orders.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) {
+                    final order = _orders[i];
+                    return _OrderCard(
+                      order,
+                      wide: wide,
+                      shipping: _shippingIds.contains(order.id),
+                      onTap: _openDetail,
+                      onMarkShipped: _markShipped,
+                    );
                   },
                 ),
-                ..._statuses.map((s) => _FilterChip(
-                      label: orderStatusLabel(s),
-                      selected: _statusFilter == s,
-                      color: orderStatusColor(s),
-                      onTap: () {
-                        setState(() => _statusFilter = s);
-                        _load();
-                      },
-                    )),
-              ],
-            ),
-          ),
+              ),
+          ],
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _orders.isEmpty
-              ? _EmptyState(
-                  hasFilter: _statusFilter != null,
-                  onClear: () {
-                    setState(() => _statusFilter = null);
-                    _load();
-                  },
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 80),
-                    itemCount: _orders.length,
-                    itemBuilder: (_, i) => _OrderCard(
-                      _orders[i],
-                      onTap: _openDetail,
-                    ),
+    );
+  }
+
+  Widget _buildTop(bool wide) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Orders & Shipping',
+                style: textTheme.headlineLarge
+                    ?.copyWith(fontSize: wide ? 40 : 30, height: 1.1),
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: _openAdd,
+              icon: const Icon(Icons.add, size: 20),
+              label: Text(wide ? 'New manual order' : 'New'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          padding: EdgeInsets.zero,
+          labelPadding: const EdgeInsets.only(right: 28),
+          tabs: [
+            for (final t in _OrdersTab.values)
+              Tab(
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: t.label),
+                  TextSpan(
+                    text: '  ${_countFor(t)}',
+                    style: const TextStyle(
+                        color: AppColors.muted, fontWeight: FontWeight.w400),
                   ),
-                ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAdd,
-        child: const Icon(Icons.add),
-      ),
+                ])),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color? color;
-  final VoidCallback onTap;
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final c = color ?? cs.primary;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: selected,
-        selectedColor: c.withValues(alpha: 0.15),
-        checkmarkColor: c,
-        labelStyle: TextStyle(
-            color: selected ? c : null,
-            fontWeight: selected ? FontWeight.w600 : null),
-        onSelected: (_) => onTap(),
-      ),
-    );
-  }
-}
-
 class _EmptyState extends StatelessWidget {
-  final bool hasFilter;
-  final VoidCallback onClear;
-  const _EmptyState({required this.hasFilter, required this.onClear});
+  final String message;
+  const _EmptyState({required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            hasFilter
-                ? Icons.filter_list_off
-                : Icons.receipt_long_outlined,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            hasFilter
-                ? 'No orders with that status'
-                : 'No orders yet',
-            style: const TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-          if (hasFilter) ...[
-            const SizedBox(height: 8),
-            TextButton(
-                onPressed: onClear, child: const Text('Clear filter')),
-          ],
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 48, 16, 64),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: Theme.of(context)
+            .textTheme
+            .bodyLarge
+            ?.copyWith(color: AppColors.muted),
       ),
     );
   }
@@ -204,74 +291,357 @@ class _EmptyState extends StatelessWidget {
 
 class _OrderCard extends StatelessWidget {
   final Order order;
+  final bool wide;
+  final bool shipping;
   final Future<void> Function(Order) onTap;
-  const _OrderCard(this.order, {required this.onTap});
+  final Future<void> Function(Order) onMarkShipped;
 
-  Color get _statusColor => orderStatusColor(order.status);
+  const _OrderCard(
+    this.order, {
+    required this.wide,
+    required this.shipping,
+    required this.onTap,
+    required this.onMarkShipped,
+  });
+
+  static String _date(DateTime d) {
+    final local = d.toLocal();
+    return DateFormat(local.year == DateTime.now().year ? 'd MMM' : 'd MMM y')
+        .format(local);
+  }
+
+  static String _dateTime(DateTime d) =>
+      '${_date(d)}, ${DateFormat('HH:mm').format(d.toLocal())}';
+
+  // ── Derived display values ────────────────────────────────────────────────
+
+  String get _dateLine => switch (order.status) {
+        'confirmed' when order.saleChannel == 'platform' &&
+                order.offerId == null =>
+          'Paid ${_date(order.orderDate)}',
+        'pending_payment' when order.offerId != null =>
+          'Offer accepted ${_date(order.createdAt ?? order.orderDate)}',
+        'shipped' when order.shippedAt != null =>
+          'Shipped ${_date(order.shippedAt!)}',
+        'received' when order.receivedAt != null =>
+          'Received ${_date(order.receivedAt!)}',
+        _ => 'Ordered ${_date(order.orderDate)}',
+      };
+
+  String get _itemLine {
+    if (order.items.isEmpty) return 'No items';
+    final first = order.items.first.itemTitle.isNotEmpty
+        ? order.items.first.itemTitle
+        : 'Untitled item';
+    final more = order.items.length - 1;
+    return more > 0 ? '$first  +$more more' : first;
+  }
+
+  String? get _imageUrl =>
+      order.items.map((i) => i.itemImageUrl).whereType<String>().firstOrNull;
+
+  String? get _buyerName => [
+        order.customerName,
+        order.buyerName ?? '',
+        order.shippingName ?? '',
+      ].where((s) => s.isNotEmpty).firstOrNull;
+
+  String? get _buyerEmail =>
+      order.buyerEmail?.isNotEmpty == true ? order.buyerEmail : null;
+
+  double get _total => order.orderTotal > 0 ? order.orderTotal : order.total;
+
+  /// Order date + the largest prep_days among its items (default 3).
+  DateTime get _shipBy {
+    final prep = order.items
+        .map((i) => i.itemPrepDays)
+        .whereType<int>()
+        .fold<int?>(null, (m, d) => m == null || d > m ? d : m);
+    final base = order.orderDate.toLocal();
+    return DateTime(base.year, base.month, base.day)
+        .add(Duration(days: prep ?? _kDefaultPrepDays));
+  }
+
+  bool get _isOverdue {
+    final now = DateTime.now();
+    return _shipBy.isBefore(DateTime(now.year, now.month, now.day));
+  }
+
+  bool get _canShipHere =>
+      order.status == 'confirmed' && order.saleChannel == 'platform';
+
+  // ── Pieces ────────────────────────────────────────────────────────────────
+
+  Widget? _dueLine(TextTheme t) {
+    if (order.status == 'confirmed') {
+      final overdue = _isOverdue;
+      return Text(
+        'Ship by ${_date(_shipBy)}${overdue ? ' · overdue' : ''}',
+        style: t.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: overdue ? AppColors.error : AppColors.ink,
+        ),
+      );
+    }
+    if (order.status == 'pending_payment' && order.paymentDueAt != null) {
+      return Text(
+        'Buyer pays by ${_dateTime(order.paymentDueAt!)}',
+        style: t.bodyMedium
+            ?.copyWith(fontWeight: FontWeight.w600, color: AppColors.accent),
+      );
+    }
+    return null;
+  }
+
+  /// Main action; [showsDetails] tells whether it already is "View details".
+  (Widget, bool showsDetails) _mainButton() {
+    const size = Size(0, 40);
+    if (_canShipHere) {
+      return (
+        FilledButton.icon(
+          onPressed: shipping ? null : () => onMarkShipped(order),
+          style: FilledButton.styleFrom(minimumSize: size),
+          icon: shipping
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.local_shipping_outlined, size: 18),
+          label: const Text('Mark as shipped'),
+        ),
+        false,
+      );
+    }
+    if (order.status == 'pending_payment') {
+      return (
+        FilledButton(
+          onPressed: null,
+          style: FilledButton.styleFrom(
+            minimumSize: size,
+            disabledBackgroundColor: AppColors.raised,
+            disabledForegroundColor: AppColors.muted,
+          ),
+          child: const Text('Waiting for buyer'),
+        ),
+        false,
+      );
+    }
+    return (
+      OutlinedButton(
+        onPressed: () => onTap(order),
+        style: OutlinedButton.styleFrom(minimumSize: size),
+        child: const Text('View details'),
+      ),
+      true,
+    );
+  }
+
+  Widget _detailsLink(TextTheme t) => InkWell(
+        onTap: () => onTap(order),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            'View details',
+            style: t.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: ListTile(
+    final t = Theme.of(context).textTheme;
+    final muted = t.bodyMedium?.copyWith(fontSize: 13, color: AppColors.muted);
+    final due = _dueLine(t);
+    final (button, buttonIsDetails) = _mainButton();
+
+    final orderBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          order.orderNumber.isNotEmpty ? order.orderNumber : 'Draft',
+          style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        Text(_dateLine, style: muted),
+        const SizedBox(height: 6),
+        Text(_itemLine,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: t.bodyMedium?.copyWith(fontSize: 15)),
+      ],
+    );
+
+    final buyerBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Name if known, else the email takes the name line; "No buyer" only
+        // when both are missing.
+        Text(_buyerName ?? _buyerEmail ?? 'No buyer',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _buyerName == null && _buyerEmail == null
+                ? muted
+                : t.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+        if (_buyerName != null && _buyerEmail != null)
+          Text(_buyerEmail!,
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
+        if (order.shippingCountry?.isNotEmpty == true)
+          Text(order.shippingCountry!, style: muted),
+      ],
+    );
+
+    final total = Text(
+      '€${_total.toStringAsFixed(2)}',
+      style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+
+    final Widget content = wide
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Photo(_imageUrl, size: 88),
+              const SizedBox(width: 20),
+              Expanded(flex: 4, child: orderBlock),
+              const SizedBox(width: 16),
+              Expanded(flex: 3, child: buyerBlock),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 100,
+                child: Align(alignment: Alignment.topRight, child: total),
+              ),
+              const SizedBox(width: 24),
+              SizedBox(
+                width: 220,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _StatusChip(order.status),
+                    if (due != null) ...[const SizedBox(height: 8), due],
+                    const SizedBox(height: 12),
+                    button,
+                    if (!buttonIsDetails) ...[
+                      const SizedBox(height: 4),
+                      _detailsLink(t),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Photo(_imageUrl, size: 72),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: orderBlock),
+                            const SizedBox(width: 8),
+                            total,
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        buyerBlock,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [_StatusChip(order.status), ?due],
+              ),
+              const SizedBox(height: 12),
+              button,
+              if (!buttonIsDetails)
+                Align(
+                  alignment: Alignment.center,
+                  child: _detailsLink(t),
+                ),
+            ],
+          );
+
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: () => onTap(order),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: _statusColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-            border:
-                Border.all(color: _statusColor.withValues(alpha: 0.4)),
-          ),
-          child: Icon(Icons.receipt_outlined,
-              color: _statusColor, size: 22),
+        hoverColor: AppColors.raised.withValues(alpha: 0.3),
+        child: Padding(
+          padding: EdgeInsets.all(wide ? 20 : 16),
+          child: content,
         ),
-        title: Text(
-          order.orderNumber.isNotEmpty
-              ? order.orderNumber
-              : 'Draft',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          order.customerName.isNotEmpty
-              ? order.customerName
-              : 'No customer',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: _statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: _statusColor.withValues(alpha: 0.4)),
-              ),
-              child: Text(
-                orderStatusLabel(order.status),
-                style: TextStyle(
-                    fontSize: 11,
-                    color: _statusColor,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${order.orderDate.day.toString().padLeft(2, '0')}/'
-              '${order.orderDate.month.toString().padLeft(2, '0')}/'
-              '${order.orderDate.year}',
-              style:
-                  const TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
+      ),
+    );
+  }
+}
+
+class _Photo extends StatelessWidget {
+  final String? url;
+  final double size;
+  const _Photo(this.url, {required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    const placeholder = ColoredBox(
+      color: AppColors.raised,
+      child: Center(
+        child: Icon(Icons.diamond_outlined, size: 28, color: AppColors.muted),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: url != null
+            ? Image.network(url!,
+                fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder)
+            : placeholder,
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip(this.status);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: ShapeDecoration(
+        color: orderStatusBackground(status),
+        shape: const StadiumBorder(),
+      ),
+      child: Text(
+        orderStatusLabel(status),
+        style: TextStyle(
+          fontSize: 12,
+          color: orderStatusColor(status),
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

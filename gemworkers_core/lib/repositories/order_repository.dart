@@ -21,6 +21,36 @@ class OrderRepository {
     return response.map<Order>((row) => Order.fromMap(row)).toList();
   }
 
+  /// Orders & Shipping list — adds buyer, offer/payment-due fields and the
+  /// items' title, first image and prep_days (for the "Ship by" date).
+  /// [statuses] null = all statuses.
+  Future<List<Order>> getShopOrders({List<String>? statuses}) async {
+    var query = supabase.from('orders').select(
+        'id, order_number, status, order_date, created_at, notes, '
+        'customer_id, seller_id, sale_channel, order_total, '
+        'shipping_name, shipping_country, offer_id, payment_due_at, '
+        'shipped_at, received_at, '
+        'customers(name), sellers(name), buyers(email, display_name), '
+        'order_items(id, price_at_sale, quantity, '
+        'inventory_items(title, sku, image_urls, prep_days))');
+    if (statuses != null) query = query.inFilter('status', statuses);
+    final response = await query.order('created_at', ascending: false);
+    return response.map<Order>((row) => Order.fromMap(row)).toList();
+  }
+
+  /// Order count per status. Pass [sellerId] to scope to a single seller.
+  Future<Map<String, int>> getStatusCounts({String? sellerId}) async {
+    var query = supabase.from('orders').select('status');
+    if (sellerId != null) query = query.eq('seller_id', sellerId);
+    final response = await query;
+    final counts = <String, int>{};
+    for (final row in response) {
+      final s = row['status']?.toString() ?? '';
+      counts[s] = (counts[s] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   /// Full detail — joins customer name AND order_items with inventory names.
   Future<Order> getOrderDetail(String id) async {
     final response = await supabase

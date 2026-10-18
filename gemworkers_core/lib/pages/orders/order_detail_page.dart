@@ -4,6 +4,7 @@ import '../../core/services/user_profile_service.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import 'add_edit_order_page.dart';
+import 'mark_shipped_dialog.dart';
 import 'order_status.dart';
 
 class OrderDetailPage extends StatefulWidget {
@@ -89,51 +90,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   Future<void> _markShipped() async {
-    final trackingCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Mark as Shipped'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Confirm shipment. Add a tracking number so the buyer '
-              'can check delivery status.',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: trackingCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Tracking number (optional)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              textCapitalization: TextCapitalization.characters,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Mark as Shipped'),
-          ),
-        ],
-      ),
-    );
-    final tracking =
-        trackingCtrl.text.trim().isEmpty ? null : trackingCtrl.text.trim();
-    trackingCtrl.dispose();
-
-    if (confirmed != true || !mounted) return;
+    final result = await showMarkShippedDialog(context);
+    if (result == null || !mounted) return;
     await _runAction(() async {
-      await _repository.markShipped(widget.orderId, trackingNumber: tracking);
+      await _repository.markShipped(widget.orderId,
+          trackingNumber: result.tracking);
       await _load();
     });
   }
