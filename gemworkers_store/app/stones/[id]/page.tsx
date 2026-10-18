@@ -385,6 +385,7 @@ export default async function StoneDetailPage({
                   isLoggedIn={!!user}
                   initialOffer={offerRow}
                   payable={payable}
+                  isAvailable
                 />
               )}
             </div>

@@ -58,17 +58,31 @@ export function OfferPanel({
   isLoggedIn,
   initialOffer,
   payable = null,
+  isAvailable = false,
 }: {
   itemId: string
   isLoggedIn: boolean
   initialOffer: BuyerOffer | null
   payable?: PayableOrder | null
+  // Stone is available for offers — lets the buyer re-offer after an
+  // expired/declined offer (SQL only blocks while an offer is 'pending').
+  isAvailable?: boolean
 }) {
   const [state, setState] = useState<State>(initState(initialOffer))
   const [offer, setOffer] = useState<BuyerOffer | null>(initialOffer)
   const [priceInput, setPriceInput] = useState('')
   const [noteInput, setNoteInput] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  function openForm() {
+    setErrorMsg(null); setPriceInput(''); setNoteInput(''); setState('form')
+  }
+
+  const newOfferButton = isAvailable ? (
+    <button onClick={openForm} style={pillOutline}>
+      Make a new offer
+    </button>
+  ) : null
 
   // ── Logged-out ─────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
@@ -83,7 +97,7 @@ export function OfferPanel({
   if (state === 'idle') {
     return (
       <button
-        onClick={() => { setErrorMsg(null); setPriceInput(''); setNoteInput(''); setState('form') }}
+        onClick={openForm}
         style={pillOutline}
       >
         Make an offer
@@ -161,7 +175,7 @@ export function OfferPanel({
             {busy ? 'Sending…' : 'Send offer'}
           </button>
           <button
-            onClick={() => setState('idle')}
+            onClick={() => setState(initState(offer))}
             disabled={busy}
             style={{ ...pillOutlineSm, flex: '1 1 100px', width: 'auto', cursor: busy ? 'default' : 'pointer' }}
           >
@@ -241,8 +255,11 @@ export function OfferPanel({
   // ── Expired ───────────────────────────────────────────────────────────────
   if (state === 'expired') {
     return (
-      <div style={panel}>
-        <p style={{ fontSize: 15, color: '#5A5045', margin: 0 }}>This offer has expired.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={panel}>
+          <p style={{ fontSize: 15, color: '#5A5045', margin: 0 }}>This offer has expired.</p>
+        </div>
+        {newOfferButton}
       </div>
     )
   }
@@ -253,7 +270,7 @@ export function OfferPanel({
     ? { label: 'Accepted', bg: 'rgba(43,122,61,0.08)', color: '#2B7A3D', border: 'rgba(43,122,61,0.3)' }
     : { label: 'Declined', bg: 'rgba(180,35,24,0.06)', color: '#B42318', border: 'rgba(180,35,24,0.25)' }
 
-  return (
+  const summary = (
     <div style={{
       ...panel, border: `1px solid ${chip.border}`,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
@@ -267,6 +284,15 @@ export function OfferPanel({
       }}>
         {chip.label}
       </span>
+    </div>
+  )
+
+  if (accepted || !newOfferButton) return summary
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {summary}
+      {newOfferButton}
     </div>
   )
 }
