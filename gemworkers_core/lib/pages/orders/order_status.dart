@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
+
 /// Human-readable label for a raw order status ('pending_payment' → 'Awaiting payment').
 String orderStatusLabel(String status) => switch (status) {
       'pending_payment' => 'Awaiting payment',
@@ -9,11 +11,14 @@ String orderStatusLabel(String status) => switch (status) {
 
 /// Chip/accent colour for a raw order status.
 Color orderStatusColor(String status) => switch (status) {
-      'pending_payment' => Colors.amber.shade700,
-      'paid'            => Colors.green,
-      'confirmed'       => Colors.blue,
-      'shipped'         => Colors.orange,
-      'received'        => Colors.teal,
-      'cancelled'       => Colors.red,
-      _                 => Colors.grey,
+      'pending_payment'                  => AppColors.warning,
+      'confirmed' || 'paid' || 'received' => AppColors.success,
+      'cancelled'                        => AppColors.error,
+      _                                  => AppColors.muted,
+    };
+
+/// Chip background for a raw order status (pairs with [orderStatusColor]).
+Color orderStatusBackground(String status) => switch (status) {
+      'pending_payment' => AppColors.warningBackground,
+      _                 => orderStatusColor(status).withValues(alpha: 0.1),
     };

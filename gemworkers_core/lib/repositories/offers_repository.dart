@@ -31,6 +31,18 @@ class OffersRepository {
     return offers;
   }
 
+  /// Number of offers awaiting a response. Pass [sellerId] to scope to a
+  /// single seller.
+  Future<int> getPendingCount({String? sellerId}) async {
+    var query = supabase
+        .from('storefront_offers')
+        .select('id')
+        .eq('status', 'pending');
+    if (sellerId != null) query = query.eq('seller_id', sellerId);
+    final response = await query;
+    return response.length;
+  }
+
   /// Calls respond_to_offer with 'accepted' or 'declined'.
   /// Returns the RPC's JSON result: { offer_id, order_id }.
   /// Throws PostgrestException on RPC errors (e.g. stone already reserved).

@@ -162,12 +162,15 @@ class OrderRepository {
 
   /// Count of confirmed platform orders waiting to be shipped.
   /// RLS scopes automatically: sellers see their own, owner sees all.
-  Future<int> getConfirmedPlatformCount() async {
-    final response = await supabase
+  /// Pass [sellerId] to scope to a single seller.
+  Future<int> getConfirmedPlatformCount({String? sellerId}) async {
+    var query = supabase
         .from('orders')
         .select('id')
         .eq('status', 'confirmed')
         .eq('sale_channel', 'platform');
+    if (sellerId != null) query = query.eq('seller_id', sellerId);
+    final response = await query;
     return response.length;
   }
 

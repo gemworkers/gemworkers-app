@@ -13,7 +13,10 @@ import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
 import 'pages/purchases/purchases_page.dart';
 import 'pages/suppliers/suppliers_page.dart';
+import 'repositories/offers_repository.dart';
 import 'repositories/order_repository.dart';
+import 'theme/app_theme.dart';
+import 'widgets/shop_sidebar.dart';
 
 class GemWorkersApp extends StatelessWidget {
   const GemWorkersApp({super.key});
@@ -23,7 +26,7 @@ class GemWorkersApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'GemWorkers',
-      theme: ThemeData(useMaterial3: true),
+      theme: AppTheme.light,
       home: StreamBuilder<AuthState>(
         stream: AuthService.authStateChanges,
         builder: (context, _) {
@@ -91,18 +94,26 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   int _toShipCount = 0;
+  int _pendingOffersCount = 0;
   final _orderRepo = OrderRepository();
+  final _offersRepo = OffersRepository();
 
   @override
   void initState() {
     super.initState();
-    _loadToShipCount();
+    _loadCounts();
   }
 
-  Future<void> _loadToShipCount() async {
+  Future<void> _loadCounts() async {
+    final svc = UserProfileService.instance;
+    final sellerId = svc.shouldFilterBySeller ? svc.sellerId : null;
     try {
-      final count = await _orderRepo.getConfirmedPlatformCount();
+      final count = await _orderRepo.getConfirmedPlatformCount(sellerId: sellerId);
       if (mounted) setState(() => _toShipCount = count);
+    } catch (_) {}
+    try {
+      final count = await _offersRepo.getPendingCount(sellerId: sellerId);
+      if (mounted) setState(() => _pendingOffersCount = count);
     } catch (_) {}
   }
 
@@ -119,56 +130,50 @@ class _MainLayoutState extends State<MainLayout> {
         if (_isOwner) const SellersPage(),
       ];
 
-  List<NavigationRailDestination> get _destinations => [
-        const NavigationRailDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: Text('Dashboard'),
+  List<ShopNavItem> get _destinations => [
+        const ShopNavItem(
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard,
+          label: 'Dashboard',
         ),
-        const NavigationRailDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2),
-          label: Text('Inventory'),
+        const ShopNavItem(
+          icon: Icons.inventory_2_outlined,
+          selectedIcon: Icons.inventory_2,
+          label: 'Listings',
         ),
-        NavigationRailDestination(
-          icon: Badge(
-            isLabelVisible: _toShipCount > 0,
-            label: Text('$_toShipCount'),
-            child: const Icon(Icons.receipt_long_outlined),
-          ),
-          selectedIcon: Badge(
-            isLabelVisible: _toShipCount > 0,
-            label: Text('$_toShipCount'),
-            child: const Icon(Icons.receipt_long),
-          ),
-          label: const Text('Orders'),
+        ShopNavItem(
+          icon: Icons.local_shipping_outlined,
+          selectedIcon: Icons.local_shipping,
+          label: 'Orders & Shipping',
+          badgeCount: _toShipCount,
         ),
-        const NavigationRailDestination(
-          icon: Icon(Icons.local_offer_outlined),
-          selectedIcon: Icon(Icons.local_offer),
-          label: Text('Offers'),
+        ShopNavItem(
+          icon: Icons.local_offer_outlined,
+          selectedIcon: Icons.local_offer,
+          label: 'Offers',
+          badgeCount: _pendingOffersCount,
         ),
         if (_isOwner)
-          const NavigationRailDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: Text('Customers'),
+          const ShopNavItem(
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
+            label: 'Customers',
           ),
-        const NavigationRailDestination(
-          icon: Icon(Icons.shopping_bag_outlined),
-          selectedIcon: Icon(Icons.shopping_bag),
-          label: Text('Purchases'),
+        const ShopNavItem(
+          icon: Icons.shopping_bag_outlined,
+          selectedIcon: Icons.shopping_bag,
+          label: 'Purchases',
         ),
-        const NavigationRailDestination(
-          icon: Icon(Icons.people_outline),
-          selectedIcon: Icon(Icons.people),
-          label: Text('Suppliers'),
+        const ShopNavItem(
+          icon: Icons.people_outline,
+          selectedIcon: Icons.people,
+          label: 'Suppliers',
         ),
         if (_isOwner)
-          const NavigationRailDestination(
-            icon: Icon(Icons.store_outlined),
-            selectedIcon: Icon(Icons.store),
-            label: Text('Sellers'),
+          const ShopNavItem(
+            icon: Icons.store_outlined,
+            selectedIcon: Icons.store,
+            label: 'Sellers',
           ),
       ];
 
@@ -182,17 +187,15 @@ class _MainLayoutState extends State<MainLayout> {
     return Scaffold(
       body: Row(
         children: [
-          NavigationRail(
+          ShopSidebar(
+            items: destinations,
             selectedIndex: safeIndex,
-            onDestinationSelected: (i) {
+            onSelected: (i) {
               setState(() => _selectedIndex = i);
-              _loadToShipCount();
+              _loadCounts();
             },
-            labelType: NavigationRailLabelType.all,
-            destinations: destinations,
-            trailing: const _UserMenu(),
+            accountBuilder: (compact) => _UserMenu(compact: compact),
           ),
-          const VerticalDivider(thickness: 1, width: 1),
           Expanded(
             child: pages[safeIndex],
           ),
@@ -205,11 +208,13 @@ class _MainLayoutState extends State<MainLayout> {
 // ── User account menu ─────────────────────────────────────────────────────────
 
 class _UserMenu extends StatelessWidget {
-  const _UserMenu();
+  final bool compact;
+  const _UserMenu({required this.compact});
 
   @override
   Widget build(BuildContext context) {
-    final profile = UserProfileService.instance.profile;
+    final svc = UserProfileService.instance;
+    final profile = svc.profile;
     final email = AuthService.currentUserEmail ?? '';
     final displayName = profile?.displayName;
     final initial = displayName?.isNotEmpty == true
@@ -217,44 +222,66 @@ class _UserMenu extends StatelessWidget {
         : email.isNotEmpty
             ? email[0].toUpperCase()
             : '?';
-    final cs = Theme.of(context).colorScheme;
+    final role = svc.isOwner ? 'Owner' : 'Seller';
+    final textTheme = Theme.of(context).textTheme;
+
+    final avatar = CircleAvatar(
+      radius: 18,
+      backgroundColor: AppColors.raised,
+      child: Text(
+        initial,
+        style: textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.accent,
+        ),
+      ),
+    );
 
     return PopupMenuButton<String>(
       tooltip: 'Account',
-      offset: const Offset(72, 0),
+      position: PopupMenuPosition.over,
+      offset: Offset(compact ? 56 : 0, -8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: cs.primaryContainer,
-              child: Text(
-                initial,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: cs.onPrimaryContainer,
-                ),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: compact
+            ? Center(child: avatar)
+            : Row(
+                children: [
+                  avatar,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          displayName?.isNotEmpty == true
+                              ? displayName!
+                              : (email.isNotEmpty ? email : 'Account'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          role,
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.unfold_more,
+                      size: 18, color: AppColors.muted),
+                ],
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              displayName ?? 'Account',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ],
-        ),
       ),
       itemBuilder: (_) => [
         PopupMenuItem(
           enabled: false,
           child: Text(
             email,
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
           ),
         ),
         const PopupMenuDivider(),
