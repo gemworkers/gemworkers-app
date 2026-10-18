@@ -38,7 +38,7 @@ export async function buyNow(
   // Supabase returns numeric columns as strings; coerce with Number().
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('order_total')
+    .select('order_total, order_number')
     .eq('id', orderId)
     .single()
 
@@ -82,6 +82,11 @@ export async function buyNow(
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${orderId}`,
       // CRITICAL: the webhook uses this to advance the order to 'confirmed'.
       metadata: { order_id: orderId },
+      // Shown on the PaymentIntent in the Stripe dashboard.
+      payment_intent_data: {
+        description: order.order_number ? `GemWorkers ${order.order_number}` : 'GemWorkers order',
+        metadata: { order_id: orderId, ...(order.order_number && { order_number: order.order_number }) },
+      },
     })
 
     if (!session.url) {
@@ -121,7 +126,7 @@ export async function payAcceptedOffer(
 
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('id, order_total, payment_due_at, order_items ( inventory_item_id )')
+    .select('id, order_number, order_total, payment_due_at, order_items ( inventory_item_id )')
     .eq('offer_id', offerId)
     .eq('buyer_id', user.id)
     .eq('status', 'pending_payment')
@@ -230,6 +235,11 @@ export async function payAcceptedOffer(
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${order.id}`,
       // CRITICAL: the webhook uses this to advance the order to 'confirmed'.
       metadata: { order_id: order.id },
+      // Shown on the PaymentIntent in the Stripe dashboard.
+      payment_intent_data: {
+        description: order.order_number ? `GemWorkers ${order.order_number}` : 'GemWorkers order',
+        metadata: { order_id: order.id, ...(order.order_number && { order_number: order.order_number }) },
+      },
     })
   } catch (err) {
     // The order stays pending_payment inside its window; the buyer can retry.
@@ -295,6 +305,18 @@ export async function cancelPendingOrder(
 }
 
 // ── checkoutCart helpers ──────────────────────────────────────────────────────
+
+// Joins values with commas, dropping whole trailing values so the result stays
+// within Stripe's 500-character metadata value limit.
+function joinForMetadata(values: string[], max = 500): string {
+  let out = ''
+  for (const v of values) {
+    const next = out ? `${out},${v}` : v
+    if (next.length > max) break
+    out = next
+  }
+  return out
+}
 
 // Releases all pending_payment orders created during a failed checkoutCart.
 // If the grouping update already succeeded, tries cancel_order_group (the
@@ -403,7 +425,7 @@ export async function checkoutCart(): Promise<
   // ── 5. Read authoritative totals back from DB ─────────────────────────────
   const { data: orderRows, error: totalsErr } = await supabase
     .from('orders')
-    .select('id, order_total')
+    .select('id, order_number, order_total')
     .in('id', createdOrderIds)
 
   if (totalsErr || !orderRows || orderRows.length === 0) {
@@ -455,6 +477,15 @@ export async function checkoutCart(): Promise<
       cancel_url:  `${base}/cart?canceled=1&group=${groupId}`,
       // CRITICAL: the webhook uses this to confirm all orders in the group.
       metadata: { checkout_group_id: groupId },
+      // Shown on the PaymentIntent in the Stripe dashboard.
+      payment_intent_data: {
+        description: `GemWorkers cart — ${orderRows.length} item${orderRows.length === 1 ? '' : 's'}`,
+        metadata: {
+          checkout_group_id: groupId,
+          order_ids: joinForMetadata(orderRows.map(o => o.id)),
+          order_numbers: joinForMetadata(orderRows.map(o => o.order_number).filter(Boolean)),
+        },
+      },
     })
 
     if (!session.url) {
