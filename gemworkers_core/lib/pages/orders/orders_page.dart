@@ -315,17 +315,19 @@ class _OrderCard extends StatelessWidget {
 
   // ── Derived display values ────────────────────────────────────────────────
 
+  /// Shipped/received orders show that date; otherwise (or if it's missing)
+  /// the paid date, then the status-specific fallbacks.
   String get _dateLine => switch (order.status) {
+        'shipped' when order.shippedAt != null =>
+          'Shipped ${_date(order.shippedAt!)}',
+        'received' when order.receivedAt != null =>
+          'Received ${_date(order.receivedAt!)}',
         _ when order.paidAt != null => 'Paid ${_date(order.paidAt!)}',
         'confirmed' when order.saleChannel == 'platform' &&
                 order.offerId == null =>
           'Paid ${_date(order.orderDate)}',
         'pending_payment' when order.offerId != null =>
           'Offer accepted ${_date(order.createdAt ?? order.orderDate)}',
-        'shipped' when order.shippedAt != null =>
-          'Shipped ${_date(order.shippedAt!)}',
-        'received' when order.receivedAt != null =>
-          'Received ${_date(order.receivedAt!)}',
         _ => 'Ordered ${_date(order.orderDate)}',
       };
 
