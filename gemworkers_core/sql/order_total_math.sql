@@ -1,3 +1,4 @@
+-- Superseded — live create_platform_order uses COALESCE(rate, 0.10) (0 = genuine zero). Verified 2026-10-18.
 -- =============================================================================
 -- GemWorkers — Order Total Math
 -- =============================================================================
