@@ -10,6 +10,7 @@ class AppColors {
   static const raised = Color(0xFFF4EEE4);
   static const border = Color(0xFFECE5D8);
   static const borderStrong = Color(0xFFDDD3C2);
+  static const rowDivider = Color(0xFFF1EBE0);
 
   static const ink = Color(0xFF1F1B16);
   static const textSecondary = Color(0xFF5A5045);
