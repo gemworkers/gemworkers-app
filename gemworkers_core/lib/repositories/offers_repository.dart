@@ -5,16 +5,21 @@ import '../models/storefront_offer.dart';
 class OffersRepository {
   final SupabaseClient supabase = Supabase.instance.client;
 
-  /// Fetches pending + accepted + declined offers for the logged-in user.
+  /// Fetches pending + accepted + declined + expired offers for the logged-in
+  /// user, with the item (title, SKU, photo, price), the buyer, and the order
+  /// created on acceptance (orders.offer_id).
   /// RLS (offers_seller_select) already scopes sellers to their own rows at
   /// the DB level; the app layer applies shouldFilterBySeller on top for
   /// consistency with orders/purchases pages.
-  /// Withdrawn and expired offers are excluded: they need no action.
+  /// Withdrawn offers are excluded: the buyer took them back.
   Future<List<StorefrontOffer>> fetchOffers() async {
     final response = await supabase
         .from('storefront_offers')
-        .select('*, inventory_items(title), buyers(email)')
-        .inFilter('status', ['pending', 'accepted', 'declined'])
+        .select('*, '
+            'inventory_items(title, sku, image_urls, selling_price, sale_price), '
+            'buyers(email, display_name), '
+            'orders(id, status, payment_due_at)')
+        .inFilter('status', ['pending', 'accepted', 'declined', 'expired'])
         .order('created_at', ascending: false);
 
     final offers = response

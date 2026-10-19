@@ -1,9 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../models/storefront_offer.dart';
 import '../../repositories/offers_repository.dart';
+import '../../theme/app_theme.dart';
+import '../orders/order_detail_page.dart';
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+enum _OffersTab {
+  pending('Pending', 'pending', "No offers waiting — you're all caught up."),
+  accepted('Accepted', 'accepted', 'No accepted offers yet.'),
+  declined('Declined', 'declined', 'No declined offers.'),
+  expired('Expired', 'expired', 'No expired offers.'),
+  all('All', null, 'No offers yet. Buyers\' offers will appear here.');
+
+  final String label;
+
+  /// Offer status shown in this tab; null = every status.
+  final String? status;
+  final String emptyMessage;
+  const _OffersTab(this.label, this.status, this.emptyMessage);
+
+  bool matches(StorefrontOffer o) => status == null || o.status == status;
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 class OffersPage extends StatefulWidget {
   const OffersPage({super.key});
@@ -12,17 +36,36 @@ class OffersPage extends StatefulWidget {
   State<OffersPage> createState() => _OffersPageState();
 }
 
-class _OffersPageState extends State<OffersPage> {
+class _OffersPageState extends State<OffersPage>
+    with SingleTickerProviderStateMixin {
   final _repository = OffersRepository();
+  late final TabController _tabController;
 
   List<StorefrontOffer> _offers = [];
   bool _loading = true;
   String? _saving; // ID of the offer currently being accepted/declined
+  _OffersTab _tab = _OffersTab.pending;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(
+      length: _OffersTab.values.length,
+      vsync: this,
+      initialIndex: _tab.index,
+    )..addListener(() {
+        if (!_tabController.indexIsChanging &&
+            _tabController.index != _tab.index) {
+          setState(() => _tab = _OffersTab.values[_tabController.index]);
+        }
+      });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -37,6 +80,7 @@ class _OffersPageState extends State<OffersPage> {
         setState(() {
           _offers = scoped;
           _loading = false;
+          _saving = null;
         });
       }
     } catch (e) {
@@ -44,6 +88,8 @@ class _OffersPageState extends State<OffersPage> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  int _countFor(_OffersTab tab) => _offers.where(tab.matches).length;
 
   Future<void> _respond(StorefrontOffer offer, String action) async {
     final accepted = action == 'accepted';
@@ -105,238 +151,475 @@ class _OffersPageState extends State<OffersPage> {
     }
   }
 
+  Future<void> _openOrder(String orderId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: orderId)),
+    );
+    if (mounted) _load();
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final gutter = wide ? 32.0 : 16.0;
+    final visible = _offers.where(_tab.matches).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Offers')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _offers.isEmpty
-              ? const _EmptyState()
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 80),
-                    itemCount: _offers.length,
-                    itemBuilder: (_, i) {
-                      final offer = _offers[i];
-                      return _OfferCard(
-                        offer: offer,
-                        saving: _saving == offer.id,
-                        onAccept: _saving == null
-                            ? () => _respond(offer, 'accepted')
-                            : null,
-                        onDecline: _saving == null
-                            ? () => _respond(offer, 'declined')
-                            : null,
-                      );
-                    },
-                  ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(gutter, wide ? 28 : 20, gutter, 20),
+              sliver: SliverToBoxAdapter(child: _buildTop(wide)),
+            ),
+            if (_loading && _offers.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (visible.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyState(message: _tab.emptyMessage),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 32),
+                sliver: SliverList.separated(
+                  itemCount: visible.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) {
+                    final offer = visible[i];
+                    return _OfferCard(
+                      offer: offer,
+                      wide: wide,
+                      saving: _saving == offer.id,
+                      onAccept: _saving == null
+                          ? () => _respond(offer, 'accepted')
+                          : null,
+                      onDecline: _saving == null
+                          ? () => _respond(offer, 'declined')
+                          : null,
+                      onViewOrder: offer.orderId != null
+                          ? () => _openOrder(offer.orderId!)
+                          : null,
+                    );
+                  },
                 ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTop(bool wide) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Offers',
+          style: textTheme.headlineLarge
+              ?.copyWith(fontSize: wide ? 40 : 30, height: 1.1),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "Buyers' price offers on your stones.",
+          style: textTheme.bodyLarge?.copyWith(color: AppColors.muted),
+        ),
+        const SizedBox(height: 20),
+        TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          padding: EdgeInsets.zero,
+          labelPadding: const EdgeInsets.only(right: 28),
+          tabs: [
+            for (final t in _OffersTab.values)
+              Tab(
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: t.label),
+                  TextSpan(
+                    text: '  ${_countFor(t)}',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: AppTheme.tabularFigures,
+                    ),
+                  ),
+                ])),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final String message;
+  const _EmptyState({required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.local_offer_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'No offers yet',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Offers from buyers will appear here.',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 48, 16, 64),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: Theme.of(context)
+            .textTheme
+            .bodyLarge
+            ?.copyWith(color: AppColors.muted),
       ),
     );
   }
 }
 
-// ── Offer card ────────────────────────────────────────────────────────────────
-
 class _OfferCard extends StatelessWidget {
   final StorefrontOffer offer;
+  final bool wide;
   final bool saving;
   final VoidCallback? onAccept;
   final VoidCallback? onDecline;
+  final VoidCallback? onViewOrder;
 
   const _OfferCard({
     required this.offer,
+    required this.wide,
     required this.saving,
     required this.onAccept,
     required this.onDecline,
+    required this.onViewOrder,
   });
 
-  Color get _statusColor => switch (offer.status) {
-        'accepted' => Colors.green,
-        'declined' => Colors.red,
-        _          => Colors.orange,
-      };
+  static String _money(double v) =>
+      NumberFormat.currency(locale: 'en', symbol: '€', decimalDigits: 2)
+          .format(v);
 
-  String get _statusLabel => switch (offer.status) {
-        'accepted' => 'Accepted',
-        'declined' => 'Declined',
-        _          => 'Pending',
-      };
+  static String _dateTime(DateTime d) {
+    final local = d.toLocal();
+    final day = DateFormat(
+            local.year == DateTime.now().year ? 'd MMM' : 'd MMM y')
+        .format(local);
+    return '$day, ${DateFormat('HH:mm').format(local)}';
+  }
 
-  String _formatDate(DateTime dt) {
-    final local = dt.toLocal();
-    return '${local.day.toString().padLeft(2, '0')}/'
-        '${local.month.toString().padLeft(2, '0')}/'
-        '${local.year}  '
-        '${local.hour.toString().padLeft(2, '0')}:'
-        '${local.minute.toString().padLeft(2, '0')}';
+  static String _ago(DateTime d) {
+    final diff = DateTime.now().difference(d.toLocal());
+    String plural(int n, String unit) => '$n $unit${n == 1 ? '' : 's'} ago';
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return plural(diff.inMinutes, 'minute');
+    if (diff.inDays < 1) return plural(diff.inHours, 'hour');
+    if (diff.inDays < 7) return plural(diff.inDays, 'day');
+    if (diff.inDays < 30) return plural(diff.inDays ~/ 7, 'week');
+    final local = d.toLocal();
+    return 'on ${DateFormat(local.year == DateTime.now().year ? 'd MMM' : 'd MMM y').format(local)}';
+  }
+
+  /// Offer as a share of the listed price, rounded; null if no price.
+  int? get _percentOfPrice {
+    final listed = offer.listedPrice;
+    if (listed == null || listed <= 0) return null;
+    return (offer.offeredPrice / listed * 100).round();
+  }
+
+  String get _buyerLabel {
+    if (offer.buyerName.isNotEmpty && offer.buyerEmail.isNotEmpty) {
+      return '${offer.buyerName} · ${offer.buyerEmail}';
+    }
+    if (offer.buyerName.isNotEmpty) return offer.buyerName;
+    if (offer.buyerEmail.isNotEmpty) return offer.buyerEmail;
+    return 'Buyer';
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs        = Theme.of(context).colorScheme;
-    final isPending = offer.status == 'pending';
+    final textTheme = Theme.of(context).textTheme;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          offer.stoneTitle.isNotEmpty ? offer.stoneTitle : 'Unknown stone',
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (offer.stoneSku.isNotEmpty)
+          Text(
+            offer.stoneSku,
+            style: textTheme.bodySmall?.copyWith(color: AppColors.muted),
+          ),
+        const SizedBox(height: 10),
+        if (offer.listedPrice != null)
+          Text(
+            'Listed at ${_money(offer.listedPrice!)}',
+            style: AppTheme.numeric(textTheme.bodyMedium,
+                    color: AppColors.muted)
+                .copyWith(fontWeight: FontWeight.w400),
+          ),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 10,
+          runSpacing: 4,
           children: [
-            // ── Stone title + status chip ──────────────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    offer.stoneTitle.isNotEmpty
-                        ? offer.stoneTitle
-                        : 'Unknown stone',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 15),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: _statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: _statusColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    _statusLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: _statusColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // ── Offered price ──────────────────────────────────────────
             Text(
-              '€${offer.offeredPrice.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: cs.primary,
-                letterSpacing: -0.5,
-              ),
+              _money(offer.offeredPrice),
+              style: AppTheme.numeric(textTheme.headlineSmall,
+                  fontSize: 28, height: 1.2, color: AppColors.ink),
             ),
-            const SizedBox(height: 6),
-
-            // ── Buyer email ────────────────────────────────────────────
-            if (offer.buyerEmail.isNotEmpty)
-              Text(
-                offer.buyerEmail,
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade600),
-              ),
-
-            // ── Buyer note ─────────────────────────────────────────────
-            if (offer.buyerNote.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '"${offer.buyerNote}"',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey.shade700),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 8),
-
-            // ── Timestamp ──────────────────────────────────────────────
-            Text(
-              _formatDate(offer.createdAt),
-              style: TextStyle(
-                  fontSize: 11, color: Colors.grey.shade500),
-            ),
-
-            // ── Actions (pending only) ─────────────────────────────────
-            if (isPending) ...[
-              const SizedBox(height: 14),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: saving ? null : onAccept,
-                      child: saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white),
-                            )
-                          : const Text('Accept'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: saving ? null : onDecline,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: cs.error,
-                        side: BorderSide(
-                            color: cs.error.withValues(alpha: 0.5)),
-                      ),
-                      child: const Text('Decline'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            if (_percentOfPrice != null) _PercentChip(_percentOfPrice!),
           ],
         ),
+      ],
+    );
+
+    final buyerInfo = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(
+              text: _buyerLabel,
+              style: const TextStyle(
+                  color: AppColors.ink, fontWeight: FontWeight.w500),
+            ),
+            TextSpan(text: '  ·  received ${_ago(offer.createdAt)}'),
+          ]),
+          style: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+        ),
+        if (offer.buyerNote.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            '“${offer.buyerNote}”',
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final actions = _buildActions(context);
+
+    final Widget body;
+    if (wide) {
+      body = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Thumb(offer.stoneImageUrl),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [details, const SizedBox(height: 12), buyerInfo],
+            ),
+          ),
+          const SizedBox(width: 24),
+          SizedBox(width: 260, child: actions),
+        ],
+      );
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Thumb(offer.stoneImageUrl),
+              const SizedBox(width: 14),
+              Expanded(child: details),
+            ],
+          ),
+          const SizedBox(height: 12),
+          buyerInfo,
+          const SizedBox(height: 14),
+          actions,
+        ],
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.all(wide ? 20 : 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: body,
+    );
+  }
+
+  Widget _buildActions(BuildContext context) {
+    switch (offer.status) {
+      case 'pending':
+        final accept = FilledButton(
+          onPressed: saving ? null : onAccept,
+          child: saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Accept'),
+        );
+        final decline = OutlinedButton(
+          onPressed: saving ? null : onDecline,
+          child: const Text('Decline'),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [accept, const SizedBox(height: 8), decline],
+        );
+
+      case 'accepted':
+        final orderStatus = offer.orderStatus;
+        final awaiting = orderStatus == null || orderStatus == 'pending_payment';
+        final cancelled = orderStatus == 'cancelled';
+        final String detail;
+        if (cancelled) {
+          detail = 'Order cancelled';
+        } else if (!awaiting) {
+          detail = 'Paid';
+        } else if (offer.orderPaymentDueAt != null) {
+          detail = 'Buyer pays by ${_dateTime(offer.orderPaymentDueAt!)}';
+        } else {
+          detail = '';
+        }
+        return Column(
+          crossAxisAlignment:
+              wide ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            _StatusChip(
+              awaiting ? 'Accepted — awaiting payment' : 'Accepted',
+              color: awaiting ? AppColors.accent : AppColors.success,
+              background: awaiting
+                  ? AppColors.raised
+                  : AppColors.success.withValues(alpha: 0.1),
+            ),
+            if (detail.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                detail,
+                textAlign: wide ? TextAlign.end : TextAlign.start,
+                style: AppTheme.numeric(
+                  Theme.of(context).textTheme.bodySmall,
+                  color: detail == 'Paid'
+                      ? AppColors.success
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+            if (onViewOrder != null)
+              TextButton(
+                onPressed: onViewOrder,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 36),
+                ),
+                child: const Text('View order'),
+              ),
+          ],
+        );
+
+      default:
+        final label = switch (offer.status) {
+          'declined' => 'Declined',
+          'expired' => 'Expired',
+          final s => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1),
+        };
+        return Align(
+          alignment: wide ? Alignment.topRight : Alignment.centerLeft,
+          child: _StatusChip(
+            label,
+            color: AppColors.muted,
+            background: AppColors.raised,
+          ),
+        );
+    }
+  }
+}
+
+class _PercentChip extends StatelessWidget {
+  final int percent;
+  const _PercentChip(this.percent);
+
+  @override
+  Widget build(BuildContext context) {
+    final low = percent < 70;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: const ShapeDecoration(
+        color: AppColors.raised,
+        shape: StadiumBorder(),
+      ),
+      child: Text(
+        '$percent% of price',
+        style: AppTheme.numeric(
+          Theme.of(context).textTheme.labelMedium,
+          color: low ? AppColors.error : AppColors.accent,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color background;
+  const _StatusChip(this.label,
+      {required this.color, required this.background});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: ShapeDecoration(color: background, shape: const StadiumBorder()),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  final String? url;
+  const _Thumb(this.url);
+
+  @override
+  Widget build(BuildContext context) {
+    const placeholder = ColoredBox(
+      color: AppColors.raised,
+      child: Center(
+        child: Icon(Icons.diamond_outlined, size: 28, color: AppColors.muted),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 88,
+        height: 88,
+        child: url != null
+            ? Image.network(url!,
+                fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder)
+            : placeholder,
       ),
     );
   }
