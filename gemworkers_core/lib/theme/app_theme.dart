@@ -180,6 +180,30 @@ class AppTheme {
     );
   }
 
+  /// Figures shown as figures (tabular numerals). Pass to `fontFeatures`.
+  static const tabularFigures = [
+    FontFeature.liningFigures(),
+    FontFeature.tabularFigures(),
+  ];
+
+  /// For counts, prices and stat values: DM Sans 600 with tabular lining
+  /// figures. Never Cormorant — its old-style numerals make 0 read as "O"
+  /// and 1 as "I". [base] supplies size/height/colour (its font is replaced).
+  static TextStyle numeric(
+    TextStyle? base, {
+    double? fontSize,
+    double? height,
+    Color? color,
+  }) =>
+      GoogleFonts.dmSans(
+        textStyle: base,
+        fontSize: fontSize,
+        height: height,
+        color: color,
+        fontWeight: FontWeight.w600,
+        fontFeatures: tabularFigures,
+      );
+
   /// DM Sans everywhere; Cormorant Garamond (500) for display, headline and
   /// title-large.
   static TextTheme _textTheme(TextTheme base) {

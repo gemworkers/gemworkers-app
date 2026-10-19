@@ -93,6 +93,9 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
+  // Tab to open when a dashboard link switches page; cleared on sidebar taps.
+  String? _ordersStatus;
+  String? _listingsTab;
   int _toShipCount = 0;
   int _pendingOffersCount = 0;
   final _orderRepo = OrderRepository();
@@ -108,7 +111,7 @@ class _MainLayoutState extends State<MainLayout> {
     final svc = UserProfileService.instance;
     final sellerId = svc.shouldFilterBySeller ? svc.sellerId : null;
     try {
-      final count = await _orderRepo.getConfirmedPlatformCount(sellerId: sellerId);
+      final count = await _orderRepo.getToShipCount(sellerId: sellerId);
       if (mounted) setState(() => _toShipCount = count);
     } catch (_) {}
     try {
@@ -119,10 +122,39 @@ class _MainLayoutState extends State<MainLayout> {
 
   bool get _isOwner => UserProfileService.instance.isOwner;
 
+  // Sidebar indices — Dashboard, Listings, Orders and Offers are always first.
+  static const _listingsIndex = 1;
+  static const _ordersIndex = 2;
+  static const _offersIndex = 3;
+
+  void _openFromDashboard(DashboardDestination d) {
+    setState(() {
+      _ordersStatus = null;
+      _listingsTab = null;
+      switch (d) {
+        case DashboardDestination.ordersToShip:
+          _ordersStatus = 'confirmed';
+          _selectedIndex = _ordersIndex;
+        case DashboardDestination.ordersAwaitingPayment:
+          _ordersStatus = 'pending_payment';
+          _selectedIndex = _ordersIndex;
+        case DashboardDestination.ordersAll:
+          _ordersStatus = 'all';
+          _selectedIndex = _ordersIndex;
+        case DashboardDestination.offers:
+          _selectedIndex = _offersIndex;
+        case DashboardDestination.listingsDraft:
+          _listingsTab = 'draft';
+          _selectedIndex = _listingsIndex;
+      }
+    });
+    _loadCounts();
+  }
+
   List<Widget> get _pages => [
-        const DashboardPage(),
-        const InventoryPage(),
-        const OrdersPage(),
+        DashboardPage(onNavigate: _openFromDashboard),
+        InventoryPage(initialTab: _listingsTab),
+        OrdersPage(initialStatusFilter: _ordersStatus),
         const OffersPage(),
         if (_isOwner) const CustomersPage(),
         const PurchasesPage(),
@@ -191,7 +223,11 @@ class _MainLayoutState extends State<MainLayout> {
             items: destinations,
             selectedIndex: safeIndex,
             onSelected: (i) {
-              setState(() => _selectedIndex = i);
+              setState(() {
+                _selectedIndex = i;
+                _ordersStatus = null;
+                _listingsTab = null;
+              });
               _loadCounts();
             },
             accountBuilder: (compact) => _UserMenu(compact: compact),

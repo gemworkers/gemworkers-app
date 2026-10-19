@@ -28,7 +28,7 @@ class OrderRepository {
   Future<List<Order>> getShopOrders({List<String>? statuses}) async {
     var query = supabase.from('orders').select(
         'id, order_number, status, order_date, created_at, notes, '
-        'customer_id, seller_id, sale_channel, order_total, '
+        'customer_id, seller_id, sale_channel, order_total, seller_payout, '
         'shipping_name, shipping_country, offer_id, payment_due_at, paid_at, '
         'shipped_at, received_at, '
         'customers(name), sellers(name), buyers(email, display_name), '
@@ -232,15 +232,15 @@ class OrderRepository {
 
   // ── To-ship count ─────────────────────────────────────────────────────────
 
-  /// Count of confirmed platform orders waiting to be shipped.
+  /// Count of confirmed orders waiting to be shipped (any channel) — same
+  /// rule as the To ship tab and the dashboard card.
   /// RLS scopes automatically: sellers see their own, owner sees all.
   /// Pass [sellerId] to scope to a single seller.
-  Future<int> getConfirmedPlatformCount({String? sellerId}) async {
+  Future<int> getToShipCount({String? sellerId}) async {
     var query = supabase
         .from('orders')
         .select('id')
-        .eq('status', 'confirmed')
-        .eq('sale_channel', 'platform');
+        .eq('status', 'confirmed');
     if (sellerId != null) query = query.eq('seller_id', sellerId);
     final response = await query;
     return response.length;

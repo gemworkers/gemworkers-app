@@ -52,7 +52,9 @@ _ListingTab _listingStatus(InventoryItem item) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 class InventoryPage extends StatefulWidget {
-  const InventoryPage({super.key});
+  /// Tab to open on, by name: 'all' | 'active' | 'draft' | 'reserved' | 'sold'.
+  final String? initialTab;
+  const InventoryPage({super.key, this.initialTab});
 
   @override
   State<InventoryPage> createState() => _InventoryPageState();
@@ -93,8 +95,13 @@ class _InventoryPageState extends State<InventoryPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _ListingTab.values.length, vsync: this)
-      ..addListener(() {
+    _selectedTab =
+        _ListingTab.values.asNameMap()[widget.initialTab] ?? _ListingTab.all;
+    _tabController = TabController(
+      length: _ListingTab.values.length,
+      vsync: this,
+      initialIndex: _selectedTab.index,
+    )..addListener(() {
         if (!_tabController.indexIsChanging) {
           setState(
               () => _selectedTab = _ListingTab.values[_tabController.index]);
@@ -676,10 +683,22 @@ class _InventoryPageState extends State<InventoryPage>
   Widget _buildTop(bool wide) {
     final textTheme = Theme.of(context).textTheme;
     final counts = _tabCounts;
-    final summary = _selectionMode
-        ? '${_selectedIds.length} selected'
-        : '${_all.length} items · $_availableCount available · '
-            '€${_formatValue(_listedValue)} listed value';
+    final number = AppTheme.numeric(textTheme.bodyMedium);
+    final summary = TextSpan(
+      children: _selectionMode
+          ? [
+              TextSpan(text: '${_selectedIds.length}', style: number),
+              const TextSpan(text: ' selected'),
+            ]
+          : [
+              TextSpan(text: '${_all.length}', style: number),
+              const TextSpan(text: ' items · '),
+              TextSpan(text: '$_availableCount', style: number),
+              const TextSpan(text: ' available · '),
+              TextSpan(text: '€${_formatValue(_listedValue)}', style: number),
+              const TextSpan(text: ' listed value'),
+            ],
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -697,7 +716,7 @@ class _InventoryPageState extends State<InventoryPage>
                           fontSize: wide ? 40 : 32, height: 1.1)),
                   if (_all.isNotEmpty || _selectionMode) ...[
                     const SizedBox(height: 2),
-                    Text(summary,
+                    Text.rich(summary,
                         style: textTheme.bodyMedium
                             ?.copyWith(color: AppColors.muted)),
                   ],
@@ -729,7 +748,10 @@ class _InventoryPageState extends State<InventoryPage>
                   TextSpan(
                     text: '  ${counts[t]}',
                     style: const TextStyle(
-                        color: AppColors.muted, fontWeight: FontWeight.w400),
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: AppTheme.tabularFigures,
+                    ),
                   ),
                 ])),
               ),

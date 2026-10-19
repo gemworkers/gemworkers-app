@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../repositories/dashboard_intelligence_repository.dart';
+import '../../theme/app_theme.dart';
 
 class DashboardIntelligenceSections extends StatefulWidget {
   final DashboardTimeRange timeRange;
@@ -69,9 +70,9 @@ class _DashboardIntelligenceSectionsState
     }
     if (_error != null) {
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Text('Could not load intelligence: $_error',
-            style: const TextStyle(color: Colors.red)),
+            style: const TextStyle(color: AppColors.error)),
       );
     }
     final data = _data!;
@@ -118,12 +119,12 @@ class _ProfitSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Profit & Margins',
-                style: Theme.of(context).textTheme.titleMedium),
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             if (timeRange == DashboardTimeRange.vsLastMonth && previous != null)
               _buildComparison(context)
@@ -134,7 +135,7 @@ class _ProfitSection extends StatelessWidget {
               const SizedBox(height: 20),
               Text('Monthly trend',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Colors.grey.shade600,
+                        color: AppColors.muted,
                       )),
               const SizedBox(height: 8),
               _MonthlyTrendList(months: monthlyTrend),
@@ -154,19 +155,19 @@ class _ProfitSection extends StatelessWidget {
                 child: _ProfitTile(
                     label: 'Revenue',
                     value: _eur(p.revenue),
-                    color: Colors.teal)),
+                    color: AppColors.ink)),
             const SizedBox(width: 8),
             Expanded(
                 child: _ProfitTile(
                     label: 'Cost',
                     value: _eur(p.cost),
-                    color: Colors.orange)),
+                    color: AppColors.accent)),
             const SizedBox(width: 8),
             Expanded(
                 child: _ProfitTile(
                     label: 'Profit',
                     value: _eur(p.profit),
-                    color: p.profit >= 0 ? Colors.green : Colors.red)),
+                    color: p.profit >= 0 ? AppColors.success : AppColors.error)),
           ],
         ),
         const SizedBox(height: 8),
@@ -176,13 +177,13 @@ class _ProfitSection extends StatelessWidget {
                 child: _ProfitTile(
                     label: 'Margin',
                     value: '${p.marginPct.toStringAsFixed(1)}%',
-                    color: Colors.indigo)),
+                    color: AppColors.ink)),
             const SizedBox(width: 8),
             Expanded(
                 child: _ProfitTile(
                     label: 'Commission earned',
                     value: _eur(p.commission),
-                    color: Colors.deepPurple)),
+                    color: AppColors.accent)),
             const SizedBox(width: 8),
             const Expanded(child: SizedBox()),
           ],
@@ -255,21 +256,21 @@ class _ProfitTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.rowDivider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16, color: color)),
+              style: AppTheme.numeric(null, fontSize: 16, color: color)),
           const SizedBox(height: 2),
           Text(label,
               style:
-                  TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  TextStyle(fontSize: 11, color: AppColors.muted)),
         ],
       ),
     );
@@ -296,9 +297,9 @@ class _CompareColumn extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border.all(
             color: isReference
-                ? Colors.grey.shade300
+                ? AppColors.border
                 : Theme.of(context).colorScheme.primary.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +309,7 @@ class _CompareColumn extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: isReference
-                      ? Colors.grey.shade600
+                      ? AppColors.muted
                       : Theme.of(context).colorScheme.primary)),
           const SizedBox(height: 10),
           _compareRow('Revenue', period.revenue, reference?.revenue),
@@ -332,8 +333,8 @@ class _CompareColumn extends StatelessWidget {
       final pct = ((value - refValue) / refValue) * 100;
       final up = pct > 0;
       final color = positiveIsGood
-          ? (up ? Colors.green : Colors.red)
-          : (up ? Colors.red : Colors.green);
+          ? (up ? AppColors.success : AppColors.error)
+          : (up ? AppColors.error : AppColors.success);
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         decoration: BoxDecoration(
@@ -387,7 +388,7 @@ class _MonthlyTrendList extends StatelessWidget {
       children: months.map((m) {
         final revPct = maxBar > 0 ? (m.revenue / maxBar).clamp(0.0, 1.0) : 0.0;
         final profitColor =
-            m.profit >= 0 ? Colors.green.shade600 : Colors.red;
+            m.profit >= 0 ? AppColors.success : AppColors.error;
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
@@ -403,8 +404,8 @@ class _MonthlyTrendList extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
                     value: revPct,
-                    backgroundColor: Colors.grey.shade200,
-                    color: Colors.teal,
+                    backgroundColor: AppColors.raised,
+                    color: AppColors.ink,
                     minHeight: 7,
                   ),
                 ),
@@ -415,7 +416,7 @@ class _MonthlyTrendList extends StatelessWidget {
                 child: Text(
                   '€${_fmt(m.revenue)}',
                   textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 6),
@@ -458,28 +459,28 @@ class _DeadStockSection extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Text('Dead Stock',
-                    style: Theme.of(context).textTheme.titleMedium),
+                    style: Theme.of(context).textTheme.titleLarge),
                 const Spacer(),
                 if (over90.isNotEmpty)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.12),
+                      color: AppColors.error.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '€${_fmt(capitalStuck)} stuck > 90 days',
                       style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.red,
+                          color: AppColors.error,
                           fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -490,7 +491,7 @@ class _DeadStockSection extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.all(8),
                 child: Text('No unsold stock.',
-                    style: TextStyle(color: Colors.grey)),
+                    style: TextStyle(color: AppColors.muted)),
               )
             else ...[
               // Header row
@@ -504,7 +505,7 @@ class _DeadStockSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                     const SizedBox(
                         width: 52,
                         child: Text('Days',
@@ -512,7 +513,7 @@ class _DeadStockSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                     const SizedBox(
                         width: 72,
                         child: Text('Cost',
@@ -520,7 +521,7 @@ class _DeadStockSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                     const SizedBox(
                         width: 44,
                         child: Text('Listed',
@@ -528,7 +529,7 @@ class _DeadStockSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                   ],
                 ),
               ),
@@ -539,7 +540,7 @@ class _DeadStockSection extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     '… and ${items.length - 30} more items',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
                   ),
                 ),
             ],
@@ -562,9 +563,9 @@ class _DeadStockRow extends StatelessWidget {
   const _DeadStockRow({required this.item});
 
   Color get _ageColor {
-    if (item.daysInStock >= 180) return const Color(0xFFB71C1C); // dark red
-    if (item.daysInStock >= 90) return Colors.red;
-    return Colors.black87;
+    if (item.daysInStock >= 180) return AppColors.error;
+    if (item.daysInStock >= 90) return AppColors.error;
+    return AppColors.ink;
   }
 
   @override
@@ -590,9 +591,7 @@ class _DeadStockRow extends StatelessWidget {
               style: TextStyle(
                   fontSize: 12,
                   color: _ageColor,
-                  fontWeight: item.daysInStock >= 90
-                      ? FontWeight.w600
-                      : FontWeight.normal),
+                  fontWeight: FontWeight.w600),
             ),
           ),
           SizedBox(
@@ -600,15 +599,15 @@ class _DeadStockRow extends StatelessWidget {
             child: Text(
               '€${item.costPrice.toStringAsFixed(0)}',
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
           SizedBox(
             width: 44,
             child: Center(
               child: item.isListed
-                  ? const Icon(Icons.storefront, size: 14, color: Colors.teal)
-                  : const Icon(Icons.remove, size: 14, color: Colors.grey),
+                  ? const Icon(Icons.storefront, size: 14, color: AppColors.ink)
+                  : const Icon(Icons.remove, size: 14, color: AppColors.muted),
             ),
           ),
         ],
@@ -633,12 +632,12 @@ class _CustomersSection extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Top Customers',
-                style: Theme.of(context).textTheme.titleMedium),
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 10),
             // Tier breakdown chips
             Wrap(
@@ -662,7 +661,7 @@ class _CustomersSection extends StatelessWidget {
             const SizedBox(height: 10),
             if (customers.isEmpty)
               const Text('No customers yet.',
-                  style: TextStyle(color: Colors.grey))
+                  style: TextStyle(color: AppColors.muted))
             else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -674,14 +673,14 @@ class _CustomersSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                     SizedBox(
                         width: 56,
                         child: Text('Tier',
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                     SizedBox(
                         width: 44,
                         child: Text('Orders',
@@ -689,7 +688,7 @@ class _CustomersSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                     SizedBox(
                         width: 80,
                         child: Text('Spent',
@@ -697,7 +696,7 @@ class _CustomersSection extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey))),
+                                color: AppColors.muted))),
                   ],
                 ),
               ),
@@ -709,7 +708,7 @@ class _CustomersSection extends StatelessWidget {
                   child: Text(
                     '… and ${customers.length - 20} more customers',
                     style:
-                        TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        TextStyle(color: AppColors.muted, fontSize: 12),
                   ),
                 ),
             ],
@@ -720,10 +719,10 @@ class _CustomersSection extends StatelessWidget {
   }
 
   static Color _tierColor(String tier) => switch (tier) {
-        'Gold' => Colors.amber.shade700,
-        'Premium' => Colors.deepPurple,
-        'Collector' => Colors.indigo,
-        _ => Colors.blueGrey,
+        'Gold' => AppColors.accent,
+        'Premium' => AppColors.accent,
+        'Collector' => AppColors.ink,
+        _ => AppColors.muted,
       };
 }
 
@@ -733,10 +732,10 @@ class _CustomerRow extends StatelessWidget {
   const _CustomerRow({required this.customer});
 
   Color get _tierColor => switch (customer.tier) {
-        'Gold' => Colors.amber.shade700,
-        'Premium' => Colors.deepPurple,
-        'Collector' => Colors.indigo,
-        _ => Colors.blueGrey,
+        'Gold' => AppColors.accent,
+        'Premium' => AppColors.accent,
+        'Collector' => AppColors.ink,
+        _ => AppColors.muted,
       };
 
   @override
@@ -769,7 +768,7 @@ class _CustomerRow extends StatelessWidget {
             child: Text(
               '${customer.orderCount}',
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
           SizedBox(
@@ -807,22 +806,22 @@ class _SuppliersAndSellersSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Suppliers & Sellers',
-                style: Theme.of(context).textTheme.titleMedium),
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             Text('Best suppliers by profit',
                 style: Theme.of(context)
                     .textTheme
                     .labelMedium
-                    ?.copyWith(color: Colors.grey.shade600)),
+                    ?.copyWith(color: AppColors.muted)),
             const SizedBox(height: 6),
             if (suppliers.isEmpty)
               const Text('No supplier data for this period.',
-                  style: TextStyle(color: Colors.grey, fontSize: 13))
+                  style: TextStyle(color: AppColors.muted, fontSize: 13))
             else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -833,7 +832,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                   SizedBox(
                       width: 52,
                       child: Text('Sold',
@@ -841,7 +840,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                   SizedBox(
                       width: 80,
                       child: Text('Profit',
@@ -849,7 +848,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                 ]),
               ),
               const Divider(height: 1),
@@ -860,11 +859,11 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .labelMedium
-                    ?.copyWith(color: Colors.grey.shade600)),
+                    ?.copyWith(color: AppColors.muted)),
             const SizedBox(height: 6),
             if (sellers.isEmpty)
               const Text('No seller data for this period.',
-                  style: TextStyle(color: Colors.grey, fontSize: 13))
+                  style: TextStyle(color: AppColors.muted, fontSize: 13))
             else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -875,7 +874,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                   SizedBox(
                       width: 52,
                       child: Text('Items',
@@ -883,7 +882,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                   SizedBox(
                       width: 72,
                       child: Text('Revenue',
@@ -891,7 +890,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                   SizedBox(
                       width: 72,
                       child: Text('Commission',
@@ -899,7 +898,7 @@ class _SuppliersAndSellersSection extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey))),
+                              color: AppColors.muted))),
                 ]),
               ),
               const Divider(height: 1),
@@ -934,7 +933,7 @@ class _SupplierRow extends StatelessWidget {
             width: 52,
             child: Text('${supplier.itemsSold}',
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 12)),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           SizedBox(
             width: 80,
@@ -945,8 +944,8 @@ class _SupplierRow extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: supplier.totalProfit >= 0
-                      ? Colors.green.shade700
-                      : Colors.red),
+                      ? AppColors.success
+                      : AppColors.error),
             ),
           ),
         ],
@@ -983,7 +982,7 @@ class _SellerRow extends StatelessWidget {
             width: 52,
             child: Text('${seller.itemsSold}',
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 12)),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           SizedBox(
             width: 72,
@@ -997,7 +996,7 @@ class _SellerRow extends StatelessWidget {
                 textAlign: TextAlign.right,
                 style: TextStyle(
                     fontSize: 12,
-                    color: Colors.deepPurple,
+                    color: AppColors.accent,
                     fontWeight: FontWeight.w600)),
           ),
         ],

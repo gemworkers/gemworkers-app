@@ -37,9 +37,6 @@ enum _OrdersTab {
       };
 }
 
-/// Prep days assumed when none of an order's items has prep_days set.
-const _kDefaultPrepDays = 3;
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 class OrdersPage extends StatefulWidget {
@@ -256,7 +253,10 @@ class _OrdersPageState extends State<OrdersPage>
                   TextSpan(
                     text: '  ${_countFor(t)}',
                     style: const TextStyle(
-                        color: AppColors.muted, fontWeight: FontWeight.w400),
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: AppTheme.tabularFigures,
+                    ),
                   ),
                 ])),
               ),
@@ -354,22 +354,9 @@ class _OrderCard extends StatelessWidget {
 
   double get _total => order.orderTotal > 0 ? order.orderTotal : order.total;
 
-  /// Paid date (fallback: order date) + the largest prep_days among its
-  /// items (default 3).
-  DateTime get _shipBy {
-    final prep = order.items
-        .map((i) => i.itemPrepDays)
-        .whereType<int>()
-        .fold<int?>(null, (m, d) => m == null || d > m ? d : m);
-    final base = (order.paidAt ?? order.orderDate).toLocal();
-    return DateTime(base.year, base.month, base.day)
-        .add(Duration(days: prep ?? _kDefaultPrepDays));
-  }
+  DateTime get _shipBy => orderShipBy(order);
 
-  bool get _isOverdue {
-    final now = DateTime.now();
-    return _shipBy.isBefore(DateTime(now.year, now.month, now.day));
-  }
+  bool get _isOverdue => orderShipOverdue(order);
 
   bool get _canShipHere =>
       order.status == 'confirmed' && order.saleChannel == 'platform';
@@ -525,7 +512,7 @@ class _OrderCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    _StatusChip(order.status),
+                    OrderStatusChip(order.status),
                     if (due != null) ...[const SizedBox(height: 8), due],
                     const SizedBox(height: 12),
                     button,
@@ -570,7 +557,7 @@ class _OrderCard extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
-                children: [_StatusChip(order.status), ?due],
+                children: [OrderStatusChip(order.status), ?due],
               ),
               const SizedBox(height: 12),
               button,
@@ -623,30 +610,6 @@ class _Photo extends StatelessWidget {
             ? Image.network(url!,
                 fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder)
             : placeholder,
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-  const _StatusChip(this.status);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: ShapeDecoration(
-        color: orderStatusBackground(status),
-        shape: const StadiumBorder(),
-      ),
-      child: Text(
-        orderStatusLabel(status),
-        style: TextStyle(
-          fontSize: 12,
-          color: orderStatusColor(status),
-          fontWeight: FontWeight.w600,
-        ),
       ),
     );
   }
