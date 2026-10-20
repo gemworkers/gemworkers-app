@@ -56,6 +56,13 @@ class Customer {
   /// Computed by sell engine and stored in DB. Reflects thresholds above.
   final String? autoTier;
 
+  // ── all_customers view ───────────────────────────────────────────────────
+  /// 'manual' (customers table) or 'website' (storefront buyer account).
+  final String source;
+
+  /// Most recent order time from the view (website rows).
+  final DateTime? lastOrderAt;
+
   const Customer({
     this.id,
     required this.name,
@@ -71,7 +78,14 @@ class Customer {
     this.firstOrderDate,
     this.lastOrderDate,
     this.autoTier,
+    this.source = 'manual',
+    this.lastOrderAt,
   });
+
+  bool get isWebsite => source == 'website';
+
+  /// Last order for display: the view's timestamp, else the stored date.
+  DateTime? get lastOrder => lastOrderAt ?? lastOrderDate;
 
   /// Manual tier wins → auto_tier from DB → computed from stored spend.
   String get effectiveTier =>
@@ -99,6 +113,10 @@ class Customer {
           ? DateTime.parse(map['last_order_date'].toString())
           : null,
       autoTier: map['auto_tier']?.toString(),
+      source: map['source']?.toString() ?? 'manual',
+      lastOrderAt: map['last_order_at'] != null
+          ? DateTime.parse(map['last_order_at'].toString())
+          : null,
     );
   }
 
@@ -151,6 +169,8 @@ class Customer {
       autoTier: identical(autoTier, _omitted)
           ? this.autoTier
           : autoTier as String?,
+      source: source,
+      lastOrderAt: lastOrderAt,
     );
   }
 }

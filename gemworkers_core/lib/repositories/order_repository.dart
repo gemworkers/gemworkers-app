@@ -29,7 +29,8 @@ class OrderRepository {
     var query = supabase.from('orders').select(
         'id, order_number, status, order_date, created_at, notes, '
         'customer_id, seller_id, sale_channel, order_total, seller_payout, '
-        'shipping_name, shipping_country, offer_id, payment_due_at, paid_at, '
+        'shipping_name, shipping_country, order_email, offer_id, '
+        'payment_due_at, paid_at, '
         'shipped_at, received_at, '
         'customers(name), sellers(name), buyers(email, display_name), '
         'order_items(id, price_at_sale, quantity, '
@@ -109,6 +110,16 @@ class OrderRepository {
         .from('orders')
         .select('*, order_items(price_at_sale, quantity)')
         .eq('customer_id', customerId)
+        .order('created_at', ascending: false);
+    return response.map<Order>((row) => Order.fromMap(row)).toList();
+  }
+
+  /// Website orders placed by a storefront buyer account (orders.buyer_id).
+  Future<List<Order>> getOrdersForBuyer(String buyerId) async {
+    final response = await supabase
+        .from('orders')
+        .select('*, order_items(price_at_sale, quantity)')
+        .eq('buyer_id', buyerId)
         .order('created_at', ascending: false);
     return response.map<Order>((row) => Order.fromMap(row)).toList();
   }

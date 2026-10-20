@@ -7,6 +7,7 @@ import '../../repositories/order_repository.dart';
 import '../orders/order_detail_page.dart';
 import '../orders/order_status.dart';
 import 'add_edit_customer_page.dart';
+import 'customers_page.dart' show CustomerSourceChip;
 
 class CustomerDetailPage extends StatefulWidget {
   final Customer customer;
@@ -34,7 +35,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final orders = await _orderRepo.getOrdersForCustomer(_customer.id!);
+      // Website customers are storefront buyers: their orders link by
+      // buyer_id, not customer_id.
+      final orders = _customer.isWebsite
+          ? await _orderRepo.getOrdersForBuyer(_customer.id!)
+          : await _orderRepo.getOrdersForCustomer(_customer.id!);
       if (mounted) setState(() { _orders = orders; _loading = false; });
     } catch (e) {
       debugPrint(e.toString());
@@ -109,18 +114,21 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_customer.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit',
-            onPressed: _openEdit,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete',
-            onPressed: _delete,
-          ),
-        ],
+        // Website customers are storefront accounts — read-only here.
+        actions: _customer.isWebsite
+            ? null
+            : [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit',
+                  onPressed: _openEdit,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete',
+                  onPressed: _delete,
+                ),
+              ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -151,7 +159,9 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               radius: 36,
               backgroundColor: cs.primaryContainer,
               child: Text(
-                _customer.name[0].toUpperCase(),
+                _customer.name.isNotEmpty
+                    ? _customer.name[0].toUpperCase()
+                    : '?',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -165,7 +175,14 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
-            _TierBadge(tier),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomerSourceChip(_customer.source),
+                const SizedBox(width: 6),
+                _TierBadge(tier),
+              ],
+            ),
             if (_customer.manualTier != null &&
                 _customer.autoTier != null &&
                 _customer.manualTier != _customer.autoTier) ...[
@@ -187,6 +204,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                   _StatCell(
                     label: 'Since',
                     value: _fmtDate(_customer.firstOrderDate!),
+                  )
+                else if (_customer.isWebsite && _customer.createdAt != null)
+                  _StatCell(
+                    label: 'Joined',
+                    value: _fmtDate(_customer.createdAt!.toLocal()),
                   ),
               ],
             ),
@@ -208,12 +230,15 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             if (_customer.email.isNotEmpty) _row('Email', _customer.email),
             if (_customer.phone.isNotEmpty) _row('Phone', _customer.phone),
             if (_customer.country.isNotEmpty) _row('Country', _customer.country),
-            _row('Type',
-                _customer.type == 'business' ? 'Business' : 'Individual'),
+            if (!_customer.isWebsite)
+              _row('Type',
+                  _customer.type == 'business' ? 'Business' : 'Individual'),
+            if (_customer.isWebsite)
+              _row('Account', 'Website (storefront sign-up)'),
             if (_customer.manualTier != null)
               _row('Tier Override', _customer.manualTier!),
-            if (_customer.lastOrderDate != null)
-              _row('Last order', _fmtDate(_customer.lastOrderDate!)),
+            if (_customer.lastOrder != null)
+              _row('Last order', _fmtDate(_customer.lastOrder!.toLocal())),
             if (_customer.notes.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Notes',

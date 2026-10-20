@@ -349,8 +349,12 @@ class _OrderCard extends StatelessWidget {
         order.shippingName ?? '',
       ].where((s) => s.isNotEmpty).firstOrNull;
 
-  String? get _buyerEmail =>
-      order.buyerEmail?.isNotEmpty == true ? order.buyerEmail : null;
+  /// Account email, else the email Stripe collected at checkout (sellers
+  /// can't read buyers, so for them this is the order's own email).
+  String? get _buyerEmail => [
+        order.buyerEmail ?? '',
+        order.orderEmail ?? '',
+      ].where((s) => s.isNotEmpty).firstOrNull;
 
   double get _total => order.orderTotal > 0 ? order.orderTotal : order.total;
 

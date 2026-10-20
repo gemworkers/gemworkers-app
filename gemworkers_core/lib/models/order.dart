@@ -157,6 +157,9 @@ class Order {
   final String? buyerEmail;
   final String? buyerName;
 
+  /// Email Stripe collected at checkout (orders.order_email).
+  final String? orderEmail;
+
   const Order({
     this.id,
     this.customerId,
@@ -196,6 +199,7 @@ class Order {
     this.paymentDueAt,
     this.buyerEmail,
     this.buyerName,
+    this.orderEmail,
   });
 
   /// Computed from loaded items — use orderTotal for the stored, authoritative value.
@@ -265,6 +269,7 @@ class Order {
       buyerEmail: (map['buyers'] as Map<String, dynamic>?)?['email']?.toString(),
       buyerName:
           (map['buyers'] as Map<String, dynamic>?)?['display_name']?.toString(),
+      orderEmail: map['order_email']?.toString(),
     );
   }
 
@@ -385,6 +390,7 @@ class Order {
       paymentDueAt: paymentDueAt,
       buyerEmail: buyerEmail,
       buyerName: buyerName,
+      orderEmail: orderEmail,
     );
   }
 }
