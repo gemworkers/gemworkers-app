@@ -5,7 +5,8 @@ import { BuyButton } from './BuyButton';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer, type PayableOrder } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
-import { pillDark } from '@/lib/ui';
+import { AskPanel } from './AskPanel';
+import { pillDark, pillQuiet } from '@/lib/ui';
 import { cancelPendingOrder } from '@/app/actions/commerce';
 import { countryName } from '@/lib/countries';
 import { TrustList } from '@/app/components/TrustList';
@@ -137,9 +138,9 @@ export default async function StoneDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ canceled?: string; order?: string }>;
+  searchParams: Promise<{ canceled?: string; order?: string; ask?: string }>;
 }) {
-  const [{ id }, { canceled, order: canceledOrderId }] = await Promise.all([
+  const [{ id }, { canceled, order: canceledOrderId, ask }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -204,6 +205,36 @@ export default async function StoneDetailPage({
         payableOrderId = offerOrder.id;
       }
     }
+  }
+
+  // ── Ask about this stone: existing conversation + whether we need a name ──
+  // Mirrors ask_about_stone's fallback: buyers.display_name, then the latest
+  // order's shipping_name. Only ask for a first name when both are empty.
+  let conversationId: string | null = null;
+  let needsFirstName = false;
+  if (user) {
+    const [{ data: conv }, { data: buyer }, { data: namedOrder }] = await Promise.all([
+      supabase
+        .from('buyer_conversations')
+        .select('id')
+        .eq('inventory_item_id', id)
+        .maybeSingle(),
+      supabase
+        .from('buyers')
+        .select('display_name')
+        .eq('id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('orders')
+        .select('id')
+        .eq('buyer_id', user.id)
+        .not('shipping_name', 'is', null)
+        .neq('shipping_name', '')
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    conversationId = (conv?.id as string | undefined) ?? null;
+    needsFirstName = !buyer?.display_name?.trim() && !namedOrder;
   }
 
   const item = data as ListingDetail;
@@ -401,12 +432,27 @@ export default async function StoneDetailPage({
             </div>
           )}
 
+          {/* Ask about this stone */}
+          <div style={{ marginTop: 12 }}>
+            {user ? (
+              <AskPanel
+                itemId={item.id}
+                existingConversationId={conversationId}
+                needsFirstName={needsFirstName}
+                autoOpen={ask === '1'}
+              />
+            ) : (
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(`/stones/${item.id}?ask=1`)}`}
+                style={pillQuiet}
+              >
+                Ask about this stone
+              </Link>
+            )}
+          </div>
+
           {/* Trust list */}
           <TrustList />
-
-          <Link href="/contact?topic=General%20question" className="pd-link" style={{ fontSize: 15 }}>
-            Questions about this stone? →
-          </Link>
         </div>
       </div>
 

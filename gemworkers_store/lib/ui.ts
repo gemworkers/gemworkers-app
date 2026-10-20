@@ -24,6 +24,12 @@ export const pillDisabled: CSSProperties = {
   border: '1px solid #ECE5D8', cursor: 'not-allowed',
 }
 
+// Quiet secondary action under the main buttons (e.g. "Ask about this stone")
+export const pillQuiet: CSSProperties = {
+  ...pillBase, height: 46, fontSize: 14, background: 'transparent',
+  color: '#7A5A22', border: '1px solid #ECE5D8', cursor: 'pointer',
+}
+
 // Smaller pills used inside confirm / offer panels
 export const pillDarkSm: CSSProperties  = { ...pillDark,    height: 44, fontSize: 14 }
 export const pillOutlineSm: CSSProperties = { ...pillOutline, height: 44, fontSize: 14 }
