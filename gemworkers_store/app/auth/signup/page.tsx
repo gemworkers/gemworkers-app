@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { safeNext } from '@/lib/safe-next'
 import { AuthShell, authErrorStyle } from '@/app/components/AuthShell'
+import { Turnstile, TURNSTILE_ENABLED, CAPTCHA_FAILED_MESSAGE, isCaptchaError } from '@/app/components/Turnstile'
 import { inputStyle, labelStyle, pillDark, pillDisabled } from '@/lib/ui'
 
 export default function SignupPage() {
@@ -15,6 +16,9 @@ export default function SignupPage() {
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
+  const canSubmit = !loading && (!TURNSTILE_ENABLED || !!captchaToken)
   const [checkEmail, setCheckEmail] = useState(false)
   const [next, setNext] = useState('/')
 
@@ -25,6 +29,7 @@ export default function SignupPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!canSubmit) return
     setError(null)
     setLoading(true)
 
@@ -35,11 +40,13 @@ export default function SignupPage() {
       password,
       options: {
         data: { source: 'storefront' },
+        captchaToken: captchaToken ?? undefined,
       },
     })
 
     if (signUpError) {
-      setError(signUpError.message)
+      setError(isCaptchaError(signUpError.message) ? CAPTCHA_FAILED_MESSAGE : signUpError.message)
+      setCaptchaReset(n => n + 1)
       setLoading(false)
       return
     }
@@ -123,9 +130,11 @@ export default function SignupPage() {
           />
         </div>
 
+        <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+
         {error && <p style={authErrorStyle}>{error}</p>}
 
-        <button type="submit" disabled={loading} style={loading ? pillDisabled : pillDark}>
+        <button type="submit" disabled={!canSubmit} style={canSubmit ? pillDark : pillDisabled}>
           {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>

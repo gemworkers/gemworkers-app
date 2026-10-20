@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { safeNext } from '@/lib/safe-next'
 import { AuthShell, authErrorStyle } from '@/app/components/AuthShell'
+import { Turnstile, TURNSTILE_ENABLED, CAPTCHA_FAILED_MESSAGE, isCaptchaError } from '@/app/components/Turnstile'
 import { inputStyle, labelStyle, pillDark, pillDisabled } from '@/lib/ui'
 
 export default function LoginPage() {
@@ -14,6 +15,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
+  const canSubmit = !loading && (!TURNSTILE_ENABLED || !!captchaToken)
   const [next, setNext] = useState('/')
 
   // Read ?next= on the client (validated to a same-site relative path)
@@ -23,14 +27,20 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!canSubmit) return
     setError(null)
     setLoading(true)
 
     const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken: captchaToken ?? undefined },
+    })
 
     if (authError) {
-      setError(authError.message)
+      setError(isCaptchaError(authError.message) ? CAPTCHA_FAILED_MESSAGE : authError.message)
+      setCaptchaReset(n => n + 1)
       setLoading(false)
     } else {
       router.push(next)
@@ -70,9 +80,11 @@ export default function LoginPage() {
           />
         </div>
 
+        <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+
         {error && <p style={authErrorStyle}>{error}</p>}
 
-        <button type="submit" disabled={loading} style={loading ? pillDisabled : pillDark}>
+        <button type="submit" disabled={!canSubmit} style={canSubmit ? pillDark : pillDisabled}>
           {loading ? 'Logging in…' : 'Log in'}
         </button>
       </form>
