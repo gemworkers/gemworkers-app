@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/turnstile_config.dart';
 import '../../core/services/auth_service.dart';
+import '../../widgets/turnstile/turnstile_widget.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,10 +14,15 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _turnstile = TurnstileController();
 
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+  String? _captchaToken;
+
+  bool get _canSubmit =>
+      !_loading && (!turnstileEnabled || _captchaToken != null);
 
   @override
   void dispose() {
@@ -32,6 +39,10 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _error = 'Email and password are required.');
       return;
     }
+    if (turnstileEnabled && _captchaToken == null) {
+      setState(() => _error = 'Please complete the check and try again.');
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -40,12 +51,18 @@ class _LoginPageState extends State<LoginPage> {
 
     // signIn returns null on success or a friendly error string on failure.
     // Navigation on success is handled by the StreamBuilder in app.dart.
-    final error = await AuthService.signIn(email: email, password: password);
+    final error = await AuthService.signIn(
+      email: email,
+      password: password,
+      captchaToken: turnstileEnabled ? _captchaToken : null,
+    );
     if (mounted) {
       setState(() {
         _loading = false;
         _error = error;
       });
+      // Tokens are single-use: get a fresh one before the next attempt.
+      if (error != null && turnstileEnabled) _turnstile.reset();
     }
   }
 
@@ -127,6 +144,19 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
 
+                    // Cloudflare Turnstile (web only)
+                    if (turnstileEnabled) ...[
+                      const SizedBox(height: 18),
+                      Center(
+                        child: TurnstileWidget(
+                          siteKey: turnstileSiteKey,
+                          controller: _turnstile,
+                          onToken: (token) =>
+                              setState(() => _captchaToken = token),
+                        ),
+                      ),
+                    ],
+
                     // Error
                     if (_error != null) ...[
                       const SizedBox(height: 14),
@@ -158,7 +188,7 @@ class _LoginPageState extends State<LoginPage> {
 
                     // Sign in button
                     FilledButton(
-                      onPressed: _loading ? null : _signIn,
+                      onPressed: _canSubmit ? _signIn : null,
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),

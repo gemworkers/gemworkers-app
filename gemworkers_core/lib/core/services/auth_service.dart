@@ -7,9 +7,14 @@ class AuthService {
   static Future<String?> signIn({
     required String email,
     required String password,
+    String? captchaToken,
   }) async {
     try {
-      await _client.auth.signInWithPassword(email: email, password: password);
+      await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+        captchaToken: captchaToken,
+      );
       return null;
     } on AuthException catch (e) {
       return _friendlyError(e.message);
@@ -31,6 +36,9 @@ class AuthService {
 
   static String _friendlyError(String raw) {
     final msg = raw.toLowerCase();
+    if (msg.contains('captcha')) {
+      return 'Please complete the check and try again.';
+    }
     if (msg.contains('invalid login credentials') ||
         msg.contains('invalid email or password')) {
       return 'Incorrect email or password.';
