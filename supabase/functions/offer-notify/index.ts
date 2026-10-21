@@ -1,0 +1,510 @@
+// Supabase Edge Function — offer-notify
+// Triggered by a Database Webhook on public.storefront_offers INSERT + UPDATE.
+// Sends offer emails via Resend, one email per recipient:
+//   INSERT pending          → seller + owner         ("New offer on {SKU}")
+//   pending  → accepted     → buyer (pay within 48 h) + the staff side that didn't act
+//   pending  → declined     → buyer (or "reserved by another buyer" when system-declined)
+//   accepted → expired      → buyer + seller + owner (payment window ended)
+//   anything else (withdrawn, claim stamps, …) → no email
+// Each event is sent at most once: public.claim_offer_notification stamps
+// <kind>_notified_at atomically before anything is sent.
+// SERVER ONLY. Never reads seller_note. Never reveals the seller to the buyer.
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+
+// ── Payload types ──────────────────────────────────────────────────────────────
+
+// Deliberately no seller_note / buyer_note — this function must never read them.
+interface OfferRecord {
+  id:                string
+  buyer_id:          string
+  inventory_item_id: string
+  seller_id:         string
+  offered_price:     number | string
+  status:            string
+  responded_by_role: string | null
+}
+
+interface WebhookPayload {
+  type:       string
+  table:      string
+  schema:     string
+  record:     OfferRecord | null
+  old_record: { status?: string } | null
+}
+
+interface OrderRow {
+  order_total:    number | string | null
+  shipping_cost:  number | string | null
+  payment_due_at: string | null
+}
+
+// One event per webhook. Later parts add their own variants here
+// (e.g. "payment_reminder", "countered") plus a case in classify() and the handler switch.
+type OfferEvent = "new_offer" | "accepted" | "declined" | "expired"
+
+// Must match the kinds accepted by public.claim_offer_notification.
+type ClaimKind = "new_offer" | "response" | "expired"
+
+const CLAIM_KIND: Record<OfferEvent, ClaimKind> = {
+  new_offer: "new_offer",
+  accepted:  "response",
+  declined:  "response",
+  expired:   "expired",
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const FROM       = "GemWorkers <orders@gemworkers.com>"
+const ADMIN_URL  = "https://sell.gemworkers.com"
+const STORE_URL  = "https://www.gemworkers.com"
+const ORDERS_URL = `${STORE_URL}/orders`
+
+const stoneUrl = (itemId: string) => `${STORE_URL}/stones/${encodeURIComponent(itemId)}`
+
+// ── Formatting ─────────────────────────────────────────────────────────────────
+
+const eurWhole = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })
+const eurCents = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 2 })
+
+function eur(n: number): string {
+  return Number.isInteger(n) ? eurWhole.format(n) : eurCents.format(n)
+}
+
+const utcDate = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric", month: "short", year: "numeric",
+  hour: "2-digit", minute: "2-digit", hour12: false,
+})
+
+// ── HTML builder ───────────────────────────────────────────────────────────────
+
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+const strong = (s: string) => `<strong style="color:#111">${esc(s)}</strong>`
+
+// paragraphsHtml are already-escaped HTML fragments.
+function buildHtml(heading: string, paragraphsHtml: string[], linkUrl: string, linkLabel: string): string {
+  const paragraphs = paragraphsHtml
+    .map(p => `<p style="font-size:14px;color:#6b7280;margin:0 0 14px;line-height:1.6">${p}</p>`)
+    .join("\n    ")
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:40px 24px;background:#fafaf9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111">
+  <div style="max-width:520px;margin:0 auto">
+    <p style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#9ca3af;margin:0 0 10px">GemWorkers</p>
+    <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;margin:0 0 8px;color:#111;line-height:1.2">${esc(heading)}</h1>
+    ${paragraphs}
+
+    <p style="margin:14px 0 32px">
+      <a href="${esc(linkUrl)}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px">${esc(linkLabel)}</a>
+    </p>
+    <p style="font-size:13px;color:#6b7280;margin:0 0 32px;line-height:1.6;word-break:break-all">Or open: <a href="${esc(linkUrl)}" style="color:#374151">${esc(linkUrl)}</a></p>
+
+    <p style="font-size:12px;color:#9ca3af;margin:0">This is an automated message &mdash; please do not reply. Questions? Email us at hello@gemworkers.com</p>
+  </div>
+</body></html>`
+}
+
+interface Email {
+  subject: string
+  html:    string
+  text:    string
+}
+
+// ── Staff emails ───────────────────────────────────────────────────────────────
+
+function staffNewOfferEmail(sku: string, amount: string): Email {
+  const subject = `New offer on ${sku}: ${amount}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [`A customer offered ${strong(amount)} for ${strong(sku)}. Accept or decline it in GemWorkers admin.`],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `A customer offered ${amount} for ${sku}. Accept or decline it in GemWorkers admin: ${ADMIN_URL}\n`,
+  }
+}
+
+function staffAcceptedEmail(sku: string, amount: string, actedBy: "seller" | "owner"): Email {
+  const who     = actedBy === "seller" ? "the seller" : "GemWorkers admin"
+  const subject = `Offer accepted on ${sku}: ${amount}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `The offer of ${strong(amount)} for ${strong(sku)} was accepted by ${esc(who)}.`,
+        "The stone is reserved and the buyer has 48 hours to pay.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `The offer of ${amount} for ${sku} was accepted by ${who}. The stone is reserved and the buyer has 48 hours to pay.\n${ADMIN_URL}\n`,
+  }
+}
+
+function staffExpiredEmail(sku: string, amount: string): Email {
+  const subject = `Offer payment window ended on ${sku}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `The buyer did not pay for the accepted offer of ${strong(amount)} on ${strong(sku)} within 48 hours.`,
+        "The order was cancelled and the stone is available again.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `The buyer did not pay for the accepted offer of ${amount} on ${sku} within 48 hours. The order was cancelled and the stone is available again.\n${ADMIN_URL}\n`,
+  }
+}
+
+// ── Buyer emails (never mention the seller) ────────────────────────────────────
+
+function buyerAcceptedEmail(stoneTitle: string, amount: string, total: string, shipping: number, dueAt: string): Email {
+  const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
+  const subject   = "Your offer was accepted"
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Good news &mdash; your offer of ${strong(amount)} for ${strong(stoneTitle)} was accepted. The stone is reserved for you.`,
+        `Total to pay: ${strong(totalLine)}`,
+        `Please pay within 48 hours (by ${strong(`${dueAt} UTC`)}). After that the reservation ends and the stone goes back on sale.`,
+      ],
+      ORDERS_URL,
+      "Pay now",
+    ),
+    text:
+      `Good news - your offer of ${amount} for ${stoneTitle} was accepted. The stone is reserved for you.\n\n` +
+      `Total to pay: ${totalLine}\n\n` +
+      `Please pay within 48 hours (by ${dueAt} UTC). After that the reservation ends and the stone goes back on sale.\n\n` +
+      `Pay here: ${ORDERS_URL}\n`,
+  }
+}
+
+function buyerDeclinedEmail(stoneTitle: string, amount: string, itemId: string, reservedByOther: boolean): Email {
+  const url     = stoneUrl(itemId)
+  const subject = "Your offer wasn't accepted this time"
+  const reason  = reservedByOther
+    ? "This stone has just been reserved by another buyer."
+    : "We weren't able to accept it this time."
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Thank you for your offer of ${strong(amount)} for ${strong(stoneTitle)}. ${esc(reason)}`,
+        "You're welcome to take another look at the stone.",
+      ],
+      url,
+      "View the stone",
+    ),
+    text: `Thank you for your offer of ${amount} for ${stoneTitle}. ${reason}\n\nYou're welcome to take another look at the stone: ${url}\n`,
+  }
+}
+
+function buyerExpiredEmail(stoneTitle: string, itemId: string): Email {
+  const url     = stoneUrl(itemId)
+  const subject = "Your payment window has ended"
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `The 48-hour payment window for ${strong(stoneTitle)} has ended, so your reservation was released and the stone is available again.`,
+        "If you're still interested, you can view it here.",
+      ],
+      url,
+      "View the stone",
+    ),
+    text: `The 48-hour payment window for ${stoneTitle} has ended, so your reservation was released and the stone is available again.\n\nView it here: ${url}\n`,
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+
+// Only status transitions matter; the claim stamps' own UPDATEs fall through to null.
+function classify(payload: WebhookPayload): OfferEvent | null {
+  const now    = payload.record?.status
+  const before = payload.old_record?.status
+  if (payload.type === "INSERT") {
+    return now === "pending" ? "new_offer" : null
+  }
+  if (payload.type === "UPDATE" && before !== now) {
+    if (before === "pending"  && now === "accepted") return "accepted"
+    if (before === "pending"  && now === "declined") return "declined"
+    if (before === "accepted" && now === "expired")  return "expired"
+  }
+  return null
+}
+
+async function claim(supabase: SupabaseClient, offerId: string, kind: ClaimKind): Promise<boolean> {
+  const { data, error } = await supabase.rpc("claim_offer_notification", {
+    p_offer_id: offerId,
+    p_kind:     kind,
+  })
+  if (error) {
+    console.error("[offer-notify] claim", kind, "failed for offer", offerId, "—", error.message)
+    return false
+  }
+  return data === true
+}
+
+// One recipient per call — seller, owner and buyer never share a To: line.
+async function sendEmail(apiKey: string, to: string, email: Email, context: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method:  "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type":  "application/json",
+      },
+      body: JSON.stringify({
+        from:    FROM,
+        to:      [to],
+        subject: email.subject,
+        html:    email.html,
+        text:    email.text,
+      }),
+    })
+    if (!res.ok) {
+      console.error("[offer-notify] Resend returned", res.status, "for", context, "—", await res.text())
+      return false
+    }
+    return true
+  } catch (e) {
+    console.error("[offer-notify] fetch to Resend threw for", context, ":", e instanceof Error ? e.message : String(e))
+    return false
+  }
+}
+
+const sameAddress = (a: string, b: string) => a !== "" && b !== "" && a.toLowerCase() === b.toLowerCase()
+
+// ── Handler ────────────────────────────────────────────────────────────────────
+
+Deno.serve(async (req: Request) => {
+  // ── 1. Secret verification ─────────────────────────────────────────────────
+  // Supabase webhook must send the header: x-webhook-secret: <OFFER_WEBHOOK_SECRET>
+  const expectedSecret = Deno.env.get("OFFER_WEBHOOK_SECRET")
+  const incomingSecret = req.headers.get("x-webhook-secret")
+  if (!expectedSecret || incomingSecret !== expectedSecret) {
+    console.error("[offer-notify] Unauthorized request — secret mismatch or missing")
+    return json({ error: "Unauthorized" }, 401)
+  }
+
+  // From here on, always 200 so Supabase doesn't retry and double-send.
+
+  // ── 2. Parse payload + classify ────────────────────────────────────────────
+  let payload: WebhookPayload
+  try {
+    payload = await req.json()
+  } catch {
+    console.error("[offer-notify] invalid JSON payload")
+    return json({ skipped: true, reason: "invalid JSON" })
+  }
+
+  if (payload.table !== "storefront_offers") {
+    return json({ skipped: true, reason: "not storefront_offers" })
+  }
+
+  const offer = payload.record
+  if (!offer?.id || !offer.buyer_id || !offer.seller_id || !offer.inventory_item_id) {
+    console.error("[offer-notify] malformed record — missing id, buyer_id, seller_id or inventory_item_id")
+    return json({ skipped: true, reason: "malformed record" })
+  }
+
+  const event = classify(payload)
+  if (!event) {
+    return json({ skipped: true, reason: "no email for this change" })
+  }
+
+  // ── 3. Env ─────────────────────────────────────────────────────────────────
+  const supabaseUrl        = Deno.env.get("SUPABASE_URL")
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[offer-notify] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not available")
+    return json({ ok: true, emailsSent: 0, reason: "supabase env missing" })
+  }
+
+  const resendApiKey = Deno.env.get("RESEND_API_KEY")
+  if (!resendApiKey) {
+    // Checked before claiming so a missing key doesn't burn the one-time claim.
+    console.error("[offer-notify] RESEND_API_KEY not set — no emails sent")
+    return json({ ok: true, emailsSent: 0, reason: "RESEND_API_KEY missing" })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  // ── 4. Shared lookups ──────────────────────────────────────────────────────
+  const { data: inv, error: invErr } = await supabase
+    .from("inventory_items")
+    .select("sku, title")
+    .eq("id", offer.inventory_item_id)
+    .single()
+  if (invErr) {
+    console.error("[offer-notify] could not load stone", offer.inventory_item_id, "—", invErr.message)
+  }
+  const invRow     = inv as { sku: string | null; title: string | null } | null
+  const sku        = invRow?.sku?.trim()   || "a stone"
+  const stoneTitle = invRow?.title?.trim() || "your stone"
+  const amount     = eur(Number(offer.offered_price))
+
+  const ownerEmail = Deno.env.get("OWNER_EMAIL")?.trim() ?? ""
+  if (!ownerEmail && event !== "declined") {
+    console.error("[offer-notify] OWNER_EMAIL not set — owner not emailed")
+  }
+
+  async function loadSellerEmail(): Promise<string> {
+    const { data, error } = await supabase
+      .from("sellers")
+      .select("email")
+      .eq("id", offer!.seller_id)
+      .single()
+    if (error) {
+      console.error("[offer-notify] could not load seller", offer!.seller_id, "—", error.message)
+    }
+    const addr = (data as { email: string | null } | null)?.email?.trim() ?? ""
+    if (!addr) {
+      console.log("[offer-notify] seller", offer!.seller_id, "has no email — seller not emailed")
+    }
+    return addr
+  }
+
+  async function loadBuyerEmail(): Promise<string> {
+    const { data, error } = await supabase.auth.admin.getUserById(offer!.buyer_id)
+    const addr = data?.user?.email?.trim() ?? ""
+    if (error || !addr) {
+      console.error("[offer-notify] could not resolve buyer email for offer", offer!.id, error?.message)
+    }
+    return addr
+  }
+
+  // Each send is queued here, then sent only after the claim succeeds.
+  const outbox: { to: string; email: Email; who: string }[] = []
+
+  // Seller + owner as separate emails, or one email when they share an inbox.
+  function queueStaff(sellerEmail: string, email: Email) {
+    if (sameAddress(sellerEmail, ownerEmail)) {
+      outbox.push({ to: ownerEmail, email, who: "seller+owner" })
+      return
+    }
+    if (sellerEmail) outbox.push({ to: sellerEmail, email, who: "seller" })
+    if (ownerEmail)  outbox.push({ to: ownerEmail,  email, who: "owner" })
+  }
+
+  // ── 5. Build emails per event ──────────────────────────────────────────────
+  switch (event) {
+    case "new_offer": {
+      queueStaff(await loadSellerEmail(), staffNewOfferEmail(sku, amount))
+      break
+    }
+
+    case "accepted": {
+      const buyerAddr = await loadBuyerEmail()
+
+      const { data: orderData, error: orderErr } = await supabase
+        .from("orders")
+        .select("order_total, shipping_cost, payment_due_at")
+        .eq("offer_id", offer.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const order = orderData as OrderRow | null
+      if (orderErr || !order || order.order_total == null || !order.payment_due_at) {
+        // Without the total and deadline the buyer email would be misleading — don't send it.
+        console.error("[offer-notify] no order with total + payment_due_at for accepted offer", offer.id, orderErr?.message)
+      } else if (buyerAddr) {
+        outbox.push({
+          to:  buyerAddr,
+          who: "buyer",
+          email: buyerAcceptedEmail(
+            stoneTitle,
+            amount,
+            eur(Number(order.order_total)),
+            Number(order.shipping_cost ?? 0),
+            utcDate.format(new Date(order.payment_due_at)),
+          ),
+        })
+      }
+
+      // The staff side that didn't act; skipped when it's the same inbox as the actor.
+      const actedBy = offer.responded_by_role
+      if (actedBy === "seller" || actedBy === "owner") {
+        const sellerEmail = await loadSellerEmail()
+        const other       = actedBy === "seller" ? ownerEmail : sellerEmail
+        const actor       = actedBy === "seller" ? sellerEmail : ownerEmail
+        if (other && !sameAddress(other, actor)) {
+          outbox.push({
+            to:    other,
+            who:   actedBy === "seller" ? "owner" : "seller",
+            email: staffAcceptedEmail(sku, amount, actedBy),
+          })
+        }
+      } else {
+        console.log("[offer-notify] accepted offer", offer.id, "has responded_by_role", actedBy, "— no staff email")
+      }
+      break
+    }
+
+    case "declined": {
+      const buyerAddr = await loadBuyerEmail()
+      if (buyerAddr) {
+        outbox.push({
+          to:    buyerAddr,
+          who:   "buyer",
+          email: buyerDeclinedEmail(stoneTitle, amount, offer.inventory_item_id, offer.responded_by_role === "system"),
+        })
+      }
+      break
+    }
+
+    case "expired": {
+      const buyerAddr = await loadBuyerEmail()
+      if (buyerAddr) {
+        outbox.push({ to: buyerAddr, who: "buyer", email: buyerExpiredEmail(stoneTitle, offer.inventory_item_id) })
+      }
+      queueStaff(await loadSellerEmail(), staffExpiredEmail(sku, amount))
+      break
+    }
+  }
+
+  if (outbox.length === 0) {
+    console.log("[offer-notify] offer", offer.id, "event", event, "— no recipients")
+    return json({ ok: true, emailsSent: 0, reason: "no recipients" })
+  }
+
+  // ── 6. Claim once, then send ───────────────────────────────────────────────
+  const kind = CLAIM_KIND[event]
+  if (!await claim(supabase, offer.id, kind)) {
+    console.log("[offer-notify] offer", offer.id, "event", event, "— already notified, skipping")
+    return json({ skipped: true, reason: "already notified" })
+  }
+
+  let sent = 0
+  for (const m of outbox) {
+    if (await sendEmail(resendApiKey, m.to, m.email, `offer ${offer.id} ${event} (${m.who})`)) sent++
+  }
+
+  console.log("[offer-notify] offer", offer.id, "event", event, "— emails sent:", sent, "of", outbox.length)
+  return json({ ok: true, emailsSent: sent })
+})

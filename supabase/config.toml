@@ -429,3 +429,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/message-notify/deno.json"
 entrypoint = "./functions/message-notify/index.ts"
+
+[functions.offer-notify]
+enabled = true
+verify_jwt = false
+import_map = "./functions/offer-notify/deno.json"
+entrypoint = "./functions/offer-notify/index.ts"
