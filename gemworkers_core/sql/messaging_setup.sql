@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Message portal (buyer ↔ GemWorkers staff, per stone)
 -- =============================================================================
--- NOT YET APPLIED to the live DB.
+-- Applied to live DB 2026-10-20
 --
 -- 1. Tables
 --      conversations — one per (stone, buyer): UNIQUE(inventory_item_id, buyer_id).
