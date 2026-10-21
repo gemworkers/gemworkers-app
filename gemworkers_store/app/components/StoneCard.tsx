@@ -1,9 +1,6 @@
 import Link from 'next/link'
 import { countryName } from '@/lib/countries'
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-})
+import { formatEur } from '@/lib/money'
 
 export type StoneCardItem = {
   id: string
@@ -92,7 +89,7 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
           </p>
         ) : item.selling_price != null ? (
           <p style={{ fontSize: 17, fontWeight: 600, color: '#1F1B16' }}>
-            {eur.format(Number(item.selling_price))}
+            {formatEur(Number(item.selling_price))}
           </p>
         ) : (
           <p style={{ fontSize: 17, color: '#6B6052' }}>—</p>
@@ -100,7 +97,7 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
 
         {cost !== null && (
           <p style={{ fontSize: 12, marginTop: 4, color: '#6B6052' }}>
-            {cost === 0 ? 'Free shipping' : `+ €${cost.toFixed(0)} shipping`}
+            {cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`}
           </p>
         )}
       </div>

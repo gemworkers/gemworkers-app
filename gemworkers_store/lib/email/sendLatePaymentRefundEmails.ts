@@ -1,5 +1,6 @@
 // SERVER ONLY — never import from client components.
 import { Resend } from 'resend'
+import { formatEur } from '@/lib/money'
 import type { EmailOrderLine } from './sendNewOrderEmail'
 
 const FROM = 'GemWorkers <orders@gemworkers.com>'
@@ -14,7 +15,7 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-const fmt = (n: number) => `€${Number(n).toFixed(2)}`
+const fmt = formatEur
 
 // One refunded order — orderId is always shown to the owner.
 export type RefundedOrderLine = EmailOrderLine & { orderId: string }

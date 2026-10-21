@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { searchAttachableStones, type AttachableStone } from '@/app/actions/messages'
 import { pillQuiet, inputStyle } from '@/lib/ui'
+import { formatEur } from '@/lib/money'
 
 // "Attach a stone" for buyer messages: a quiet button that opens a searchable
 // list of public stones (popover on desktop, bottom sheet on mobile), plus the
@@ -10,10 +11,6 @@ import { pillQuiet, inputStyle } from '@/lib/ui'
 // One stone per message; the DB re-checks that it is still publicly visible.
 
 const SEARCH_DEBOUNCE_MS = 250
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-})
 
 function GemIcon() {
   return (
@@ -171,7 +168,7 @@ export function AttachStonePicker({
                         {s.gem_type && <span className="msg-attach-sub">{s.gem_type}</span>}
                       </span>
                       {s.selling_price != null && (
-                        <span className="msg-attach-price">{eur.format(s.selling_price)}</span>
+                        <span className="msg-attach-price">{formatEur(s.selling_price)}</span>
                       )}
                     </button>
                   </li>

@@ -11,6 +11,7 @@ import { cancelPendingOrder } from '@/app/actions/commerce';
 import { countryName } from '@/lib/countries';
 import { TrustList } from '@/app/components/TrustList';
 import { canStartOfferPayment } from '@/lib/offer-payment';
+import { formatEur } from '@/lib/money';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,12 +78,6 @@ type ListingDetail = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
 
 const CATEGORY: Record<ListingDetail['product_type'], { label: string; href: string }> = {
   loose_stone: { label: 'Loose Gemstones', href: '/shop/loose_stone' },
@@ -284,7 +279,7 @@ export default async function StoneDetailPage({
 
   const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
   const shippingCostDisplay =
-    cost === null ? null : cost === 0 ? 'Free' : `€${cost.toFixed(0)}`;
+    cost === null ? null : cost === 0 ? 'Free' : `${formatEur(cost)}`;
 
   const deliveryRange =
     item.delivery_days_min != null && item.delivery_days_max != null
@@ -312,7 +307,7 @@ export default async function StoneDetailPage({
     item.origin_country,
   ], ' · ');
   const shippingLine = joinParts([
-    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${eur.format(cost)} shipping`,
+    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`,
     shipFromName ? `Ships from ${shipFromName}` : null,
   ], ' · ');
 
@@ -362,7 +357,7 @@ export default async function StoneDetailPage({
             {item.sale_method === 'accept_offers' ? (
               <p className="pd-price">Make an offer</p>
             ) : item.selling_price != null ? (
-              <p className="pd-price">{eur.format(Number(item.selling_price))}</p>
+              <p className="pd-price">{formatEur(Number(item.selling_price))}</p>
             ) : (
               <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}

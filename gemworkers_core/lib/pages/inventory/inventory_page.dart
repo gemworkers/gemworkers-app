@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/user_profile_service.dart';
+import '../../core/utils/money.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
@@ -695,7 +696,7 @@ class _InventoryPageState extends State<InventoryPage>
               const TextSpan(text: ' items · '),
               TextSpan(text: '$_availableCount', style: number),
               const TextSpan(text: ' available · '),
-              TextSpan(text: '€${_formatValue(_listedValue)}', style: number),
+              TextSpan(text: formatEur(_listedValue), style: number),
               const TextSpan(text: ' listed value'),
             ],
     );
@@ -850,12 +851,6 @@ class _InventoryPageState extends State<InventoryPage>
         borderRadius: BorderRadius.circular(22),
         borderSide: BorderSide(color: color, width: width),
       );
-
-  static String _formatValue(double v) {
-    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-    return v.toStringAsFixed(0);
-  }
 
   Widget _buildGemPill() {
     return PopupMenuButton<String>(

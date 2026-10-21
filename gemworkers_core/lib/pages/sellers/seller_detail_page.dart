@@ -3,6 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/user_profile_service.dart';
+import '../../core/utils/money.dart';
 import '../../models/location.dart';
 import '../../models/seller.dart';
 import '../../repositories/location_repository.dart';
@@ -485,7 +486,7 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
         const SizedBox(width: 8),
         Expanded(
             child:
-                _StatCard('€${seller.revenue.toStringAsFixed(0)}', 'Revenue')),
+                _StatCard(formatEur(seller.revenue), 'Revenue')),
       ],
     );
   }

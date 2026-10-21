@@ -9,6 +9,7 @@ import {
 } from '@/lib/ui'
 import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
 import { PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
+import { formatEur, formatEurExact } from '@/lib/money'
 
 export type BuyerOffer = {
   id: string
@@ -44,10 +45,23 @@ function initState(offer: BuyerOffer | null): State {
   return 'declined'
 }
 
-const eur = (n: number) =>
-  new Intl.NumberFormat('en-IE', {
-    style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-  }).format(n)
+// Euros with up to 2 decimals, '.' or ',' as separator: "50", "49.8", "49,80".
+const PRICE_RE = /^\d+([.,]\d{1,2})?$/
+
+// Parses the typed offer exactly — never rounds. Returns the amount, or an
+// error to show for anything that isn't a plain positive euro amount.
+function parseOfferPrice(raw: string): { price: number } | { error: string } | null {
+  const s = raw.trim()
+  if (s === '') return null
+  if (!PRICE_RE.test(s)) {
+    return { error: 'Please enter an amount like 450, 49.80 or 49,80 (up to 2 decimals).' }
+  }
+  const price = Number(s.replace(',', '.'))
+  if (!Number.isFinite(price) || price <= 0) {
+    return { error: 'Your offer must be more than €0.' }
+  }
+  return { price }
+}
 
 const chipBase: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, borderRadius: 14, padding: '3px 12px', whiteSpace: 'nowrap',
@@ -108,11 +122,13 @@ export function OfferPanel({
   // ── Form ──────────────────────────────────────────────────────────────────
   if (state === 'form' || state === 'submitting') {
     const busy = state === 'submitting'
-    const parsed = parseFloat(priceInput.replace(',', '.'))
-    const validPrice = !isNaN(parsed) && parsed > 0
+    const parsedResult = parseOfferPrice(priceInput)
+    const parsed = parsedResult && 'price' in parsedResult ? parsedResult.price : null
+    const inputError = parsedResult && 'error' in parsedResult ? parsedResult.error : null
+    const validPrice = parsed !== null
 
     async function handleSubmit() {
-      if (!validPrice) return
+      if (parsed === null) return
       setState('submitting')
       setErrorMsg(null)
       const res = await submitOffer(itemId, parsed, noteInput.trim() || undefined)
@@ -135,14 +151,21 @@ export function OfferPanel({
           <label style={labelStyle} htmlFor="offer-price">Your price (€)</label>
           <input
             id="offer-price"
-            type="number" min="0.01" step="0.01"
+            type="text" inputMode="decimal" autoComplete="off"
             placeholder="e.g. 450"
             value={priceInput}
             onChange={e => setPriceInput(e.target.value)}
             disabled={busy}
             autoFocus
+            aria-invalid={inputError ? true : undefined}
+            aria-describedby={inputError ? 'offer-price-error' : undefined}
             style={inputStyle}
           />
+          {inputError && (
+            <p id="offer-price-error" style={{ fontSize: 13, color: '#B42318', margin: '6px 0 0' }}>
+              {inputError}
+            </p>
+          )}
         </div>
 
         <div>
@@ -172,7 +195,7 @@ export function OfferPanel({
               cursor: busy || !validPrice ? 'default' : 'pointer',
             }}
           >
-            {busy ? 'Sending…' : 'Send offer'}
+            {busy ? 'Sending…' : parsed !== null ? `Send offer of ${formatEurExact(parsed)}` : 'Send offer'}
           </button>
           <button
             onClick={() => setState(initState(offer))}
@@ -208,7 +231,7 @@ export function OfferPanel({
       <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ fontSize: 15, color: '#1F1B16' }}>
-            Your offer: <strong>{offer ? eur(offer.offered_price) : '—'}</strong>
+            Your offer: <strong>{offer ? formatEur(offer.offered_price) : '—'}</strong>
           </span>
           <span style={{
             ...chipBase, color: '#7A5A22',
@@ -236,11 +259,11 @@ export function OfferPanel({
     return (
       <div style={{ ...panel, border: '1px solid rgba(43,122,61,0.3)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <p style={{ fontSize: 15, color: '#1F1B16', lineHeight: 1.5, margin: 0 }}>
-          Your offer of <strong>{eur(offer.offered_price)}</strong> was accepted.
+          Your offer of <strong>{formatEur(offer.offered_price)}</strong> was accepted.
         </p>
         {payable.canPay ? (
           <>
-            <PayOfferButton offerId={offer.id} label={`Pay ${eur(payable.orderTotal)}`} />
+            <PayOfferButton offerId={offer.id} label={`Pay ${formatEur(payable.orderTotal)}`} />
             <PaymentDeadline dueAt={payable.dueAt} style={{ margin: 0, textAlign: 'center' }} />
           </>
         ) : (
@@ -276,7 +299,7 @@ export function OfferPanel({
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     }}>
       <span style={{ fontSize: 15, color: '#1F1B16' }}>
-        Your offer: <strong>{offer ? eur(offer.offered_price) : '—'}</strong>
+        Your offer: <strong>{offer ? formatEur(offer.offered_price) : '—'}</strong>
       </span>
       <span style={{
         ...chipBase, color: chip.color,

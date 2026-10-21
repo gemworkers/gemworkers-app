@@ -6,6 +6,7 @@ import { BuyAllButton } from './BuyAllButton'
 import { TrustList } from '@/app/components/TrustList'
 import { countryName } from '@/lib/countries'
 import { pillDark, pillOutline } from '@/lib/ui'
+import { formatEur } from '@/lib/money'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,19 +23,6 @@ type CartListing = {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-})
-
-const eurDecimal = new Intl.NumberFormat('en-IE', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
 
 function isBuyable(listing: CartListing | null): listing is CartListing {
   return listing !== null &&
@@ -161,15 +149,15 @@ export default async function CartPage() {
               </h2>
               <div className="cart-sum-row">
                 <span>Subtotal</span>
-                <span>{eurDecimal.format(subtotal)}</span>
+                <span>{formatEur(subtotal)}</span>
               </div>
               <div className="cart-sum-row">
                 <span>Shipping</span>
-                <span>{shippingTotal === 0 ? 'Free' : eurDecimal.format(shippingTotal)}</span>
+                <span>{shippingTotal === 0 ? 'Free' : formatEur(shippingTotal)}</span>
               </div>
               <div className="cart-sum-row cart-sum-total">
                 <span>Total</span>
-                <span>{eurDecimal.format(grandTotal)}</span>
+                <span>{formatEur(grandTotal)}</span>
               </div>
               {buyableCount < cartItems.length && (
                 <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 16, lineHeight: 1.5 }}>
@@ -217,12 +205,12 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
             {listing.sale_method === 'accept_offers'
               ? <span style={{ fontSize: 14, fontWeight: 500, color: '#7A5A22' }}>Accepting offers</span>
               : listing.selling_price != null
-                ? eur.format(listing.selling_price)
+                ? formatEur(listing.selling_price)
                 : <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}>Price on request</span>
             }
             {cost !== null && listing.selling_price != null && listing.sale_method !== 'accept_offers' && (
               <span className="cart-sub" style={{ display: 'block', fontWeight: 400 }}>
-                {cost === 0 ? 'Free shipping' : `+ ${eur.format(cost)} shipping`}
+                {cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`}
               </span>
             )}
           </div>

@@ -5,6 +5,7 @@ import { MarkReceivedButton } from './MarkReceivedButton'
 import { pillOutline } from '@/lib/ui'
 import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
+import { formatEur } from '@/lib/money'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,10 +47,6 @@ function statusColor(s: string): string {
   if (s === 'pending_payment') return '#7A5A22'
   return '#2B7A3D'
 }
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-});
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -191,10 +188,10 @@ function SingleOrderCard({
         <div className="order-total">
           <span className="order-muted">
             {rawShipping != null && rawShipping > 0
-              ? `${eur.format(rawStone!)} + ${eur.format(rawShipping)} shipping`
+              ? `${formatEur(rawStone!)} + ${formatEur(rawShipping)} shipping`
               : 'Total'}
           </span>
-          <span className="order-total-amount">{eur.format(rawTotal)}</span>
+          <span className="order-total-amount">{formatEur(rawTotal)}</span>
         </div>
       )}
     </article>
@@ -264,7 +261,7 @@ function GroupedOrderCard({
 
               {oTotal != null && (
                 <span style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', flexShrink: 0 }}>
-                  {eur.format(oTotal)}
+                  {formatEur(oTotal)}
                 </span>
               )}
             </div>
@@ -278,7 +275,7 @@ function GroupedOrderCard({
       {/* Combined total footer */}
       <div className="order-total">
         <span className="order-muted">Total</span>
-        <span className="order-total-amount">{eur.format(combinedTotal)}</span>
+        <span className="order-total-amount">{formatEur(combinedTotal)}</span>
       </div>
     </article>
   )
@@ -289,7 +286,7 @@ function GroupedOrderCard({
 export default async function BuyerOrdersPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  if (!user) redirect('/auth/login?next=%2Forders')
 
   const { data } = await supabase
     .from('orders')

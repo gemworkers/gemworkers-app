@@ -1,5 +1,6 @@
 // SERVER ONLY — never import from client components.
 import { Resend } from 'resend'
+import { formatEur } from '@/lib/money'
 import type { EmailOrderLine, ShippingAddress } from './sendNewOrderEmail'
 
 // Re-export types so callers only need one import.
@@ -38,7 +39,7 @@ function buildSubject(orders: EmailOrderLine[]): string {
 }
 
 function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
-  const fmt = (n: number) => `€${Number(n).toFixed(2)}`
+  const fmt = formatEur
 
   const rows = orders.map(o => `
       <tr>

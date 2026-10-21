@@ -1,5 +1,6 @@
 // SERVER ONLY — never import from client components.
 import { Resend } from 'resend'
+import { formatEur } from '@/lib/money'
 
 const FROM = 'GemWorkers <orders@gemworkers.com>'
 
@@ -46,7 +47,7 @@ function buildAddrHtml(addr: ShippingAddress): string {
 }
 
 function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
-  const fmt = (n: number) => `€${Number(n).toFixed(2)}`
+  const fmt = formatEur
 
   const rows = orders.map(o => `
       <tr>

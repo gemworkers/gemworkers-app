@@ -562,9 +562,16 @@ export async function submitOffer(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'You must be logged in to make an offer.' }
 
+  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+    return { error: 'Please enter an offer greater than €0.' }
+  }
+  // Strip float noise (e.g. 49.800000000001) so the RPC's 2-decimal guard
+  // only rejects genuinely over-precise amounts.
+  const exactPrice = Math.round(offeredPrice * 100) / 100
+
   const { data, error } = await supabase.rpc('submit_storefront_offer', {
     p_inventory_item_id: itemId,
-    p_offered_price: offeredPrice,
+    p_offered_price: exactPrice,
     p_buyer_note: note ?? '',
   })
 

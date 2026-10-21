@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/money.dart';
 import '../../models/customer.dart';
 import '../../models/order.dart';
 import '../../repositories/customer_repository.dart';
@@ -199,7 +200,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                 _StatCell(label: 'Orders', value: '$paidCount'),
                 _StatCell(
                     label: 'Spent',
-                    value: '€${_fmtSpend(totalSpent)}'),
+                    value: formatEur(totalSpent)),
                 if (_customer.firstOrderDate != null)
                   _StatCell(
                     label: 'Since',
@@ -321,11 +322,6 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         ],
       ),
     );
-  }
-
-  static String _fmtSpend(double v) {
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-    return v.toStringAsFixed(0);
   }
 
   static String _fmtDate(DateTime d) =>

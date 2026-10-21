@@ -4,12 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { buyNow } from '@/app/actions/commerce'
 import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from '@/lib/ui'
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-})
+import { formatEur } from '@/lib/money'
 
 type Props = {
   itemId: string
@@ -27,7 +22,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
 
   if (sellingPrice == null) return null
 
-  const formatted = eur.format(sellingPrice)
+  const formatted = formatEur(sellingPrice)
 
   // ── Logged-out ────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
@@ -79,7 +74,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
               fontSize: 14, color: '#5A5045', marginBottom: 8,
             }}>
               <span>Shipping</span>
-              <span>{eur.format(shippingCost)}</span>
+              <span>{formatEur(shippingCost)}</span>
             </div>
             <div style={{ height: 1, background: '#ECE5D8', marginBottom: 8 }} />
             <div style={{
@@ -87,7 +82,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
               fontSize: 15, fontWeight: 600, color: '#1F1B16',
             }}>
               <span>Total</span>
-              <span>{eur.format(sellingPrice! + shippingCost)}</span>
+              <span>{formatEur(sellingPrice! + shippingCost)}</span>
             </div>
           </div>
         ) : (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { formatEur } from '@/lib/money'
 
 // Shared types + pieces for the buyer message portal (/messages).
 
@@ -25,10 +26,6 @@ export type ThreadMessage = {
   linked_inventory_item_id: string | null
   created_at: string
 }
-
-const eur = new Intl.NumberFormat('en-IE', {
-  style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-})
 
 // ── Local time ────────────────────────────────────────────────────────────────
 // Rendered in UTC on the server and on first paint (identical, so no hydration
@@ -105,7 +102,7 @@ export function MessageStoneCard({
 
         <div className="msg-stone-meta">
           {stone.status === 'available' && stone.selling_price != null && (
-            <span className="msg-stone-price">{eur.format(Number(stone.selling_price))}</span>
+            <span className="msg-stone-price">{formatEur(Number(stone.selling_price))}</span>
           )}
           {stone.status === 'reserved' && (
             <span className="order-pill msg-stone-badge">Reserved</span>
