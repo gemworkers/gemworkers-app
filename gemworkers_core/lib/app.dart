@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,10 +11,12 @@ import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
+import 'pages/messages/messages_page.dart';
 import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
 import 'pages/purchases/purchases_page.dart';
 import 'pages/suppliers/suppliers_page.dart';
+import 'repositories/messages_repository.dart';
 import 'repositories/offers_repository.dart';
 import 'repositories/order_repository.dart';
 import 'theme/app_theme.dart';
@@ -98,13 +102,34 @@ class _MainLayoutState extends State<MainLayout> {
   String? _listingsTab;
   int _toShipCount = 0;
   int _pendingOffersCount = 0;
+  int _unreadMessagesCount = 0;
   final _orderRepo = OrderRepository();
   final _offersRepo = OffersRepository();
+  final _messagesRepo = MessagesRepository();
+  Timer? _messagesTimer;
 
   @override
   void initState() {
     super.initState();
     _loadCounts();
+    _messagesTimer = Timer.periodic(
+        const Duration(seconds: 60), (_) => _loadMessagesCount());
+  }
+
+  @override
+  void dispose() {
+    _messagesTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Conversations with unread buyer messages (staff_unread_count).
+  Future<void> _loadMessagesCount() async {
+    try {
+      final count = await _messagesRepo.getUnreadCount();
+      if (mounted && count != _unreadMessagesCount) {
+        setState(() => _unreadMessagesCount = count);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadCounts() async {
@@ -118,6 +143,7 @@ class _MainLayoutState extends State<MainLayout> {
       final count = await _offersRepo.getPendingCount(sellerId: sellerId);
       if (mounted) setState(() => _pendingOffersCount = count);
     } catch (_) {}
+    await _loadMessagesCount();
   }
 
   bool get _isOwner => UserProfileService.instance.isOwner;
@@ -156,6 +182,7 @@ class _MainLayoutState extends State<MainLayout> {
         InventoryPage(initialTab: _listingsTab),
         OrdersPage(initialStatusFilter: _ordersStatus),
         const OffersPage(),
+        MessagesPage(onUnreadChanged: _loadMessagesCount),
         if (_isOwner) const CustomersPage(),
         const PurchasesPage(),
         const SuppliersPage(),
@@ -184,6 +211,12 @@ class _MainLayoutState extends State<MainLayout> {
           selectedIcon: Icons.local_offer,
           label: 'Offers',
           badgeCount: _pendingOffersCount,
+        ),
+        ShopNavItem(
+          icon: Icons.chat_bubble_outline,
+          selectedIcon: Icons.chat_bubble,
+          label: 'Messages',
+          badgeCount: _unreadMessagesCount,
         ),
         if (_isOwner)
           const ShopNavItem(
