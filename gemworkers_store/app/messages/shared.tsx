@@ -1,0 +1,129 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+
+// Shared types + pieces for the buyer message portal (/messages).
+
+// message_stone_cards row. status: available | reserved | unavailable;
+// selling_price is null when unavailable.
+export type StoneCardData = {
+  id: string
+  title: string
+  image_url: string | null
+  selling_price: number | null
+  product_type: string | null
+  status: 'available' | 'reserved' | 'unavailable'
+}
+
+// buyer_messages row
+export type ThreadMessage = {
+  id: string
+  is_mine: boolean
+  sender_name: string
+  body: string
+  linked_inventory_item_id: string | null
+  created_at: string
+}
+
+const eur = new Intl.NumberFormat('en-IE', {
+  style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
+})
+
+// ── Local time ────────────────────────────────────────────────────────────────
+// Rendered in UTC on the server and on first paint (identical, so no hydration
+// mismatch), then switched to the buyer's own time zone after mount.
+
+function formatTime(iso: string, mode: 'list' | 'thread', timeZone?: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const dayKey = (x: Date) => x.toLocaleDateString('en-IE', { timeZone })
+  const time = d.toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit', timeZone })
+
+  if (dayKey(d) === dayKey(now)) return mode === 'list' ? time : `Today, ${time}`
+
+  const sameYear = d.toLocaleDateString('en-IE', { year: 'numeric', timeZone })
+    === now.toLocaleDateString('en-IE', { year: 'numeric', timeZone })
+  const date = d.toLocaleDateString('en-IE', {
+    day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric', timeZone,
+  })
+  return mode === 'list' ? date : `${date}, ${time}`
+}
+
+export function LocalTime({ iso, mode }: { iso: string; mode: 'list' | 'thread' }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  return (
+    <time dateTime={iso} suppressHydrationWarning>
+      {formatTime(iso, mode, mounted ? undefined : 'UTC')}
+    </time>
+  )
+}
+
+// ── Stone card ────────────────────────────────────────────────────────────────
+// Large: top of a thread. Small: under a message that links a stone.
+
+export function MessageStoneCard({
+  stone,
+  size = 'large',
+}: {
+  stone: StoneCardData | null
+  size?: 'large' | 'small'
+}) {
+  const small = size === 'small'
+
+  if (!stone) {
+    return (
+      <div className={`msg-stone ${small ? 'msg-stone-sm' : ''}`}>
+        <div className="msg-stone-thumb" />
+        <div style={{ minWidth: 0 }}>
+          <p className="msg-stone-title">Stone no longer listed</p>
+          <p className="order-muted">This stone has been removed from GemWorkers.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const href = `/stones/${stone.id}`
+  const linkable = stone.status !== 'unavailable'
+
+  return (
+    <div className={`msg-stone ${small ? 'msg-stone-sm' : ''}`}>
+      <div className="msg-stone-thumb">
+        {stone.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={stone.image_url} alt={stone.title} />
+        )}
+      </div>
+
+      <div style={{ minWidth: 0, flex: 1 }}>
+        {linkable ? (
+          <Link href={href} className="msg-stone-title msg-stone-title-link">{stone.title}</Link>
+        ) : (
+          <p className="msg-stone-title">{stone.title}</p>
+        )}
+
+        <div className="msg-stone-meta">
+          {stone.status === 'available' && stone.selling_price != null && (
+            <span className="msg-stone-price">{eur.format(Number(stone.selling_price))}</span>
+          )}
+          {stone.status === 'reserved' && (
+            <span className="order-pill msg-stone-badge">Reserved</span>
+          )}
+          {stone.status === 'unavailable' && (
+            <span className="order-pill msg-stone-badge">No longer available</span>
+          )}
+        </div>
+
+        {stone.status === 'available' && (
+          <Link href={href} className="pd-link" style={{ fontSize: small ? 13 : 14 }}>
+            {small ? 'View stone →' : 'View & buy →'}
+          </Link>
+        )}
+        {stone.status === 'reserved' && !small && (
+          <p className="order-muted">This stone is reserved at the moment.</p>
+        )}
+      </div>
+    </div>
+  )
+}

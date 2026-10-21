@@ -114,14 +114,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
 
-  let navUser: { displayName: string | null } | null = null
+  let navUser: { displayName: string | null; unreadMessages: number } | null = null
   if (authUser) {
-    const { data: buyer } = await supabase
-      .from('buyers')
-      .select('display_name')
-      .eq('id', authUser.id)
-      .maybeSingle()
-    navUser = { displayName: buyer?.display_name ?? authUser.email ?? null }
+    const [{ data: buyer }, { data: unread }] = await Promise.all([
+      supabase
+        .from('buyers')
+        .select('display_name')
+        .eq('id', authUser.id)
+        .maybeSingle(),
+      supabase.rpc('buyer_unread_count'),
+    ])
+    navUser = {
+      displayName: buyer?.display_name ?? authUser.email ?? null,
+      unreadMessages: Number((unread as { messages?: number } | null)?.messages) || 0,
+    }
   }
 
   return (

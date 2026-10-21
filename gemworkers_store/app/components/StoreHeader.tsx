@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { signOut } from '@/app/actions/auth'
 import type { CSSProperties } from 'react'
 
-type NavUser = { displayName: string | null }
+type NavUser = { displayName: string | null; unreadMessages: number }
 
 const SHOP_LINKS: { label: string; href: string }[] = [
   { label: 'Loose Gemstones', href: '/shop/loose_stone' },
@@ -25,6 +25,16 @@ const NAV_LINKS: { label: string; href: string }[] = [
 const navText: CSSProperties = {
   fontSize: 12, color: '#5A5045', letterSpacing: '0.06em', whiteSpace: 'nowrap',
   fontFamily: 'var(--font-inter, system-ui)',
+}
+
+// Unread replies next to "Messages" (buyer_unread_count)
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span className="nav-badge" aria-label={`${count} unread`}>
+      {count > 9 ? '9+' : count}
+    </span>
+  )
 }
 
 export function StoreHeader({ user }: { user: NavUser | null }) {
@@ -197,6 +207,9 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <Link href="/orders" className="nav-link" style={navText}>My Orders</Link>
+              <Link href="/messages" className="nav-link" style={navText}>
+                Messages<UnreadBadge count={user.unreadMessages} />
+              </Link>
               <span style={{
                 fontSize: 11, color: '#6B6052', fontFamily: 'var(--font-inter, system-ui)',
                 maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -304,6 +317,9 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               <Link href="/cart" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>Cart</Link>
               <Link href="/orders" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>My Orders</Link>
+              <Link href="/messages" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>
+                Messages<UnreadBadge count={user.unreadMessages} />
+              </Link>
               <form action={signOut}>
                 <button type="submit" style={{
                   display: 'block', padding: '12px 0', fontSize: 18, fontWeight: 300,
