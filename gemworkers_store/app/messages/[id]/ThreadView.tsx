@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { sendBuyerMessage, markConversationRead } from '@/app/actions/messages'
+import { sendBuyerMessage, markConversationRead, type AttachableStone } from '@/app/actions/messages'
 import { pillDarkSm, pillDisabledSm, inputStyle } from '@/lib/ui'
 import { LocalTime, MessageStoneCard, type StoneCardData, type ThreadMessage } from '../shared'
+import { AttachStonePicker, AttachedStoneChip } from '../AttachStonePicker'
 
 const MAX_LEN = 2000
 // Buyers can't subscribe to Realtime, so the thread re-fetches on a timer.
@@ -28,6 +29,8 @@ export function ThreadView({
 }) {
   const router = useRouter()
   const [body, setBody] = useState('')
+  // Picked stone wins over a pasted stone link (one linked stone per message)
+  const [attached, setAttached] = useState<AttachableStone | null>(null)
   const [sending, setSending] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -71,11 +74,12 @@ export function ThreadView({
     if (!canSend) return
     setSending(true)
     setErrorMsg(null)
-    const res = await sendBuyerMessage(conversationId, body)
+    const res = await sendBuyerMessage(conversationId, body, attached?.id ?? null)
     if ('error' in res) {
       setErrorMsg(res.error)
     } else {
       setBody('')
+      setAttached(null)
       router.refresh()
     }
     setSending(false)
@@ -108,6 +112,10 @@ export function ThreadView({
         <p className="msg-closed">This conversation is closed</p>
       ) : (
         <div className="msg-reply">
+          {attached && (
+            <AttachedStoneChip stone={attached} onRemove={() => setAttached(null)} disabled={sending} />
+          )}
+
           <label htmlFor="msg-reply-body" className="sr-only">Your reply</label>
           <textarea
             id="msg-reply-body"
@@ -131,17 +139,20 @@ export function ThreadView({
 
           <div className="msg-reply-foot">
             <span style={{ fontSize: 12, color: '#6B6052' }}>{body.length} / {MAX_LEN}</span>
-            <button
-              onClick={handleSend}
-              disabled={!canSend}
-              style={{
-                ...(canSend ? pillDarkSm : pillDisabledSm),
-                width: 'auto', minWidth: 120,
-                cursor: canSend ? 'pointer' : 'default',
-              }}
-            >
-              {sending ? 'Sending…' : 'Send'}
-            </button>
+            <div className="msg-reply-actions">
+              <AttachStonePicker onPick={setAttached} align="right" disabled={sending} />
+              <button
+                onClick={handleSend}
+                disabled={!canSend}
+                style={{
+                  ...(canSend ? pillDarkSm : pillDisabledSm),
+                  width: 'auto', minWidth: 120,
+                  cursor: canSend ? 'pointer' : 'default',
+                }}
+              >
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       )}

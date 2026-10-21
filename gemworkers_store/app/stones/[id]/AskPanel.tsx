@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { askAboutStone } from '@/app/actions/messages'
+import { askAboutStone, type AttachableStone } from '@/app/actions/messages'
+import { AttachStonePicker, AttachedStoneChip } from '@/app/messages/AttachStonePicker'
 import {
   pillQuiet, pillDarkSm, pillOutlineSm, pillDisabledSm,
   panel, inputStyle, labelStyle,
@@ -33,6 +34,8 @@ export function AskPanel({
   const [state, setState] = useState<State>(autoOpen ? 'open' : 'closed')
   const [body, setBody] = useState('')
   const [firstName, setFirstName] = useState('')
+  // Picked stone wins over a pasted stone link (one linked stone per message)
+  const [attached, setAttached] = useState<AttachableStone | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -87,7 +90,9 @@ export function AskPanel({
     if (!canSend) return
     setState('sending')
     setErrorMsg(null)
-    const res = await askAboutStone(itemId, body, needsFirstName ? firstName : undefined)
+    const res = await askAboutStone(
+      itemId, body, needsFirstName ? firstName : undefined, attached?.id ?? null
+    )
     if ('error' in res) {
       setErrorMsg(res.error)
       setState('open')
@@ -121,6 +126,11 @@ export function AskPanel({
 
       <div>
         <label style={labelStyle} htmlFor="ask-body">Your question</label>
+        {attached && (
+          <div style={{ marginBottom: 8 }}>
+            <AttachedStoneChip stone={attached} onRemove={() => setAttached(null)} disabled={busy} />
+          </div>
+        )}
         <textarea
           id="ask-body"
           rows={5}
@@ -155,6 +165,7 @@ export function AskPanel({
         >
           {busy ? 'Sending…' : 'Send'}
         </button>
+        <AttachStonePicker onPick={setAttached} disabled={busy} />
         <button
           onClick={() => setState('closed')}
           disabled={busy}

@@ -21,9 +21,13 @@ function friendlyError(error: { code?: string; message: string }): string {
 export async function askAboutStone(
   stoneId: string,
   body: string,
-  firstName?: string
+  firstName?: string,
+  linkedStoneId?: string | null
 ): Promise<{ conversationId: string } | { error: string }> {
   if (typeof stoneId !== 'string' || typeof body !== 'string') {
+    return { error: GENERIC_ERROR }
+  }
+  if (linkedStoneId != null && typeof linkedStoneId !== 'string') {
     return { error: GENERIC_ERROR }
   }
 
@@ -37,7 +41,8 @@ export async function askAboutStone(
   const { data, error } = await supabase.rpc('ask_about_stone', {
     p_inventory_item_id: stoneId,
     p_body:              body,
-    p_first_name:        firstName?.trim() || null,
+    p_linked_item_id:    linkedStoneId || findLinkedStoneId(body),
+    p_first_name:      firstName?.trim() || null,
   })
 
   if (error) {
@@ -52,13 +57,18 @@ export async function askAboutStone(
   return { conversationId }
 }
 
-// Replies in an existing conversation. A pasted gemworkers.com/stones/{id}
-// link (first one only) is sent as the message's linked stone.
+// Replies in an existing conversation. A picked stone (linkedStoneId) is sent
+// as the message's linked stone; otherwise the first pasted
+// gemworkers.com/stones/{id} link is.
 export async function sendBuyerMessage(
   conversationId: string,
-  body: string
+  body: string,
+  linkedStoneId?: string | null
 ): Promise<{ ok: true } | { error: string }> {
   if (typeof conversationId !== 'string' || typeof body !== 'string') {
+    return { error: GENERIC_ERROR }
+  }
+  if (linkedStoneId != null && typeof linkedStoneId !== 'string') {
     return { error: GENERIC_ERROR }
   }
 
@@ -72,7 +82,7 @@ export async function sendBuyerMessage(
   const { error } = await supabase.rpc('send_buyer_message', {
     p_conversation_id: conversationId,
     p_body:            body,
-    p_linked_item_id:  findLinkedStoneId(body),
+    p_linked_item_id:  linkedStoneId || findLinkedStoneId(body),
   })
 
   if (error) {
@@ -101,4 +111,67 @@ export async function markConversationRead(
   }
 
   return { ok: true }
+}
+
+// ── Attach a stone ────────────────────────────────────────────────────────────
+
+export type AttachableStone = {
+  id: string
+  title: string
+  gem_type: string | null
+  selling_price: number | null
+  image_url: string | null
+}
+
+const SEARCH_LIMIT = 30
+
+// Stones a buyer can attach to a message. public_listing_details only holds
+// listed, unsold stones from active sellers, which matches the rule the DB
+// enforces on p_linked_item_id. Matches on title or gem type.
+export async function searchAttachableStones(
+  query: string
+): Promise<{ stones: AttachableStone[] } | { error: string }> {
+  if (typeof query !== 'string') {
+    return { error: GENERIC_ERROR }
+  }
+
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Please sign in to attach a stone.' }
+  }
+
+  // Drop characters that mean something inside a PostgREST or() filter.
+  const term = query.replace(/[%_,()*\\"'.:]/g, ' ').trim().slice(0, 60)
+
+  // The view exposes no listing date, so results are alphabetical.
+  let req = supabase
+    .from('public_listing_details')
+    .select('id, title, gem_type, selling_price, image_urls')
+    .order('title', { ascending: true })
+    .limit(SEARCH_LIMIT)
+
+  if (term) {
+    req = req.or(`title.ilike.%${term}%,gem_type.ilike.%${term}%`)
+  }
+
+  const { data, error } = await req
+
+  if (error) {
+    console.error('[messages] stone search error:', error.code, error.message)
+    return { error: 'Could not load stones — please try again.' }
+  }
+
+  const stones: AttachableStone[] = (data ?? []).map(row => ({
+    id:            row.id as string,
+    title:         row.title as string,
+    gem_type:      (row.gem_type as string | null) ?? null,
+    selling_price: row.selling_price != null ? Number(row.selling_price) : null,
+    image_url:     Array.isArray(row.image_urls)
+      ? ((row.image_urls as string[])[0] ?? null)
+      : null,
+  }))
+
+  return { stones }
 }
