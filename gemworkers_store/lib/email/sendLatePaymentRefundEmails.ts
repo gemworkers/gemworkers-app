@@ -81,6 +81,31 @@ export async function sendLatePaymentOwnerEmail(opts: {
   if (error) throw new Error(error.message)
 }
 
+// Seller notice: their sale fell through — the late payment was refunded, so
+// nothing ships. No buyer details, no Stripe ids.
+export async function sendLatePaymentSellerEmail(opts: {
+  to:     string
+  orders: RefundedOrderLine[]
+}): Promise<void> {
+  const plural = opts.orders.length !== 1
+  const html = wrap(`
+    <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;margin:0 0 8px;color:#111;line-height:1.2">Late payment refunded &mdash; do not ship</h1>
+    <p style="font-size:14px;color:#374151;margin:0 0 24px;line-height:1.6">The buyer paid after the reservation had already ended, so GemWorkers refunded the payment automatically. ${plural ? 'These orders are' : 'This order is'} cancelled &mdash; please <strong>do not ship</strong> for ${plural ? 'these orders' : 'this order'}.</p>
+    ${table(opts.orders, false)}
+    <p style="font-size:14px;color:#374151;margin:0 0 32px;line-height:1.6">No action is needed. Questions? Email <a href="mailto:hello@gemworkers.com" style="color:#111">hello@gemworkers.com</a>.</p>
+    <p style="font-size:12px;color:#9ca3af;margin:0">This is an automated message &mdash; please do not reply.</p>`)
+
+  const { error } = await getResend().emails.send({
+    from:    FROM,
+    to:      [opts.to],
+    subject: plural
+      ? `Late payment refunded — ${opts.orders.length} orders cancelled, do not ship`
+      : `Late payment refunded — do not ship ${opts.orders[0]?.itemTitle ?? 'this stone'}`,
+    html,
+  })
+  if (error) throw new Error(error.message)
+}
+
 // Buyer notice: kind, short explanation that the stone was released and the
 // money is on its way back.
 export async function sendLatePaymentBuyerEmail(opts: {

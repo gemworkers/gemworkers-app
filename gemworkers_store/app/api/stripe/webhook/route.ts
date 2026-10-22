@@ -9,6 +9,7 @@ import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEma
 import {
   sendLatePaymentOwnerEmail,
   sendLatePaymentBuyerEmail,
+  sendLatePaymentSellerEmail,
   type RefundedOrderLine,
 } from '@/lib/email/sendLatePaymentRefundEmails'
 
@@ -80,15 +81,24 @@ async function notifySingleOrder(admin: AdminClient, orderId: string): Promise<v
     console.error('[webhook] email: seller', ord.seller_id, 'has no email — skipping seller recipient for order', orderId)
   }
 
-  const to = [sellerEmail, ownerEmail].filter(e => e !== '')
-  if (to.length === 0) { console.error('[webhook] email: no recipients for order', orderId); return }
+  // One email per recipient — seller and owner never share a To: line.
+  // A seller whose email is the owner's gets a single copy.
+  const recipients = [sellerEmail, ownerEmail].filter(e => e !== '')
+  const unique = recipients.filter((e, i) => recipients.findIndex(x => x.toLowerCase() === e.toLowerCase()) === i)
+  if (unique.length === 0) { console.error('[webhook] email: no recipients for order', orderId); return }
 
-  await sendNewOrderEmail({
-    to,
-    subject:  `New GemWorkers order — ${itemTitle}`,
-    orders:   [{ orderNumber: ord.order_number, itemTitle, orderTotal: Number(ord.order_total) }],
-    shipping: rowToShipping(ord),
-  })
+  for (const to of unique) {
+    try {
+      await sendNewOrderEmail({
+        to:       [to],
+        subject:  `New GemWorkers order — ${itemTitle}`,
+        orders:   [{ orderNumber: ord.order_number, itemTitle, orderTotal: Number(ord.order_total) }],
+        shipping: rowToShipping(ord),
+      })
+    } catch (e) {
+      console.error('[webhook] new-order email failed for order', orderId, '(', to === ownerEmail ? 'owner' : 'seller', '):', e instanceof Error ? e.message : String(e))
+    }
+  }
 }
 
 async function notifyGroupOrders(admin: AdminClient, groupId: string, orderIdsInScope: string[]): Promise<void> {
@@ -387,7 +397,50 @@ async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promis
   })
 }
 
-// Owner + buyer notices. Best-effort — each send is isolated.
+// Each seller is told about their own refunded orders: the sale fell through
+// and nothing should be shipped. Skipped when the seller's inbox is the
+// owner's (the owner notice already covers it).
+async function notifyLatePaymentSellers(
+  admin: AdminClient,
+  lines: RefundedOrderLine[],
+  ownerEmail: string,
+): Promise<void> {
+  const { data: ordersData } = await admin
+    .from('orders').select('id, seller_id').in('id', lines.map(l => l.orderId))
+  const sellerOf = new Map(
+    ((ordersData as { id: string; seller_id: string }[] | null) ?? []).map(o => [o.id, o.seller_id])
+  )
+
+  const bySeller = new Map<string, RefundedOrderLine[]>()
+  for (const line of lines) {
+    const sellerId = sellerOf.get(line.orderId)
+    if (!sellerId) { console.error('[webhook] late-payment seller email: no seller for order', line.orderId); continue }
+    bySeller.set(sellerId, [...(bySeller.get(sellerId) ?? []), line])
+  }
+  if (bySeller.size === 0) return
+
+  const { data: sellersData } = await admin
+    .from('sellers').select('id, email').in('id', [...bySeller.keys()])
+  const emailOf = new Map(
+    ((sellersData as { id: string; email: string | null }[] | null) ?? []).map(s => [s.id, s.email?.trim() ?? ''])
+  )
+
+  for (const [sellerId, sellerLines] of bySeller) {
+    const to = emailOf.get(sellerId) ?? ''
+    if (!to) {
+      console.error('[webhook] late-payment seller email: seller', sellerId, 'has no email')
+      continue
+    }
+    if (to.toLowerCase() === ownerEmail.toLowerCase()) continue
+    try {
+      await sendLatePaymentSellerEmail({ to, orders: sellerLines })
+    } catch (e) {
+      console.error('[webhook] late-payment seller email failed for seller', sellerId, ':', e instanceof Error ? e.message : String(e))
+    }
+  }
+}
+
+// Owner + buyer + seller notices. Best-effort — each send is isolated.
 async function notifyLatePayment(
   admin: AdminClient,
   orderIds: string[],
@@ -417,6 +470,12 @@ async function notifyLatePayment(
     }
   } else {
     console.error('[webhook] late-payment buyer email: no customer email on session', sessionId)
+  }
+
+  try {
+    await notifyLatePaymentSellers(admin, lines, ownerEmail)
+  } catch (e) {
+    console.error('[webhook] late-payment seller emails threw for', orderIds, ':', e instanceof Error ? e.message : String(e))
   }
 }
 
