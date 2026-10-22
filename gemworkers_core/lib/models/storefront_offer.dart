@@ -1,3 +1,5 @@
+import '../core/utils/commission.dart';
+
 class StorefrontOffer {
   final String id;
   final String inventoryItemId;
@@ -7,7 +9,10 @@ class StorefrontOffer {
   final String? stoneImageUrl; // first of inventory_items.image_urls
   final double? listedPrice; // inventory_items.selling_price (fallback sale_price)
   final double offeredPrice;
-  final String status;       // 'pending' | 'accepted' | 'declined' | 'expired'
+  final String status;       // 'pending' | 'countered' | 'accepted' | 'declined' | 'expired'
+  /// Staff counter-offer (one per offer); null if never countered.
+  final double? counterPrice;
+  final DateTime? counterExpiresAt;
   final String buyerNote;
   final String sellerNote;
   final String buyerEmail;   // from buyers join; '' if RLS blocks
@@ -30,6 +35,8 @@ class StorefrontOffer {
     this.listedPrice,
     required this.offeredPrice,
     required this.status,
+    this.counterPrice,
+    this.counterExpiresAt,
     required this.buyerNote,
     required this.sellerNote,
     required this.buyerEmail,
@@ -72,6 +79,10 @@ class StorefrontOffer {
       listedPrice:      listed != null && listed > 0 ? listed.toDouble() : null,
       offeredPrice:     (map['offered_price'] as num).toDouble(),
       status:           map['status']?.toString() ?? 'pending',
+      counterPrice:     parseNumeric(map['counter_price']),
+      counterExpiresAt: map['counter_expires_at'] != null
+                            ? DateTime.parse(map['counter_expires_at'].toString())
+                            : null,
       buyerNote:        map['buyer_note']?.toString() ?? '',
       sellerNote:       map['seller_note']?.toString() ?? '',
       buyerEmail:       buyer?['email']?.toString() ?? '',

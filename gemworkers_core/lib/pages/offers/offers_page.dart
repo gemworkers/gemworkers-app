@@ -12,6 +12,7 @@ import '../orders/order_detail_page.dart';
 
 enum _OffersTab {
   pending('Pending', 'pending', "No offers waiting — you're all caught up."),
+  countered('Countered', 'countered', 'No counter-offers waiting on a buyer.'),
   accepted('Accepted', 'accepted', 'No accepted offers yet.'),
   declined('Declined', 'declined', 'No declined offers.'),
   expired('Expired', 'expired', 'No expired offers.'),
@@ -151,6 +152,35 @@ class _OffersPageState extends State<OffersPage>
     }
   }
 
+  Future<void> _counter(StorefrontOffer offer) async {
+    final cents = await showDialog<int>(
+      context: context,
+      builder: (_) => _CounterDialog(offer: offer),
+    );
+    if (cents == null || !mounted) return;
+
+    setState(() => _saving = offer.id);
+    try {
+      await _repository.counterOffer(offer.id, cents);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Counter-offer sent. The buyer has 48 hours to accept or decline it.'),
+        ));
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = null);
+        final msg = e is PostgrestException ? e.message : e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
+    }
+  }
+
   Future<void> _openOrder(String orderId) async {
     await Navigator.push(
       context,
@@ -204,6 +234,9 @@ class _OffersPageState extends State<OffersPage>
                           : null,
                       onDecline: _saving == null
                           ? () => _respond(offer, 'declined')
+                          : null,
+                      onCounter: _saving == null
+                          ? () => _counter(offer)
                           : null,
                       onViewOrder: offer.orderId != null
                           ? () => _openOrder(offer.orderId!)
@@ -290,6 +323,7 @@ class _OfferCard extends StatelessWidget {
   final bool saving;
   final VoidCallback? onAccept;
   final VoidCallback? onDecline;
+  final VoidCallback? onCounter;
   final VoidCallback? onViewOrder;
 
   const _OfferCard({
@@ -298,6 +332,7 @@ class _OfferCard extends StatelessWidget {
     required this.saving,
     required this.onAccept,
     required this.onDecline,
+    required this.onCounter,
     required this.onViewOrder,
   });
 
@@ -380,6 +415,12 @@ class _OfferCard extends StatelessWidget {
             if (_percentOfPrice != null) _PercentChip(_percentOfPrice!),
           ],
         ),
+        if (offer.counterPrice != null)
+          Text(
+            'Counter-offer ${_money(offer.counterPrice!)}',
+            style: AppTheme.numeric(textTheme.bodyMedium,
+                color: AppColors.accent),
+          ),
       ],
     );
 
@@ -474,13 +515,47 @@ class _OfferCard extends StatelessWidget {
                 )
               : const Text('Accept'),
         );
+        final counter = OutlinedButton(
+          onPressed: saving ? null : onCounter,
+          child: const Text('Counter'),
+        );
         final decline = OutlinedButton(
           onPressed: saving ? null : onDecline,
           child: const Text('Decline'),
         );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [accept, const SizedBox(height: 8), decline],
+          children: [
+            accept,
+            const SizedBox(height: 8),
+            counter,
+            const SizedBox(height: 8),
+            decline,
+          ],
+        );
+
+      case 'countered':
+        return Column(
+          crossAxisAlignment:
+              wide ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            const _StatusChip(
+              'Countered — waiting for buyer',
+              color: AppColors.accent,
+              background: AppColors.raised,
+            ),
+            if (offer.counterExpiresAt != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Expires ${_dateTime(offer.counterExpiresAt!)}',
+                textAlign: wide ? TextAlign.end : TextAlign.start,
+                style: AppTheme.numeric(
+                  Theme.of(context).textTheme.bodySmall,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
         );
 
       case 'accepted':
@@ -548,6 +623,128 @@ class _OfferCard extends StatelessWidget {
           ),
         );
     }
+  }
+}
+
+/// Asks for the counter amount. Returns it in exact cents, or null on cancel.
+/// Text input (not a number spinner) so the amount never drifts; the range
+/// shown here is re-checked by counter_offer in SQL.
+class _CounterDialog extends StatefulWidget {
+  final StorefrontOffer offer;
+  const _CounterDialog({required this.offer});
+
+  @override
+  State<_CounterDialog> createState() => _CounterDialogState();
+}
+
+class _CounterDialogState extends State<_CounterDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  static final _amountRe = RegExp(r'^\d+([.,]\d{1,2})?$');
+
+  int get _offeredCents => (widget.offer.offeredPrice * 100).round();
+  int? get _listedCents => widget.offer.listedPrice != null
+      ? (widget.offer.listedPrice! * 100).round()
+      : null;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// "15", "15.5", "15,50" → 1500, 1550, 1550; null if not a euro amount.
+  static int? _parseCents(String input) {
+    final s = input.trim().replaceAll(' ', '');
+    if (!_amountRe.hasMatch(s)) return null;
+    final parts = s.replaceAll(',', '.').split('.');
+    final whole = int.parse(parts[0]);
+    final frac = parts.length > 1 ? int.parse(parts[1].padRight(2, '0')) : 0;
+    return whole * 100 + frac;
+  }
+
+  void _submit() {
+    final cents = _parseCents(_controller.text);
+    final listed = _listedCents;
+    String? error;
+    if (cents == null) {
+      error = 'Enter an amount in euros, e.g. 49.80';
+    } else if (cents <= _offeredCents) {
+      error = 'Must be higher than the buyer\'s offer '
+          '(${_OfferCard._money(widget.offer.offeredPrice)}).';
+    } else if (listed == null) {
+      error = 'This stone has no listed price, so it can\'t be countered.';
+    } else if (cents >= listed) {
+      error = 'Must be lower than the listed price '
+          '(${_OfferCard._money(widget.offer.listedPrice!)}).';
+    }
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    Navigator.pop(context, cents);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final offer = widget.offer;
+    final range = offer.listedPrice != null
+        ? 'Between ${_OfferCard._money(offer.offeredPrice)} (their offer) and '
+            '${_OfferCard._money(offer.listedPrice!)} (listed price).'
+        : 'Higher than their offer of ${_OfferCard._money(offer.offeredPrice)}.';
+
+    return AlertDialog(
+      title: const Text('Send a counter-offer'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Offer a price for "${offer.stoneTitle}". $range',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Counter-offer',
+                prefixText: '€ ',
+                errorText: _error,
+              ),
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The buyer has 48 hours to accept or decline. You can send one '
+              'counter-offer per offer, and it can\'t be changed afterwards.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Send counter-offer'),
+        ),
+      ],
+    );
   }
 }
 
