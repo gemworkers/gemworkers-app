@@ -83,9 +83,13 @@ class InventoryRepository {
   }
 
   Future<void> updateItem(String id, InventoryItem item) async {
+    final map = item.toMap();
+    // A general save never clears the seller: a missing sellerId on the model
+    // must not orphan the stone (it would vanish from the store).
+    if (map['seller_id'] == null) map.remove('seller_id');
     await supabase
         .from('inventory_items')
-        .update(item.toMap())
+        .update(map)
         .eq('id', id);
   }
 

@@ -329,6 +329,20 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         notes: _notes.text.trim(),
         imageUrls: finalImageUrls,
         makerId: _makerId,
+        // Keep the stone's seller — leaving it out saved seller_id = NULL and
+        // hid the stone from the store (public views join sellers).
+        sellerId: widget.item.sellerId,
+        // Not edited on this page (listing panel / lot sorting own them) —
+        // carried over so the full-row save doesn't reset them to defaults.
+        saleMethod: widget.item.saleMethod,
+        isUnsortedLot: widget.item.isUnsortedLot,
+        lotRemainingCount: widget.item.lotRemainingCount,
+        parentLotId: widget.item.parentLotId,
+        courier: widget.item.courier,
+        shippingCost: widget.item.shippingCost,
+        deliveryDaysMin: widget.item.deliveryDaysMin,
+        deliveryDaysMax: widget.item.deliveryDaysMax,
+        prepDays: widget.item.prepDays,
         supplierId: _supplierId,
         supplierName: supplierName,
         locationId: _locationId,
