@@ -600,9 +600,8 @@ export async function markOrderReceived(
   return { ok: true }
 }
 
-// Sets status = 'withdrawn' on the buyer's own pending offer.
-// RLS offers_buyer_update enforces: row must be buyer's own AND currently pending;
-// the new row must have status = 'withdrawn' (no other change is permitted).
+// Withdraws the buyer's own pending offer via withdraw_offer, which checks the
+// offer is the caller's and still 'pending' (buyers have no direct table access).
 export async function withdrawOffer(
   offerId: string
 ): Promise<{ ok: true } | { error: string }> {
@@ -611,16 +610,9 @@ export async function withdrawOffer(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'You must be logged in.' }
 
-  const { data, error } = await supabase
-    .from('storefront_offers')
-    .update({ status: 'withdrawn' })
-    .eq('id', offerId)
-    .select('id')
-    .maybeSingle()
+  const { error } = await supabase.rpc('withdraw_offer', { p_offer_id: offerId })
 
   if (error) return { error: error.message }
-  if (!data) return { error: 'Could not withdraw — the offer may already be resolved.' }
-
   return { ok: true }
 }
 

@@ -165,17 +165,16 @@ export default async function StoneDetailPage({
   }
 
   // ── This buyer's latest offer + its payable order (buyer's own RLS) ──
-  // Filtered by buyer_id: a logged-in seller could otherwise read other
-  // buyers' offers on their own stone via offers_seller_select.
+  // buyer_offers is filtered on auth.uid() and has no seller fields, so a
+  // logged-in seller only ever sees their own offers as a buyer here.
   let offerRow: BuyerOffer | null = null;
   let payable: PayableOrder | null = null;
   let payableOrderId: string | null = null;
   if (user) {
     const { data: offer } = await supabase
-      .from('storefront_offers')
+      .from('buyer_offers')
       .select('id, offered_price, status, counter_price, counter_expires_at')
       .eq('inventory_item_id', id)
-      .eq('buyer_id', user.id)
       .in('status', ['pending', 'countered', 'accepted', 'declined', 'expired'])
       .order('created_at', { ascending: false })
       .limit(1)
