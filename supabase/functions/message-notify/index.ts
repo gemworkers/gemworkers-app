@@ -17,6 +17,7 @@ interface MessageRecord {
   id:              string
   conversation_id: string
   sender_role:     string
+  kind?:           string | null
 }
 
 interface WebhookPayload {
@@ -185,6 +186,13 @@ Deno.serve(async (req: Request) => {
   if (!conversationId || !senderRole) {
     console.error("[message-notify] malformed record — missing conversation_id or sender_role")
     return json({ skipped: true, reason: "malformed record" })
+  }
+
+  // Missing kind (column not yet added) counts as 'text'.
+  const kind = record?.kind ?? "text"
+  if (kind !== "text") {
+    console.log("[message-notify] skipped — message kind", kind, "for conversation", conversationId)
+    return json({ skipped: true, reason: "non-text kind" })
   }
 
   // ── 3. Env ─────────────────────────────────────────────────────────────────
