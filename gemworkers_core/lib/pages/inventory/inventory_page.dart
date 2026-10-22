@@ -33,6 +33,7 @@ enum _SortOrder {
 enum _ListingTab {
   all('All'),
   active('Active'),
+  awaiting('Awaiting approval'),
   draft('Draft'),
   reserved('Reserved'),
   sold('Sold');
@@ -47,13 +48,15 @@ _ListingTab _listingStatus(InventoryItem item) {
   if (item.status == 'sold') return _ListingTab.sold;
   if (item.status == 'reserved') return _ListingTab.reserved;
   if (item.isListed && item.status == 'available') return _ListingTab.active;
+  if (item.isAwaitingApproval) return _ListingTab.awaiting;
   return _ListingTab.draft;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 class InventoryPage extends StatefulWidget {
-  /// Tab to open on, by name: 'all' | 'active' | 'draft' | 'reserved' | 'sold'.
+  /// Tab to open on, by name: 'all' | 'active' | 'awaiting' | 'draft' |
+  /// 'reserved' | 'sold'.
   final String? initialTab;
   const InventoryPage({super.key, this.initialTab});
 
@@ -369,13 +372,66 @@ class _InventoryPageState extends State<InventoryPage>
     final result = await showListingSheet(context, item);
     if (result == null || !mounted) return;
     _loadItems();
-    if (result.listed && result.price != null) {
+    if (result.listed && !UserProfileService.instance.isOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sent for approval. It goes live on the store once '
+              'GemWorkers approves it.')));
+    } else if (result.listed && result.price != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Item listed at €${result.price!.toStringAsFixed(2)}')));
     } else if (!result.listed) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Removed from marketplace')));
+    }
+  }
+
+  Future<void> _approveListing(InventoryItem item) async {
+    if (item.id == null) return;
+    try {
+      await _repository.approveListing(item.id!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Approved — "${item.title}" is now live on the store.')));
+      _loadItems();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Approve failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _rejectListing(InventoryItem item) async {
+    if (item.id == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reject this listing?'),
+        content: Text('"${item.title}" stays a draft and is not shown on the '
+            'store. The seller can fix it and send it again.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Reject')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _repository.clearListingRequest(item.id!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Listing rejected — it is back in Draft.')));
+      _loadItems();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Reject failed: $e')));
+      }
     }
   }
 
@@ -627,6 +683,10 @@ class _InventoryPageState extends State<InventoryPage>
       case _RowAction.list:
       case _RowAction.unlist:
         _openListingSheet(item);
+      case _RowAction.approve:
+        _approveListing(item);
+      case _RowAction.reject:
+        _rejectListing(item);
       case _RowAction.recordSale:
         _recordSale([item]);
       case _RowAction.select:
@@ -990,7 +1050,7 @@ class _InventoryPageState extends State<InventoryPage>
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
 
-enum _RowAction { list, unlist, recordSale, select, details }
+enum _RowAction { list, unlist, approve, reject, recordSale, select, details }
 
 /// Outline pill used for the filter/sort/select controls. With [onTap] null
 /// it is purely visual (e.g. as a PopupMenuButton child).
@@ -1239,13 +1299,22 @@ class _ListingRow extends StatelessWidget {
       icon: const Icon(Icons.more_horiz, color: AppColors.textSecondary),
       onSelected: (a) => onAction(a, item),
       itemBuilder: (_) => [
+        if (item.isAwaitingApproval && UserProfileService.instance.isOwner) ...[
+          const PopupMenuItem(
+              value: _RowAction.approve, child: Text('Approve listing')),
+          const PopupMenuItem(
+              value: _RowAction.reject, child: Text('Reject listing')),
+        ],
         if (item.status != 'sold')
           item.isListed
               ? const PopupMenuItem(
                   value: _RowAction.unlist,
                   child: Text('Remove from marketplace'))
-              : const PopupMenuItem(
-                  value: _RowAction.list, child: Text('List on marketplace')),
+              : PopupMenuItem(
+                  value: _RowAction.list,
+                  child: Text(item.isAwaitingApproval
+                      ? 'Edit listing request'
+                      : 'List on marketplace')),
         if (item.status != 'sold')
           const PopupMenuItem(
               value: _RowAction.recordSale, child: Text('Record sale')),
@@ -1515,6 +1584,7 @@ class _EmptyState extends StatelessWidget {
             : switch (tab) {
                 _ListingTab.all => 'No listings yet.',
                 _ListingTab.active => 'No active listings.',
+                _ListingTab.awaiting => 'Nothing waiting for approval.',
                 _ListingTab.draft => 'No draft listings.',
                 _ListingTab.reserved => 'No reserved listings.',
                 _ListingTab.sold => 'No sold listings.',
@@ -1568,6 +1638,7 @@ class _StatusChip extends StatelessWidget {
           AppColors.success.withValues(alpha: 0.1)
         ),
       _ListingTab.reserved => (AppColors.accent, AppColors.raised),
+      _ListingTab.awaiting => (AppColors.accent, AppColors.raised),
       _ => (AppColors.muted, AppColors.raised),
     };
     return Container(

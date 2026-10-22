@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
 import '../../models/item_movement.dart';
 import '../../repositories/inventory_repository.dart';
@@ -123,19 +124,63 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     if (_item.id == null) return;
     final result = await showListingSheet(context, _item);
     if (result == null || !mounted) return;
-    if (result.listed && result.price != null) {
+    if (result.listed && !_item.isListed && !UserProfileService.instance.isOwner) {
+      // A seller's new listing waits for the owner (sql/listing_approval.sql).
+      setState(() => _item = _item.copyWith(
+            sellingPrice: result.price,
+            listingRequestedAt: DateTime.now(),
+          ));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sent for approval. It goes live on the store once '
+              'GemWorkers approves it.')));
+    } else if (result.listed && result.price != null) {
       setState(() => _item = _item.copyWith(
             isListed: true,
             sellingPrice: result.price,
             listedAt: DateTime.now(),
+            listingRequestedAt: null,
           ));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Item listed at €${result.price!.toStringAsFixed(2)}')));
     } else if (!result.listed) {
-      setState(() => _item = _item.copyWith(isListed: false, listedAt: null));
+      setState(() => _item = _item.copyWith(
+          isListed: false, listedAt: null, listingRequestedAt: null));
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Removed from marketplace')));
+    }
+  }
+
+  Future<void> _approveListing() async {
+    if (_item.id == null) return;
+    try {
+      await _repository.approveListing(_item.id!);
+      if (!mounted) return;
+      setState(() => _item = _item.copyWith(
+          isListed: true, listedAt: DateTime.now(), listingRequestedAt: null));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Approved — now live on the store.')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Approve failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _rejectListing() async {
+    if (_item.id == null) return;
+    try {
+      await _repository.clearListingRequest(_item.id!);
+      if (!mounted) return;
+      setState(() => _item = _item.copyWith(listingRequestedAt: null));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Listing rejected — it is back in Draft.')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Reject failed: $e')));
+      }
     }
   }
 
@@ -591,10 +636,29 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                   'Listing',
                   _item.isListed
                       ? 'Listed · €${_item.sellingPrice?.toStringAsFixed(2) ?? ''}'
-                      : 'Private (not listed)',
+                      : _item.isAwaitingApproval
+                          ? 'Waiting for approval'
+                          : 'Private (not listed)',
                 ),
               ),
-              if (_item.status != 'sold')
+              if (_item.isAwaitingApproval &&
+                  UserProfileService.instance.isOwner) ...[
+                FilledButton(
+                  onPressed: _approveListing,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: const Text('Approve'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _rejectListing,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: const Text('Reject'),
+                ),
+              ] else if (_item.status != 'sold')
                 _item.isListed
                     ? OutlinedButton(
                         onPressed: _openListingSheet,
@@ -611,7 +675,8 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                           padding:
                               const EdgeInsets.symmetric(horizontal: 12),
                         ),
-                        child: const Text('List'),
+                        child: Text(
+                            _item.isAwaitingApproval ? 'Edit request' : 'List'),
                       ),
             ],
           ),

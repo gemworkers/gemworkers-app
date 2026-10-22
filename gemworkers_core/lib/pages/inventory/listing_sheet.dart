@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
 import '../../repositories/inventory_repository.dart';
 import 'widgets/price_field.dart';
@@ -244,6 +245,8 @@ class _ListingSheetState extends State<_ListingSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isListed = widget.item.isListed;
+    // Sellers' new listings wait for the owner (sql/listing_approval.sql).
+    final needsApproval = !isListed && !UserProfileService.instance.isOwner;
     final shippingDecided = _shippingMode != null &&
         (_shippingMode != 'charged' ||
             (double.tryParse(_shippingCostCtrl.text.replaceAll(',', '.')) ?? 0) >
@@ -286,6 +289,25 @@ class _ListingSheetState extends State<_ListingSheet> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          if (needsApproval) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                widget.item.isAwaitingApproval
+                    ? 'Waiting for GemWorkers to approve this listing. You can '
+                        'still change the details below.'
+                    : 'GemWorkers checks every new listing before it goes live '
+                        'on the store.',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
 
           // ── Sale method picker ─────────────────────────────────────────
@@ -543,11 +565,15 @@ class _ListingSheetState extends State<_ListingSheet> {
                     ? 'Saving…'
                     : isListed
                         ? 'Update listing'
-                        : 'List item'),
+                        : widget.item.isAwaitingApproval
+                            ? 'Update request'
+                            : needsApproval
+                                ? 'Send for approval'
+                                : 'List item'),
               ),
             ),
 
-            if (isListed) ...[
+            if (isListed || widget.item.isAwaitingApproval) ...[
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -558,7 +584,9 @@ class _ListingSheetState extends State<_ListingSheet> {
                     side: BorderSide(
                         color: cs.error.withValues(alpha: 0.5)),
                   ),
-                  child: const Text('Remove from marketplace'),
+                  child: Text(isListed
+                      ? 'Remove from marketplace'
+                      : 'Cancel listing request'),
                 ),
               ),
             ],

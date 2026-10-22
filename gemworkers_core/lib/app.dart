@@ -17,6 +17,7 @@ import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
 import 'pages/purchases/purchases_page.dart';
 import 'pages/suppliers/suppliers_page.dart';
+import 'repositories/inventory_repository.dart';
 import 'repositories/messages_repository.dart';
 import 'repositories/offers_repository.dart';
 import 'repositories/order_repository.dart';
@@ -104,6 +105,8 @@ class _MainLayoutState extends State<MainLayout> {
   int _toShipCount = 0;
   int _pendingOffersCount = 0;
   int _unreadMessagesCount = 0;
+  int _awaitingApprovalCount = 0; // owner only: seller listing requests
+  final _inventoryRepo = InventoryRepository();
   final _orderRepo = OrderRepository();
   final _offersRepo = OffersRepository();
   final _messagesRepo = MessagesRepository();
@@ -144,6 +147,12 @@ class _MainLayoutState extends State<MainLayout> {
       final count = await _offersRepo.getPendingCount(sellerId: sellerId);
       if (mounted) setState(() => _pendingOffersCount = count);
     } catch (_) {}
+    if (svc.isOwner) {
+      try {
+        final count = await _inventoryRepo.getAwaitingApprovalCount();
+        if (mounted) setState(() => _awaitingApprovalCount = count);
+      } catch (_) {}
+    }
     await _loadMessagesCount();
   }
 
@@ -197,10 +206,11 @@ class _MainLayoutState extends State<MainLayout> {
           selectedIcon: Icons.dashboard,
           label: 'Dashboard',
         ),
-        const ShopNavItem(
+        ShopNavItem(
           icon: Icons.inventory_2_outlined,
           selectedIcon: Icons.inventory_2,
           label: 'Listings',
+          badgeCount: _isOwner ? _awaitingApprovalCount : 0,
         ),
         ShopNavItem(
           icon: Icons.local_shipping_outlined,

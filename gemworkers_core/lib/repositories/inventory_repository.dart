@@ -173,6 +173,8 @@ class InventoryRepository {
 
   /// Sets is_listed=true and records the sale method, selling price, listed_at,
   /// and optional shipping details. sellingPrice may be null for accept_offers stones.
+  /// For a seller (not owner) the DB turns a new listing into a request that
+  /// waits for owner approval (sql/listing_approval.sql); the details are saved.
   /// Shipping params are named optional — caller passes only what the user filled in.
   Future<void> listItem(
     String id,
@@ -199,12 +201,43 @@ class InventoryRepository {
     }).eq('id', id);
   }
 
-  /// Clears is_listed; keeps selling_price so it can be reused next time.
+  /// Clears is_listed (and any pending listing request); keeps selling_price
+  /// so it can be reused next time.
   Future<void> unlistItem(String id) async {
     await supabase.from('inventory_items').update({
       'is_listed': false,
       'listed_at': null,
+      'listing_requested_at': null,
     }).eq('id', id);
+  }
+
+  /// Owner approves a seller's listing request: the stone goes live. The DB
+  /// trigger clears listing_requested_at once is_listed is true.
+  Future<void> approveListing(String id) async {
+    await supabase.from('inventory_items').update({
+      'is_listed': true,
+      'listed_at': DateTime.now().toIso8601String(),
+    }).eq('id', id);
+  }
+
+  /// Owner rejects, or the seller withdraws, a listing request. The stone
+  /// stays a draft.
+  Future<void> clearListingRequest(String id) async {
+    await supabase
+        .from('inventory_items')
+        .update({'listing_requested_at': null})
+        .eq('id', id);
+  }
+
+  /// Seller listing requests waiting for the owner.
+  Future<int> getAwaitingApprovalCount() async {
+    final response = await supabase
+        .from('inventory_items')
+        .select('id')
+        .eq('is_listed', false)
+        .eq('status', 'available')
+        .not('listing_requested_at', 'is', null);
+    return response.length;
   }
 
   /// Marks a batch of items as sold and removes them from the marketplace.

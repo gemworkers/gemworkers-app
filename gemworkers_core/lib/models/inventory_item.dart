@@ -53,6 +53,9 @@ class InventoryItem {
   final bool isListed;
   final double? sellingPrice;
   final DateTime? listedAt;
+  // Seller asked to list; waiting for the owner (sql/listing_approval.sql).
+  // Read only — not in toMap(), so a general save never touches it.
+  final DateTime? listingRequestedAt;
   // 'buy_now' | 'accept_offers' | 'both' — mirrors CHECK constraint on inventory_items.
   final String saleMethod;
 
@@ -133,6 +136,7 @@ class InventoryItem {
     this.isListed = false,
     this.sellingPrice,
     this.listedAt,
+    this.listingRequestedAt,
     this.saleMethod = 'buy_now',
     this.isUnsortedLot = false,
     this.lotRemainingCount,
@@ -169,6 +173,10 @@ class InventoryItem {
     this.deliveryDaysMax,
     this.prepDays,
   });
+
+  /// Waiting for the owner to approve a seller's listing request.
+  bool get isAwaitingApproval =>
+      !isListed && listingRequestedAt != null && status == 'available';
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
     List<String> parseUrls(dynamic value) {
@@ -210,6 +218,9 @@ class InventoryItem {
           : null,
       listedAt: map['listed_at'] != null
           ? DateTime.parse(map['listed_at'].toString())
+          : null,
+      listingRequestedAt: map['listing_requested_at'] != null
+          ? DateTime.parse(map['listing_requested_at'].toString())
           : null,
       saleMethod: map['sale_method']?.toString() ?? 'buy_now',
       isUnsortedLot: map['is_unsorted_lot'] == true,
@@ -350,6 +361,7 @@ class InventoryItem {
     bool? isListed,
     Object? sellingPrice = _omitted,
     Object? listedAt = _omitted,
+    Object? listingRequestedAt = _omitted,
     String? saleMethod,
     bool? isUnsortedLot,
     Object? lotRemainingCount = _omitted,
@@ -421,6 +433,9 @@ class InventoryItem {
       listedAt: identical(listedAt, _omitted)
           ? this.listedAt
           : listedAt as DateTime?,
+      listingRequestedAt: identical(listingRequestedAt, _omitted)
+          ? this.listingRequestedAt
+          : listingRequestedAt as DateTime?,
       saleMethod: saleMethod ?? this.saleMethod,
       isUnsortedLot: isUnsortedLot ?? this.isUnsortedLot,
       lotRemainingCount: identical(lotRemainingCount, _omitted)
