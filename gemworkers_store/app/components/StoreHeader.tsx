@@ -17,6 +17,7 @@ const SHOP_LINKS: { label: string; href: string }[] = [
 
 const NAV_LINKS: { label: string; href: string }[] = [
   { label: 'Our Makers', href: '/makers' },
+  { label: 'Reviews',    href: '/reviews' },
   { label: 'Journal',    href: '/journal' },
   { label: 'About',      href: '/about' },
   { label: 'Contact',    href: '/contact' },

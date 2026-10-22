@@ -2,6 +2,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import Link from 'next/link'
 import { createClient } from "@/lib/supabase/server";
+import { ReviewSummary } from "@/app/components/ReviewSummary";
 import { StoneGrid } from "@/app/components/StoneGrid";
 import type { StoneCardItem } from "@/app/components/StoneCard";
 
@@ -94,6 +95,7 @@ export default async function HomePage() {
               Request a stone
             </Link>
           </div>
+          <ReviewSummary style={{ marginTop: 20 }} />
         </div>
 
         {hasHero ? (

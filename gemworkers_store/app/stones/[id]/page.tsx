@@ -10,6 +10,7 @@ import { pillDark, pillQuiet } from '@/lib/ui';
 import { cancelPendingOrder } from '@/app/actions/commerce';
 import { countryName } from '@/lib/countries';
 import { TrustList } from '@/app/components/TrustList';
+import { ReviewSummary } from '@/app/components/ReviewSummary';
 import { canStartOfferPayment } from '@/lib/offer-payment';
 import { formatEur } from '@/lib/money';
 import { makerVerb, makerHref } from '@/lib/makers';
@@ -375,6 +376,7 @@ export default async function StoneDetailPage({
               <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}
             {shippingLine && <p className="pd-shipline">{shippingLine}</p>}
+            <ReviewSummary style={{ marginTop: 10 }} />
           </div>
 
           {/* Actions */}
