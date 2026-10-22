@@ -536,16 +536,24 @@ class _ListingSheetState extends State<_ListingSheet> {
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _videoUrlCtrl,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'Video URL (optional)',
-                hintText: 'YouTube, Vimeo, or direct .mp4 link',
-                border: OutlineInputBorder(),
-                isDense: true,
+            // An uploaded video (Add/Edit stone → Video) is kept as is: the
+            // hidden controller still carries its URL into listItem.
+            if (InventoryRepository.isUploadedVideo(widget.item.videoUrl))
+              Text(
+                'Video added ✓ — change it on the stone\'s Edit page.',
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+              )
+            else
+              TextField(
+                controller: _videoUrlCtrl,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Video URL (optional)',
+                  hintText: 'Or upload a video on the stone\'s Edit page',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
               ),
-            ),
             const SizedBox(height: 20),
 
             // ── Primary action ─────────────────────────────────────────

@@ -106,7 +106,13 @@
   flex: 0 0 100%; height: 100%; scroll-snap-align: center; scroll-snap-stop: always;
   padding: 0; border: none; background: transparent; cursor: zoom-in;
 }
-.gallery-slide img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.gallery-slide img, .gallery-slide video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.gallery-thumb-video { position: relative; display: block; width: 100%; height: 100%; background: #1F1B16; }
+.gallery-thumb-video video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.gallery-thumb-play {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 18px; text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
 
 .gallery-side-thumbs {
   flex: 0 0 72px; display: flex; flex-direction: column; gap: 10px;

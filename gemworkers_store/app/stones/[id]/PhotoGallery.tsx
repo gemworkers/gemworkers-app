@@ -6,7 +6,12 @@ import { createPortal } from 'react-dom';
 interface PhotoGalleryProps {
   imageUrls: string[];
   title: string;
+  // Uploaded stone video (inventory-videos bucket); shown as the 2nd item,
+  // playing silently on a loop, like Etsy. Old YouTube links don't come here.
+  videoUrl?: string | null;
 }
+
+type Media = { kind: 'image' | 'video'; url: string };
 
 // Etsy-style stone photos:
 //  - computer: thumbnail column on the left, big photo with ‹ › on its edges
@@ -55,12 +60,28 @@ function useFrameRatio(firstUrl: string | undefined) {
   return ratio;
 }
 
+// Silent looping clip — the Etsy listing-video behaviour.
+function LoopVideo({ url, className, onClick }: { url: string; className?: string; onClick?: (e: React.MouseEvent) => void }) {
+  return (
+    <video
+      src={url}
+      className={className}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      onClick={onClick}
+    />
+  );
+}
+
 function Arrow({ dir, onClick, dark = false }: { dir: 'prev' | 'next'; onClick: () => void; dark?: boolean }) {
   return (
     <button
       type="button"
       onClick={e => { e.stopPropagation(); onClick(); }}
-      aria-label={dir === 'prev' ? 'Previous photo' : 'Next photo'}
+      aria-label={dir === 'prev' ? 'Previous' : 'Next'}
       className={`gallery-arrow gallery-arrow-${dir}${dark ? ' gallery-arrow-dark' : ''}`}
     >
       {dir === 'prev' ? '‹' : '›'}
@@ -68,16 +89,23 @@ function Arrow({ dir, onClick, dark = false }: { dir: 'prev' | 'next'; onClick: 
   );
 }
 
-function Thumb({ url, active, onClick, label }: { url: string; active: boolean; onClick: () => void; label: string }) {
+function Thumb({ media, active, onClick, label }: { media: Media; active: boolean; onClick: () => void; label: string }) {
   return (
     <button type="button" onClick={onClick} aria-label={label} aria-current={active} className={`gallery-thumb${active ? ' is-active' : ''}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="" />
+      {media.kind === 'video' ? (
+        <span className="gallery-thumb-video">
+          <video src={`${media.url}#t=0.1`} muted playsInline preload="metadata" />
+          <span className="gallery-thumb-play" aria-hidden="true">▶</span>
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={media.url} alt="" />
+      )}
     </button>
   );
 }
 
-// ── One full-screen slide with click-to-zoom ────────────────────────────────
+// ── One full-screen photo with click-to-zoom ────────────────────────────────
 function ZoomSlide({
   url, alt, zoomed, onToggleZoom,
 }: {
@@ -115,15 +143,16 @@ function ZoomSlide({
 
 // ── Full-screen viewer ──────────────────────────────────────────────────────
 function Lightbox({
-  imageUrls, title, startIndex, onClose,
+  media, title, startIndex, onClose,
 }: {
-  imageUrls: string[]; title: string; startIndex: number; onClose: (index: number) => void;
+  media: Media[]; title: string; startIndex: number; onClose: (index: number) => void;
 }) {
-  const { ref, index, onScroll, goTo } = useSnapTrack(imageUrls.length);
+  const { ref, index, onScroll, goTo } = useSnapTrack(media.length);
   const [zoomed, setZoomed] = useState(false);
-  const many = imageUrls.length > 1;
+  const many = media.length > 1;
+  const onVideo = media[index]?.kind === 'video';
 
-  // Open on the photo that was tapped; lock page scroll while open.
+  // Open on the item that was tapped; lock page scroll while open.
   useEffect(() => {
     goTo(startIndex, false);
     const prev = document.body.style.overflow;
@@ -131,7 +160,7 @@ function Lightbox({
     return () => { document.body.style.overflow = prev; };
   }, [goTo, startIndex]);
 
-  // Changing photo always starts zoomed out.
+  // Changing item always starts zoomed out.
   const show = useCallback((i: number) => { setZoomed(false); goTo(i); }, [goTo]);
 
   useEffect(() => {
@@ -147,34 +176,49 @@ function Lightbox({
   return (
     <div className="gallery-lightbox" role="dialog" aria-modal="true" aria-label={`${title} photos`}>
       <div className="gallery-lightbox-bar">
-        <span>{many ? `${index + 1} / ${imageUrls.length}` : ''}</span>
-        <span className="gallery-lightbox-hint">{zoomed ? 'Click to zoom out' : 'Click photo to zoom'}</span>
+        <span>{many ? `${index + 1} / ${media.length}` : ''}</span>
+        <span className="gallery-lightbox-hint">
+          {onVideo ? 'Click video to pause' : zoomed ? 'Click to zoom out' : 'Click photo to zoom'}
+        </span>
         <button type="button" onClick={() => onClose(index)} aria-label="Close" className="gallery-close">✕</button>
       </div>
 
       <div
         ref={ref}
-        onScroll={() => { onScroll(); }}
+        onScroll={onScroll}
         className={`gallery-track gallery-lightbox-track${zoomed ? ' is-zoomed' : ''}`}
       >
-        {imageUrls.map((url, i) => (
-          <ZoomSlide
-            key={i}
-            url={url}
-            alt={`${title} — photo ${i + 1} of ${imageUrls.length}`}
-            zoomed={zoomed && i === index}
-            onToggleZoom={() => setZoomed(z => !z)}
-          />
-        ))}
+        {media.map((m, i) =>
+          m.kind === 'video' ? (
+            <div key={i} className="gallery-lightbox-slide">
+              <LoopVideo
+                url={m.url}
+                className="gallery-lightbox-img"
+                onClick={e => {
+                  const v = e.currentTarget as HTMLVideoElement;
+                  if (v.paused) void v.play(); else v.pause();
+                }}
+              />
+            </div>
+          ) : (
+            <ZoomSlide
+              key={i}
+              url={m.url}
+              alt={`${title} — ${i + 1} of ${media.length}`}
+              zoomed={zoomed && i === index}
+              onToggleZoom={() => setZoomed(z => !z)}
+            />
+          ),
+        )}
       </div>
 
       {many && !zoomed && index > 0 && <Arrow dir="prev" dark onClick={() => show(index - 1)} />}
-      {many && !zoomed && index < imageUrls.length - 1 && <Arrow dir="next" dark onClick={() => show(index + 1)} />}
+      {many && !zoomed && index < media.length - 1 && <Arrow dir="next" dark onClick={() => show(index + 1)} />}
 
       {many && (
         <div className="gallery-lightbox-thumbs">
-          {imageUrls.map((url, i) => (
-            <Thumb key={i} url={url} active={i === index} onClick={() => show(i)} label={`Show photo ${i + 1}`} />
+          {media.map((m, i) => (
+            <Thumb key={i} media={m} active={i === index} onClick={() => show(i)} label={`Show ${m.kind} ${i + 1}`} />
           ))}
         </div>
       )}
@@ -182,24 +226,28 @@ function Lightbox({
   );
 }
 
-export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
-  const { ref, index, onScroll, goTo } = useSnapTrack(imageUrls.length);
+export function PhotoGallery({ imageUrls, title, videoUrl }: PhotoGalleryProps) {
+  // Photo 1, then the video, then the other photos (Etsy order).
+  const media: Media[] = imageUrls.map(url => ({ kind: 'image' as const, url }));
+  if (videoUrl) media.splice(Math.min(1, media.length), 0, { kind: 'video', url: videoUrl });
+
+  const { ref, index, onScroll, goTo } = useSnapTrack(media.length);
   const ratio = useFrameRatio(imageUrls[0]);
   const [lightboxAt, setLightboxAt] = useState<number | null>(null);
 
-  if (imageUrls.length === 0) {
+  if (media.length === 0) {
     return <div className="gallery-empty" aria-hidden="true" />;
   }
 
-  const many = imageUrls.length > 1;
+  const many = media.length > 1;
 
   return (
     <div className={`gallery${many ? ' has-thumbs' : ''}`}>
       {/* Computer: vertical thumbnail column */}
       {many && (
         <div className="gallery-side-thumbs">
-          {imageUrls.map((url, i) => (
-            <Thumb key={i} url={url} active={i === index} onClick={() => goTo(i)} label={`View photo ${i + 1}`} />
+          {media.map((m, i) => (
+            <Thumb key={i} media={m} active={i === index} onClick={() => goTo(i)} label={`View ${m.kind} ${i + 1}`} />
           ))}
         </div>
       )}
@@ -212,31 +260,35 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
             className="gallery-track gallery-frame"
             style={{ aspectRatio: String(ratio) }}
           >
-            {imageUrls.map((url, i) => (
+            {media.map((m, i) => (
               <button
                 key={i}
                 type="button"
                 className="gallery-slide"
                 onClick={() => setLightboxAt(i)}
-                aria-label={`Open photo ${i + 1} full screen`}
+                aria-label={`Open ${m.kind} ${i + 1} full screen`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt={`${title} — photo ${i + 1} of ${imageUrls.length}`}
-                  draggable={false}
-                />
+                {m.kind === 'video' ? (
+                  <LoopVideo url={m.url} />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={m.url}
+                    alt={`${title} — photo ${i + 1} of ${media.length}`}
+                    draggable={false}
+                  />
+                )}
               </button>
             ))}
           </div>
           {many && index > 0 && <Arrow dir="prev" onClick={() => goTo(index - 1)} />}
-          {many && index < imageUrls.length - 1 && <Arrow dir="next" onClick={() => goTo(index + 1)} />}
+          {many && index < media.length - 1 && <Arrow dir="next" onClick={() => goTo(index + 1)} />}
         </div>
 
         {/* Phone: dots */}
         {many && (
           <div className="gallery-dots" aria-hidden="true">
-            {imageUrls.map((_, i) => (
+            {media.map((_, i) => (
               <span key={i} className={i === index ? 'is-active' : ''} />
             ))}
           </div>
@@ -247,7 +299,7 @@ export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
           otherwise trap position: fixed inside the page. */}
       {lightboxAt !== null && createPortal(
         <Lightbox
-          imageUrls={imageUrls}
+          media={media}
           title={title}
           startIndex={lightboxAt}
           onClose={i => { setLightboxAt(null); goTo(i, false); }}

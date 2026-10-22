@@ -241,6 +241,7 @@ export default async function StoneDetailPage({
   const item = data as ListingDetail;
   const isReserved = item.status === 'reserved';
   const photos = item.image_urls ?? [];
+  const uploadedVideo = !!item.video_url?.includes('/storage/v1/object/public/inventory-videos/');
   const category = CATEGORY[item.product_type] ?? CATEGORY.loose_stone;
   const nextParam = encodeURIComponent(`/stones/${item.id}`);
 
@@ -346,8 +347,14 @@ export default async function StoneDetailPage({
 
         {/* ── Left: gallery + video ── */}
         <div style={{ minWidth: 0 }}>
-          <PhotoGallery imageUrls={photos} title={item.title} />
-          {item.video_url && <VideoPlayer url={item.video_url} />}
+          {/* Uploaded video → silent loop inside the gallery (Etsy style);
+              old YouTube / Vimeo links keep the embedded player below. */}
+          <PhotoGallery
+            imageUrls={photos}
+            title={item.title}
+            videoUrl={uploadedVideo ? item.video_url : null}
+          />
+          {item.video_url && !uploadedVideo && <VideoPlayer url={item.video_url} />}
         </div>
 
         {/* ── Right: info panel ── */}

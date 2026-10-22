@@ -291,6 +291,56 @@ class InventoryRepository {
     await updateItemImages(id, updated);
   }
 
+  // ── Video (Etsy-style upload, sql/storage_inventory_videos.sql) ─────────────
+
+  static const String _videoBucket = 'inventory-videos';
+  static const String _videoFragment =
+      '/storage/v1/object/public/$_videoBucket/';
+
+  /// True for a video uploaded to our storage (vs an old YouTube/Vimeo link).
+  static bool isUploadedVideo(String? url) =>
+      url != null && url.contains(_videoFragment);
+
+  /// Uploads into the item's own folder (sellers may only upload into their
+  /// own stones' folders) and returns the public URL.
+  Future<String> uploadVideo(
+    String itemId,
+    Uint8List bytes,
+    String originalName,
+  ) async {
+    final ext = originalName.contains('.')
+        ? originalName.split('.').last.toLowerCase()
+        : 'mp4';
+    final path = '$itemId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await supabase.storage.from(_videoBucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: switch (ext) {
+              'mov' => 'video/quicktime',
+              'webm' => 'video/webm',
+              _ => 'video/mp4',
+            },
+          ),
+        );
+    return supabase.storage.from(_videoBucket).getPublicUrl(path);
+  }
+
+  /// Deletes an uploaded video file; ignores old YouTube/Vimeo links.
+  Future<void> deleteUploadedVideo(String? url) async {
+    if (!isUploadedVideo(url)) return;
+    final idx = url!.indexOf(_videoFragment);
+    final path = Uri.decodeFull(url.substring(idx + _videoFragment.length));
+    await supabase.storage.from(_videoBucket).remove([path]);
+  }
+
+  Future<void> updateItemVideo(String id, String? videoUrl) async {
+    await supabase
+        .from('inventory_items')
+        .update({'video_url': videoUrl})
+        .eq('id', id);
+  }
+
   static String _mimeType(String ext) => switch (ext) {
         'jpg' || 'jpeg' => 'image/jpeg',
         'png' => 'image/png',

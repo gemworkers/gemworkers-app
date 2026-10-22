@@ -11,6 +11,7 @@ import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
+import 'widgets/item_video_picker.dart';
 import 'widgets/maker_picker.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
@@ -115,6 +116,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   // ── Photo selection ───────────────────────────────────────────────────────
 
   List<PhotoItem> _photos = [];
+  late VideoChoice _video;
 
   bool _saving = false;
 
@@ -174,6 +176,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _locationId = i.locationId;
     _originalLocationId = i.locationId;
     _photos = i.imageUrls.map(PhotoItem.existing).toList();
+    _video = VideoChoice(currentUrl: i.videoUrl);
     _loadSuppliers();
   }
 
@@ -272,6 +275,17 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         }
       }
 
+      String? finalVideoUrl = widget.item.videoUrl;
+      if (_video.pending != null) {
+        finalVideoUrl = await _repository.uploadVideo(
+          widget.item.id!,
+          _video.pendingBytes!,
+          _video.pending!.name,
+        );
+      } else if (_video.removed) {
+        finalVideoUrl = null;
+      }
+
       final supplierName = _supplierId != null
           ? _suppliers
               .where((s) => s.id == _supplierId)
@@ -335,7 +349,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         height: parseDecimalInput(_heightCtrl.text),
         dimensionUnit: _dimensionUnit,
         description: _orNull(_description),
-        videoUrl: widget.item.videoUrl,
+        videoUrl: finalVideoUrl,
         cut: null,
         clarity: isLooseStone ? _orNull(_clarity) : widget.item.clarity,
         species: isSpecimen ? _orNull(_species) : widget.item.species,
@@ -361,6 +375,15 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       );
 
       await _repository.updateItem(widget.item.id!, updated);
+
+      // Replaced or removed an uploaded video: delete the old file (best effort).
+      if (finalVideoUrl != widget.item.videoUrl) {
+        try {
+          await _repository.deleteUploadedVideo(widget.item.videoUrl);
+        } catch (e) {
+          debugPrint('Old video not deleted: $e');
+        }
+      }
 
       if (_makerId != widget.item.makerId && UserProfileService.instance.isOwner) {
         await _repository.setItemMaker(widget.item.id!, _makerId);
@@ -581,6 +604,13 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         padding: const EdgeInsets.all(20),
         children: [
           _buildPhotoSelector(),
+
+          const FormSection('Video'),
+          ItemVideoPicker(
+            value: _video,
+            onChanged: (v) => setState(() => _video = v),
+            enabled: !_saving,
+          ),
 
           const FormSection('Identification'),
           ReadOnlyFormField('SKU', widget.item.sku),

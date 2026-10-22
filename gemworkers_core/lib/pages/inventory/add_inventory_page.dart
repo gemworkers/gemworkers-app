@@ -10,6 +10,7 @@ import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
+import 'widgets/item_video_picker.dart';
 import 'widgets/maker_picker.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
@@ -105,6 +106,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   List<Supplier> _suppliers = [];
   bool _loadingSuppliers = false;
   String? _supplierId;
+
+  // ── Video (uploaded after the item exists) ─────────────────────────────────
+
+  VideoChoice _video = const VideoChoice();
 
   // ── Maker (owner only) ────────────────────────────────────────────────────
 
@@ -329,9 +334,21 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         await _repository.updateItemImages(created.id!, urls);
       }
 
+      var listed = created;
+      if (_video.pending != null && created.id != null) {
+        if (mounted) setState(() => _savingStatus = 'Uploading video…');
+        final videoUrl = await _repository.uploadVideo(
+          created.id!,
+          _video.pendingBytes!,
+          _video.pending!.name,
+        );
+        await _repository.updateItemVideo(created.id!, videoUrl);
+        listed = created.copyWith(videoUrl: videoUrl);
+      }
+
       if (!mounted) return;
-      if (_listOnMarketplace && created.id != null) {
-        await showListingSheet(context, created);
+      if (_listOnMarketplace && listed.id != null) {
+        await showListingSheet(context, listed);
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -544,6 +561,13 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             padding: const EdgeInsets.all(20),
             children: [
               _buildPhotoSelector(),
+
+              const FormSection('Video'),
+              ItemVideoPicker(
+                value: _video,
+                onChanged: (v) => setState(() => _video = v),
+                enabled: !_saving,
+              ),
 
               const FormSection('Identification'),
               Padding(
