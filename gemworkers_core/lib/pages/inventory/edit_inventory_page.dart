@@ -35,6 +35,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late final TextEditingController _weightValue;
   late final TextEditingController _quantity;
   late final TextEditingController _costPrice;
+  // Decimal keyboards in NL show "," — accept "12,50" as 12.50.
+  String get _costText => _costPrice.text.trim().replaceAll(',', '.');
   late final TextEditingController _sellingPrice;
   late final TextEditingController _barcode;
   late final TextEditingController _notes;
@@ -227,7 +229,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         double.tryParse(_totalWeightGrams.text) == null) {
       return 'Total weight must be a number.';
     }
-    if (double.tryParse(_costPrice.text) == null) {
+    if (double.tryParse(_costText) == null) {
       return 'Cost price must be a number.';
     }
     if (int.tryParse(_quantity.text) == null) {
@@ -301,7 +303,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             isLooseStone ? double.parse(_weightValue.text) : widget.item.weightValue,
         weightUnit: isLooseStone ? _weightUnit : widget.item.weightUnit,
         quantity: int.parse(_quantity.text),
-        costPrice: double.parse(_costPrice.text),
+        costPrice: double.parse(_costText),
         salePrice: widget.item.salePrice, // legacy column — no longer edited
         barcode: _barcode.text.trim(),
         qrCode: widget.item.qrCode,
@@ -591,7 +593,8 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField('Treatment', _treatment),
 
           const FormSection('Private — only you see this'),
-          FormTextField('Cost Price *', _costPrice, keyboardType: TextInputType.number),
+          FormTextField('Cost Price *', _costPrice,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true)),
 
           const FormSection('Supplier'),
           _buildSupplierPicker(),

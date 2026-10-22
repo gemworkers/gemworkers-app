@@ -36,6 +36,8 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final _weightValue = TextEditingController();
   final _quantity = TextEditingController(text: '1');
   final _costPrice = TextEditingController();
+  // Decimal keyboards in NL show "," — accept "12,50" as 12.50.
+  String get _costText => _costPrice.text.trim().replaceAll(',', '.');
   final _sellingPrice = TextEditingController();
   final _barcode = TextEditingController();
   final _notes = TextEditingController();
@@ -179,7 +181,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       return 'Total weight must be a number.';
     }
     if (_costPrice.text.isNotEmpty &&
-        double.tryParse(_costPrice.text) == null) {
+        double.tryParse(_costText) == null) {
       return 'Cost price must be a number.';
     }
 
@@ -240,7 +242,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         weightValue: isLooseStone ? (double.tryParse(_weightValue.text) ?? 0) : 0,
         weightUnit: isLooseStone ? _weightUnit : 'ct',
         quantity: int.tryParse(_quantity.text) ?? 1,
-        costPrice: double.tryParse(_costPrice.text) ?? 0,
+        costPrice: double.tryParse(_costText) ?? 0,
         salePrice: 0,
         barcode: _barcode.text.trim(),
         qrCode: '',
@@ -564,7 +566,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               FormTextField(
                 'Cost Price',
                 _costPrice,
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
 
 
