@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { formatEur } from '@/lib/money'
-import { ReviewList, reviewAverage, type PublicReview } from '@/app/reviews/ReviewList'
+import { ReviewList, reviewAverage, PUBLIC_REVIEW_COLUMNS, type PublicReview } from '@/app/reviews/ReviewList'
 import { Stars } from '@/app/reviews/Stars'
 
 export const metadata = { title: 'Our Makers · GemWorkers' }
@@ -39,7 +39,7 @@ export default async function MakersPage() {
   if (makers.length > 0) {
     const { data: reviewData } = await supabase
       .from('public_reviews')
-      .select('id, rating, body, photo_url, reviewer_name, reviewer_country, owner_reply, created_at, maker_id, stone_title')
+      .select(PUBLIC_REVIEW_COLUMNS)
       .in('maker_id', makers.map(m => m.id))
       .order('created_at', { ascending: false })
     for (const r of (reviewData ?? []) as PublicReview[]) {

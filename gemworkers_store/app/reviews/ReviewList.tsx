@@ -13,7 +13,12 @@ export type PublicReview = {
   created_at: string
   maker_id: string | null
   stone_title: string | null
+  stone_image_url: string | null
 }
+
+// Columns to select from public_reviews.
+export const PUBLIC_REVIEW_COLUMNS =
+  'id, rating, body, photo_url, reviewer_name, reviewer_country, owner_reply, created_at, maker_id, stone_title, stone_image_url'
 
 export function reviewAverage(reviews: PublicReview[]): number | null {
   if (reviews.length === 0) return null
@@ -40,21 +45,45 @@ export function ReviewList({ reviews }: { reviews: PublicReview[] }) {
               <span style={{ fontSize: 13, color: '#6B6052' }}>{formatDate(r.created_at)}</span>
             </div>
             <p style={{ fontSize: 14, fontWeight: 600, color: '#1F1B16', margin: '10px 0 0' }}>{who}</p>
-            {r.stone_title && (
-              <p style={{ fontSize: 13, color: '#6B6052', margin: '2px 0 0' }}>Bought: {r.stone_title}</p>
-            )}
             {r.body && (
               <p style={{ fontSize: 15, lineHeight: 1.7, color: '#374151', margin: '12px 0 0', whiteSpace: 'pre-wrap' }}>
                 {r.body}
               </p>
             )}
             {r.photo_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={r.photo_url}
-                alt={`Photo from ${r.reviewer_name || 'a customer'}`}
-                style={{ marginTop: 14, maxWidth: 220, maxHeight: 220, borderRadius: 10, objectFit: 'cover', display: 'block' }}
-              />
+              <figure style={{ margin: '14px 0 0' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={r.photo_url}
+                  alt={`Photo from ${r.reviewer_name || 'a customer'}`}
+                  style={{ maxWidth: 220, maxHeight: 220, borderRadius: 10, objectFit: 'cover', display: 'block' }}
+                />
+                <figcaption style={{ fontSize: 12, color: '#6B6052', marginTop: 4 }}>Customer photo</figcaption>
+              </figure>
+            )}
+            {r.stone_title && (
+              // Purchased stone, filled in automatically from the order (sold, so no link).
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, marginTop: 14,
+                padding: 10, border: '1px solid #ECE5D8', borderRadius: 10, background: '#F9F5EE',
+                maxWidth: 360,
+              }}>
+                <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: '#F4EEE4', flexShrink: 0 }}>
+                  {r.stone_image_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={r.stone_image_url} alt={r.stone_title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7A5A22', margin: 0 }}>
+                    Purchased
+                  </p>
+                  <p style={{ fontSize: 14, color: '#1F1B16', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.stone_title}
+                  </p>
+                </div>
+              </div>
             )}
             {r.owner_reply && (
               <div style={{ marginTop: 14, padding: '12px 16px', background: '#F9F5EE', borderRadius: 10 }}>

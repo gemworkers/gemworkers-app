@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { ReviewList, reviewAverage, type PublicReview } from './ReviewList'
+import { ReviewList, reviewAverage, PUBLIC_REVIEW_COLUMNS, type PublicReview } from './ReviewList'
 import { Stars } from './Stars'
 
 export const metadata = { title: 'Customer Reviews · GemWorkers' }
@@ -8,7 +8,7 @@ export default async function ReviewsPage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('public_reviews')
-    .select('id, rating, body, photo_url, reviewer_name, reviewer_country, owner_reply, created_at, maker_id, stone_title')
+    .select(PUBLIC_REVIEW_COLUMNS)
     .order('created_at', { ascending: false })
     .limit(200)
   const reviews = (data ?? []) as PublicReview[]
