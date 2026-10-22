@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { submitOffer, withdrawOffer } from '@/app/actions/commerce'
+import { useRouter } from 'next/navigation'
+import { submitOffer, withdrawOffer, respondToCounter } from '@/app/actions/commerce'
 import {
   pillOutline, pillDarkSm, pillOutlineSm, pillDisabledSm,
   panel, inputStyle, labelStyle,
@@ -13,9 +14,19 @@ import { formatEur, formatEurExact } from '@/lib/money'
 
 export type BuyerOffer = {
   id: string
-  offered_price: number
-  status: 'pending' | 'accepted' | 'declined' | 'expired'
+  offered_price: number | string
+  status: 'pending' | 'countered' | 'accepted' | 'declined' | 'expired'
+  // Our counter-offer (one per offer); null if never countered.
+  counter_price?: number | string | null
+  counter_expires_at?: string | null
 }
+
+// Same format as the counter-offer email ("24 Oct 2026, 10:00 UTC"); fixed
+// zone so server and client render the same text.
+const utcDate = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', hour12: false,
+})
 
 // The pending_payment order created when the seller accepted this offer,
 // still inside its payment window. Loaded server-side under the buyer's RLS.
@@ -32,6 +43,8 @@ type State =
   | 'submitting'
   | 'pending'
   | 'withdrawing'
+  | 'countered'
+  | 'answering'
   | 'accepted'
   | 'declined'
   | 'expired'
@@ -40,6 +53,7 @@ type State =
 function initState(offer: BuyerOffer | null): State {
   if (!offer) return 'idle'
   if (offer.status === 'pending') return 'pending'
+  if (offer.status === 'countered') return 'countered'
   if (offer.status === 'accepted') return 'accepted'
   if (offer.status === 'expired') return 'expired'
   return 'declined'
@@ -82,6 +96,7 @@ export function OfferPanel({
   // expired/declined offer (SQL only blocks while an offer is 'pending').
   isAvailable?: boolean
 }) {
+  const router = useRouter()
   const [state, setState] = useState<State>(initState(initialOffer))
   const [offer, setOffer] = useState<BuyerOffer | null>(initialOffer)
   const [priceInput, setPriceInput] = useState('')
@@ -254,12 +269,98 @@ export function OfferPanel({
     )
   }
 
+  // ── Countered → buyer accepts or declines ─────────────────────────────────
+  if ((state === 'countered' || state === 'answering') && offer && offer.counter_price != null) {
+    const busy = state === 'answering'
+    const counter = formatEur(offer.counter_price)
+    const expiresAt = offer.counter_expires_at ? new Date(offer.counter_expires_at) : null
+    const expired = expiresAt !== null && expiresAt.getTime() <= Date.now()
+
+    async function answer(action: 'accepted' | 'declined') {
+      if (!offer) return
+      setState('answering')
+      setErrorMsg(null)
+      const res = await respondToCounter(offer.id, action)
+      if ('error' in res) {
+        setErrorMsg(res.error)
+        setState('countered')
+      } else if (action === 'accepted') {
+        // The stone is now reserved for this buyer: the page re-renders with
+        // the pay panel (fresh OfferPanel with the payable order).
+        setOffer({ ...offer, status: 'accepted' })
+        setState('accepted')
+        router.refresh()
+      } else {
+        setOffer({ ...offer, status: 'declined' })
+        setState('declined')
+      }
+    }
+
+    return (
+      <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 15, color: '#1F1B16' }}>
+            Your offer: <strong>{formatEur(offer.offered_price)}</strong>
+          </span>
+          <span style={{
+            ...chipBase, color: '#7A5A22',
+            background: 'rgba(122,90,34,0.10)', border: '1px solid rgba(122,90,34,0.3)',
+          }}>
+            Counter-offer
+          </span>
+        </div>
+
+        {expired ? (
+          <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, margin: 0 }}>
+            Our counter-offer of <strong>{counter}</strong> has expired.
+          </p>
+        ) : (
+          <>
+            <p style={{ fontSize: 15, color: '#1F1B16', lineHeight: 1.6, margin: 0 }}>
+              We can offer you this stone for <strong>{counter}</strong>.
+              {expiresAt && <> Open until <strong>{utcDate.format(expiresAt)} UTC</strong>.</>}
+            </p>
+            <p style={{ fontSize: 13, color: '#5A5045', lineHeight: 1.6, margin: 0 }}>
+              Accepting reserves the stone for you. You then have 48 hours to pay.
+            </p>
+            {errorMsg && (
+              <p role="alert" style={{ fontSize: 13, color: '#B42318', margin: 0 }}>{errorMsg}</p>
+            )}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => answer('accepted')}
+                disabled={busy}
+                style={{
+                  ...(busy ? pillDisabledSm : pillDarkSm),
+                  flex: '1 1 160px', width: 'auto', cursor: busy ? 'default' : 'pointer',
+                }}
+              >
+                {busy ? 'Please wait…' : `Accept ${counter}`}
+              </button>
+              <button
+                onClick={() => answer('declined')}
+                disabled={busy}
+                style={{ ...pillOutlineSm, flex: '1 1 100px', width: 'auto', cursor: busy ? 'default' : 'pointer' }}
+              >
+                Decline
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
   // ── Accepted, payable → pay for the offer ─────────────────────────────────
   if (state === 'accepted' && payable && offer) {
     return (
       <div style={{ ...panel, border: '1px solid rgba(43,122,61,0.3)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <p style={{ fontSize: 15, color: '#1F1B16', lineHeight: 1.5, margin: 0 }}>
-          Your offer of <strong>{formatEur(offer.offered_price)}</strong> was accepted.
+          {offer.counter_price != null ? (
+            <>You accepted our counter-offer of <strong>{formatEur(offer.counter_price)}</strong>.</>
+          ) : (
+            <>Your offer of <strong>{formatEur(offer.offered_price)}</strong> was accepted.</>
+          )}
         </p>
         {payable.canPay ? (
           <>
@@ -299,7 +400,11 @@ export function OfferPanel({
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     }}>
       <span style={{ fontSize: 15, color: '#1F1B16' }}>
-        Your offer: <strong>{offer ? formatEur(offer.offered_price) : '—'}</strong>
+        {accepted && offer?.counter_price != null ? (
+          <>Counter-offer: <strong>{formatEur(offer.counter_price)}</strong></>
+        ) : (
+          <>Your offer: <strong>{offer ? formatEur(offer.offered_price) : '—'}</strong></>
+        )}
       </span>
       <span style={{
         ...chipBase, color: chip.color,

@@ -65,15 +65,24 @@ export function LocalTime({ iso, mode }: { iso: string; mode: 'list' | 'thread' 
 // System row written when an offer is made or answered. Unknown kinds (added
 // later, e.g. counter-offers) fall back to the row's own body text.
 
-const OFFER_CARD_TEXT: Record<string, { title: string; note?: string; ordersLink?: boolean }> = {
-  offer_made:      { title: 'You made an offer' },
-  offer_accepted:  { title: 'Offer accepted', note: 'Complete your payment in My orders.', ordersLink: true },
-  offer_declined:  { title: 'Offer declined' },
-  offer_expired:   { title: 'Offer expired' },
-  offer_withdrawn: { title: 'You withdrew your offer' },
+const OFFER_CARD_TEXT: Record<string, {
+  title: string
+  note?: string
+  ordersLink?: boolean
+  stoneLink?: boolean
+}> = {
+  offer_made:       { title: 'You made an offer' },
+  offer_accepted:   { title: 'Offer accepted', note: 'Complete your payment in My orders.', ordersLink: true },
+  offer_declined:   { title: 'Offer declined' },
+  offer_expired:    { title: 'Offer expired' },
+  offer_withdrawn:  { title: 'You withdrew your offer' },
+  offer_countered:  { title: 'Counter-offer', note: 'Open for 48 hours. Accept or decline it on the stone page.', stoneLink: true },
+  counter_accepted: { title: 'You accepted the counter-offer', note: 'Complete your payment in My orders.', ordersLink: true },
+  counter_declined: { title: 'You declined the counter-offer' },
+  counter_expired:  { title: 'Counter-offer expired' },
 }
 
-export function OfferCard({ message }: { message: ThreadMessage }) {
+export function OfferCard({ message, stoneId }: { message: ThreadMessage; stoneId?: string | null }) {
   const text = OFFER_CARD_TEXT[message.kind]
   const amount = message.offer_amount != null ? formatEur(message.offer_amount) : null
 
@@ -83,6 +92,9 @@ export function OfferCard({ message }: { message: ThreadMessage }) {
       {text && amount && <p className="msg-offer-amount">{amount}</p>}
       {text?.note && <p className="msg-offer-note">{text.note}</p>}
       {text?.ordersLink && <Link href="/orders" className="pd-link" style={{ fontSize: 14 }}>Go to My orders →</Link>}
+      {text?.stoneLink && stoneId && (
+        <Link href={`/stones/${stoneId}`} className="pd-link" style={{ fontSize: 14 }}>View counter-offer →</Link>
+      )}
       <p className="msg-time"><LocalTime iso={message.created_at} mode="thread" /></p>
     </div>
   )

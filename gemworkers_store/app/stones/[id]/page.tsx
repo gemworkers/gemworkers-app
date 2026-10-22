@@ -173,10 +173,10 @@ export default async function StoneDetailPage({
   if (user) {
     const { data: offer } = await supabase
       .from('storefront_offers')
-      .select('id, offered_price, status')
+      .select('id, offered_price, status, counter_price, counter_expires_at')
       .eq('inventory_item_id', id)
       .eq('buyer_id', user.id)
-      .in('status', ['pending', 'accepted', 'declined', 'expired'])
+      .in('status', ['pending', 'countered', 'accepted', 'declined', 'expired'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

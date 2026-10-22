@@ -651,11 +651,16 @@
 }
 .msg-offer-note { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: #4A4238; }
 .msg-offer .msg-time { margin-top: 6px; }
-.msg-offer-offer_accepted { background: #F1F6EE; border-color: #D5E3CC; }
-.msg-offer-offer_accepted .msg-offer-title { color: #3F6B2A; }
+.msg-offer-offer_accepted,
+.msg-offer-counter_accepted { background: #F1F6EE; border-color: #D5E3CC; }
+.msg-offer-offer_accepted .msg-offer-title,
+.msg-offer-counter_accepted .msg-offer-title { color: #3F6B2A; }
+.msg-offer-offer_countered { background: #FFFFFF; border-color: #DDD3C2; }
 .msg-offer-offer_declined .msg-offer-amount,
 .msg-offer-offer_expired .msg-offer-amount,
-.msg-offer-offer_withdrawn .msg-offer-amount { color: #6B6052; text-decoration: line-through; }
+.msg-offer-offer_withdrawn .msg-offer-amount,
+.msg-offer-counter_declined .msg-offer-amount,
+.msg-offer-counter_expired .msg-offer-amount { color: #6B6052; text-decoration: line-through; }
 .msg-time { font-size: 12px; color: #6B6052; margin: 6px 4px 0; }
 
 .msg-closed {

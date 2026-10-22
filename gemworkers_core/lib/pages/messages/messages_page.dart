@@ -1164,6 +1164,10 @@ class _OfferCard extends StatelessWidget {
     'offer_declined':  'Offer declined',
     'offer_expired':   'Offer expired',
     'offer_withdrawn': 'Buyer withdrew the offer',
+    'offer_countered':  'Counter-offer sent',
+    'counter_accepted': 'Buyer accepted the counter-offer',
+    'counter_declined': 'Buyer declined the counter-offer',
+    'counter_expired':  'Counter-offer expired',
   };
 
   @override
@@ -1171,9 +1175,12 @@ class _OfferCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final title = _titles[message.kind];
     final amount = message.offerAmount;
-    final accepted = message.kind == 'offer_accepted';
-    final closed = const {'offer_declined', 'offer_expired', 'offer_withdrawn'}
+    final accepted = const {'offer_accepted', 'counter_accepted'}
         .contains(message.kind);
+    final closed = const {
+      'offer_declined', 'offer_expired', 'offer_withdrawn',
+      'counter_declined', 'counter_expired',
+    }.contains(message.kind);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),

@@ -623,3 +623,26 @@ export async function withdrawOffer(
 
   return { ok: true }
 }
+
+// Buyer answers a counter-offer via respond_to_counter. The RPC checks the
+// caller is the offer's buyer, the counter is still open (countered, not past
+// counter_expires_at) and, on accept, reserves the stone and creates the
+// pending_payment order at the counter price. Error messages surface as-is.
+export async function respondToCounter(
+  offerId: string,
+  action: 'accepted' | 'declined'
+): Promise<{ ok: true; orderId: string | null } | { error: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'You must be logged in.' }
+
+  const { data, error } = await supabase.rpc('respond_to_counter', {
+    p_offer_id: offerId,
+    p_action: action,
+  })
+
+  if (error) return { error: error.message }
+  const orderId = (data as { order_id?: string | null } | null)?.order_id ?? null
+  return { ok: true, orderId }
+}

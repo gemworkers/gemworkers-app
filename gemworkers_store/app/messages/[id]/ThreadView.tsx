@@ -91,7 +91,7 @@ export function ThreadView({
 
       <div className="msg-bubbles">
         {messages.map(m => {
-          if (m.kind !== 'text') return <OfferCard key={m.id} message={m} />
+          if (m.kind !== 'text') return <OfferCard key={m.id} message={m} stoneId={stone?.id} />
           const linked = m.linked_inventory_item_id
           return (
             <div key={m.id} className={`msg-bubble-row ${m.is_mine ? 'is-mine' : ''}`}>
