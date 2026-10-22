@@ -8,6 +8,11 @@
 //   anything else (withdrawn, claim stamps, …) → no email
 // Each event is sent at most once: public.claim_offer_notification stamps
 // <kind>_notified_at atomically before anything is sent.
+//
+// Also called by pg_cron (public.send_offer_payment_reminders) with
+// x-reminder-secret and {"type":"PAYMENT_REMINDER","order_id":…}:
+//   ~12 h before payment_due_at → buyer only ("Reminder: complete your payment …")
+// That job stamps orders.payment_reminder_sent_at before calling, so no claim here.
 // SERVER ONLY. Never reads seller_note. Never reveals the seller to the buyer.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
@@ -37,6 +42,18 @@ interface OrderRow {
   order_total:    number | string | null
   shipping_cost:  number | string | null
   payment_due_at: string | null
+}
+
+interface ReminderPayload {
+  type:     string
+  order_id: string
+}
+
+interface ReminderOrderRow extends OrderRow {
+  id:       string
+  status:   string
+  buyer_id: string
+  offer_id: string | null
 }
 
 // One event per webhook. Later parts add their own variants here
@@ -194,6 +211,27 @@ function buyerAcceptedEmail(stoneTitle: string, amount: string, total: string, s
   }
 }
 
+function buyerPaymentReminderEmail(stoneTitle: string, total: string, shipping: number, dueAt: string): Email {
+  const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
+  const subject   = `Reminder: complete your payment for ${stoneTitle}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Total to pay: ${strong(totalLine)}`,
+        `Your reserved stone is held until ${strong(`${dueAt} UTC`)} &mdash; please pay a little before then.`,
+      ],
+      ORDERS_URL,
+      "Pay now",
+    ),
+    text:
+      `Total to pay: ${totalLine}\n\n` +
+      `Your reserved stone is held until ${dueAt} UTC - please pay a little before then.\n\n` +
+      `Pay here: ${ORDERS_URL}\n`,
+  }
+}
+
 function buyerDeclinedEmail(stoneTitle: string, amount: string, itemId: string, reservedByOther: boolean): Email {
   const url     = stoneUrl(itemId)
   const subject = "Your offer wasn't accepted this time"
@@ -298,9 +336,119 @@ async function sendEmail(apiKey: string, to: string, email: Email, context: stri
 
 const sameAddress = (a: string, b: string) => a !== "" && b !== "" && a.toLowerCase() === b.toLowerCase()
 
+// ── Payment reminder (pg_cron) ─────────────────────────────────────────────────
+
+async function handlePaymentReminder(req: Request): Promise<Response> {
+  // pg_cron must send the header: x-reminder-secret: <OFFER_REMINDER_SECRET>
+  const expectedSecret = Deno.env.get("OFFER_REMINDER_SECRET")
+  const incomingSecret = req.headers.get("x-reminder-secret")
+  if (!expectedSecret || incomingSecret !== expectedSecret) {
+    console.error("[offer-notify] Unauthorized reminder request — secret mismatch or missing")
+    return json({ error: "Unauthorized" }, 401)
+  }
+
+  let payload: ReminderPayload
+  try {
+    payload = await req.json()
+  } catch {
+    console.error("[offer-notify] invalid JSON reminder payload")
+    return json({ skipped: true, reason: "invalid JSON" })
+  }
+
+  if (payload.type !== "PAYMENT_REMINDER" || !payload.order_id) {
+    console.error("[offer-notify] malformed reminder payload — type", payload.type)
+    return json({ skipped: true, reason: "malformed reminder payload" })
+  }
+  const orderId = payload.order_id
+
+  const supabaseUrl        = Deno.env.get("SUPABASE_URL")
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[offer-notify] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not available")
+    return json({ ok: true, emailsSent: 0, reason: "supabase env missing" })
+  }
+
+  const resendApiKey = Deno.env.get("RESEND_API_KEY")
+  if (!resendApiKey) {
+    console.error("[offer-notify] RESEND_API_KEY not set — reminder not sent")
+    return json({ ok: true, emailsSent: 0, reason: "RESEND_API_KEY missing" })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: orderData, error: orderErr } = await supabase
+    .from("orders")
+    .select("id, status, buyer_id, offer_id, order_total, shipping_cost, payment_due_at")
+    .eq("id", orderId)
+    .maybeSingle()
+  const order = orderData as ReminderOrderRow | null
+  if (orderErr || !order) {
+    console.error("[offer-notify] could not load order", orderId, "for reminder —", orderErr?.message)
+    return json({ skipped: true, reason: "order not found" })
+  }
+
+  // Paid or cancelled since the cron job picked it — nothing to remind about.
+  if (order.status !== "pending_payment") {
+    console.log("[offer-notify] order", orderId, "is", order.status, "— reminder skipped")
+    return json({ skipped: true, reason: "order no longer pending_payment" })
+  }
+  if (!order.offer_id || order.order_total == null || !order.payment_due_at) {
+    console.error("[offer-notify] order", orderId, "missing offer_id, total or payment_due_at — reminder skipped")
+    return json({ skipped: true, reason: "order incomplete" })
+  }
+
+  const { data: offerData, error: offerErr } = await supabase
+    .from("storefront_offers")
+    .select("inventory_item_id")
+    .eq("id", order.offer_id)
+    .maybeSingle()
+  const itemId = (offerData as { inventory_item_id: string | null } | null)?.inventory_item_id ?? null
+  if (offerErr || !itemId) {
+    console.error("[offer-notify] could not load offer", order.offer_id, "for reminder —", offerErr?.message)
+  }
+
+  let stoneTitle = "your stone"
+  if (itemId) {
+    const { data: inv, error: invErr } = await supabase
+      .from("inventory_items")
+      .select("title")
+      .eq("id", itemId)
+      .maybeSingle()
+    if (invErr) {
+      console.error("[offer-notify] could not load stone", itemId, "—", invErr.message)
+    }
+    stoneTitle = (inv as { title: string | null } | null)?.title?.trim() || stoneTitle
+  }
+
+  const { data: userData, error: userErr } = await supabase.auth.admin.getUserById(order.buyer_id)
+  const buyerAddr = userData?.user?.email?.trim() ?? ""
+  if (userErr || !buyerAddr) {
+    console.error("[offer-notify] could not resolve buyer email for order", orderId, userErr?.message)
+    return json({ ok: true, emailsSent: 0, reason: "no buyer email" })
+  }
+
+  const email = buyerPaymentReminderEmail(
+    stoneTitle,
+    eur(Number(order.order_total)),
+    Number(order.shipping_cost ?? 0),
+    utcDate.format(new Date(order.payment_due_at)),
+  )
+  const sent = await sendEmail(resendApiKey, buyerAddr, email, `order ${orderId} payment_reminder (buyer)`)
+
+  console.log("[offer-notify] order", orderId, "payment_reminder — emails sent:", sent ? 1 : 0, "of 1")
+  return json({ ok: true, emailsSent: sent ? 1 : 0 })
+}
+
 // ── Handler ────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // Reminder calls come from pg_cron with their own secret, not from the webhook.
+  if (req.headers.has("x-reminder-secret")) {
+    return handlePaymentReminder(req)
+  }
+
   // ── 1. Secret verification ─────────────────────────────────────────────────
   // Supabase webhook must send the header: x-webhook-secret: <OFFER_WEBHOOK_SECRET>
   const expectedSecret = Deno.env.get("OFFER_WEBHOOK_SECRET")
