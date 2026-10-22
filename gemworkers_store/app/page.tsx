@@ -3,6 +3,8 @@ import { join } from 'path'
 import Link from 'next/link'
 import { createClient } from "@/lib/supabase/server";
 import { ReviewSummary } from "@/app/components/ReviewSummary";
+import { PUBLIC_REVIEW_COLUMNS, type PublicReview } from "@/app/reviews/ReviewList";
+import { countryName } from "@/lib/countries";
 import { StoneGrid } from "@/app/components/StoneGrid";
 import type { StoneCardItem } from "@/app/components/StoneCard";
 
@@ -59,6 +61,15 @@ export default async function HomePage() {
   if (error) console.error("[GemWorkers Store] Supabase error:", error.message);
 
   const items = (data ?? []) as ListedItem[];
+
+  // Newest three approved reviews that have text — not hand-picked.
+  const { data: reviewData } = await supabase
+    .from("public_reviews")
+    .select(PUBLIC_REVIEW_COLUMNS)
+    .not("body", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(3);
+  const homeReviews = (reviewData ?? []) as PublicReview[];
   const cardItems: StoneCardItem[] = items.map(item => ({
     id:             item.id,
     title:          item.title,
@@ -162,6 +173,33 @@ export default async function HomePage() {
           <Link href="/about" className="home-text-link">Read our story →</Link>
         </div>
       </section>
+
+      {/* ── 7. Customer reviews (only once there are approved reviews with text) ── */}
+      {homeReviews.length > 0 && (
+        <section className="home-band">
+          <div className="home-wrap home-section">
+            <SectionHeader title="What our customers say" linkLabel="Read all reviews →" href="/reviews" />
+            <div className="home-review-grid">
+              {homeReviews.map(r => (
+                <figure key={r.id} className="home-review-card">
+                  <span className="home-review-stars" aria-label={`${r.rating} out of 5 stars`}>
+                    {'★'.repeat(Number(r.rating))}
+                    <span style={{ color: '#DDD3C2' }}>{'★'.repeat(5 - Number(r.rating))}</span>
+                  </span>
+                  <blockquote className="home-review-quote">
+                    “{r.body!.length > 220 ? `${r.body!.slice(0, 217).trimEnd()}…` : r.body}”
+                  </blockquote>
+                  <figcaption className="home-review-who">
+                    {[r.reviewer_name || 'A GemWorkers customer', countryName(r.reviewer_country)]
+                      .filter(Boolean).join(', ')}
+                    {r.stone_title && <span className="home-review-stone">Purchased: {r.stone_title}</span>}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

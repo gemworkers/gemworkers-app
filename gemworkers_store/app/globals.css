@@ -269,6 +269,23 @@
 .home-text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
 
 .home-band { background: #FFFFFF; border-top: 1px solid #ECE5D8; border-bottom: 1px solid #ECE5D8; }
+
+/* Homepage reviews band: 3 fixed cards, stacked on phones */
+.home-review-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.home-review-card {
+  margin: 0; padding: 26px 28px; border: 1px solid #ECE5D8; border-radius: 16px; background: #FBF8F3;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.home-review-stars { color: #B8860B; font-size: 16px; letter-spacing: 2px; }
+.home-review-quote {
+  margin: 0; font-family: var(--font-cormorant, Georgia, serif); font-size: 20px; line-height: 1.45; color: #1F1B16;
+  overflow-wrap: anywhere;
+}
+.home-review-who { margin-top: auto; font-size: 13px; font-weight: 600; color: #5A5045; display: flex; flex-direction: column; gap: 2px; }
+.home-review-stone { font-weight: 400; color: #6B6052; }
+@media (max-width: 900px) {
+  .home-review-grid { grid-template-columns: 1fr; }
+}
 .home-gem-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px;
 }
