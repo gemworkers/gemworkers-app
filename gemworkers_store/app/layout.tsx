@@ -46,6 +46,7 @@ const COMPANY_LINKS = [
 ]
 const CUSTOMER_CARE_LINKS = [
   { label: 'Shipping',           href: '/shipping' },
+  { label: 'Payment',            href: '/payment' },
   { label: 'Returns & Refunds',  href: '/returns' },
   { label: 'Our Guarantee',      href: '/guarantee' },
   { label: 'FAQ',                href: '/faq' },

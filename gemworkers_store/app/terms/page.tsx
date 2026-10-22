@@ -53,7 +53,8 @@ export default function TermsPage() {
       <h2>Payment</h2>
       <p>
         Payments are processed securely by our payment providers. We never see or store
-        your full card details.
+        your full card details. How and when you pay is explained on our{' '}
+        <Link href="/payment">Payment</Link> page.
       </p>
 
       <h2>Delivery</h2>
