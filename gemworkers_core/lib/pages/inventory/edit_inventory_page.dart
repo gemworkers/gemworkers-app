@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/services/user_profile_service.dart';
+import '../../core/utils/decimal_input.dart';
 import '../../models/inventory_item.dart';
 import '../../models/supplier.dart';
 import '../../repositories/inventory_repository.dart';
@@ -35,8 +36,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   late final TextEditingController _weightValue;
   late final TextEditingController _quantity;
   late final TextEditingController _costPrice;
-  // Decimal keyboards in NL show "," — accept "12,50" as 12.50.
-  String get _costText => _costPrice.text.trim().replaceAll(',', '.');
   late final TextEditingController _sellingPrice;
   late final TextEditingController _barcode;
   late final TextEditingController _notes;
@@ -216,20 +215,20 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       return 'A listed item needs a price — or unlist it first.';
     }
     if (_productType == 'loose_stone' &&
-        double.tryParse(_weightValue.text) == null) {
+        parseDecimalInput(_weightValue.text) == null) {
       return 'Weight must be a number.';
     }
     if (_productType == 'specimen' &&
         _weightGrams.text.isNotEmpty &&
-        double.tryParse(_weightGrams.text) == null) {
+        parseDecimalInput(_weightGrams.text) == null) {
       return 'Weight must be a number.';
     }
     if (_productType == 'jewelry' &&
         _totalWeightGrams.text.isNotEmpty &&
-        double.tryParse(_totalWeightGrams.text) == null) {
+        parseDecimalInput(_totalWeightGrams.text) == null) {
       return 'Total weight must be a number.';
     }
-    if (double.tryParse(_costText) == null) {
+    if (parseDecimalInput(_costPrice.text) == null) {
       return 'Cost price must be a number.';
     }
     if (int.tryParse(_quantity.text) == null) {
@@ -300,10 +299,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
             ? (_cutTypeSelection == 'Other' ? _cutTypeOther.text.trim() : _cutTypeSelection)
             : widget.item.cutType,
         weightValue:
-            isLooseStone ? double.parse(_weightValue.text) : widget.item.weightValue,
+            isLooseStone ? parseDecimalInput(_weightValue.text)! : widget.item.weightValue,
         weightUnit: isLooseStone ? _weightUnit : widget.item.weightUnit,
         quantity: int.parse(_quantity.text),
-        costPrice: double.parse(_costText),
+        costPrice: parseDecimalInput(_costPrice.text)!,
         salePrice: widget.item.salePrice, // legacy column — no longer edited
         barcode: _barcode.text.trim(),
         qrCode: widget.item.qrCode,
@@ -325,9 +324,9 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         certificationNumber: _orNull(_certificationNumber),
         treatment: _orNull(_treatment),
         dimensionsMm: null,
-        length: double.tryParse(_lengthCtrl.text),
-        width: double.tryParse(_widthCtrl.text),
-        height: double.tryParse(_heightCtrl.text),
+        length: parseDecimalInput(_lengthCtrl.text),
+        width: parseDecimalInput(_widthCtrl.text),
+        height: parseDecimalInput(_heightCtrl.text),
         dimensionUnit: _dimensionUnit,
         description: _orNull(_description),
         videoUrl: widget.item.videoUrl,
@@ -337,7 +336,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         locality: isSpecimen ? _orNull(_locality) : widget.item.locality,
         matrix: isSpecimen ? _orNull(_matrix) : widget.item.matrix,
         weightGrams: isSpecimen
-            ? double.tryParse(_weightGrams.text)
+            ? parseDecimalInput(_weightGrams.text)
             : widget.item.weightGrams,
         weightGramsUnit: isSpecimen ? _weightGramsUnit : widget.item.weightGramsUnit,
         jewelryType:
@@ -350,7 +349,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         gemstonesUsed:
             isJewelry ? _orNull(_gemstonesUsed) : widget.item.gemstonesUsed,
         totalWeightGrams: isJewelry
-            ? double.tryParse(_totalWeightGrams.text)
+            ? parseDecimalInput(_totalWeightGrams.text)
             : widget.item.totalWeightGrams,
         totalWeightGramsUnit: isJewelry ? _totalWeightGramsUnit : widget.item.totalWeightGramsUnit,
       );
@@ -428,7 +427,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField(
             'Weight',
             _weightGrams,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           FormDropdownField<String>(
             label: 'Unit',
@@ -442,11 +441,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: TextInputType.number)),
+              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
               const SizedBox(width: 8),
-              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: TextInputType.number)),
+              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
               const SizedBox(width: 8),
-              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: TextInputType.number)),
+              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
             ],
           ),
           FormDropdownField<String>(
@@ -472,7 +471,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           FormTextField(
             'Total Weight',
             _totalWeightGrams,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           FormDropdownField<String>(
             label: 'Unit',
@@ -513,7 +512,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           OriginCountryField(controller: _originCountry),
           FormTextField('Region', _originRegion),
           const FormSection('Weight'),
-          FormTextField('Weight *', _weightValue, keyboardType: TextInputType.number),
+          FormTextField('Weight *', _weightValue, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
           FormDropdownField<String>(
             label: 'Unit',
             value: _weightUnit,
@@ -525,11 +524,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: TextInputType.number)),
+              Expanded(child: FormTextField('Length', _lengthCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
               const SizedBox(width: 8),
-              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: TextInputType.number)),
+              Expanded(child: FormTextField('Width', _widthCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
               const SizedBox(width: 8),
-              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: TextInputType.number)),
+              Expanded(child: FormTextField('Height', _heightCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
             ],
           ),
           FormDropdownField<String>(
