@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/user_profile_service.dart';
+import '../../core/utils/money.dart';
 import '../../models/conversation.dart';
 import '../../models/message.dart';
 import '../../repositories/inventory_repository.dart';
@@ -539,6 +540,7 @@ class _MessagesPageState extends State<MessagesPage> {
         itemCount: _messages.length,
         itemBuilder: (_, i) {
           final m = _messages[i];
+          if (m.isOfferCard) return _OfferCard(message: m);
           final linkedId = m.linkedInventoryItemId;
           return _MessageBubble(
             message: m,
@@ -801,7 +803,9 @@ class _ConversationTile extends StatelessWidget {
     ].join(' · ');
     final preview = c.lastMessagePreview.isEmpty
         ? ''
-        : (c.lastMessageRole != null && c.lastMessageRole != 'buyer'
+        : (c.lastMessageRole != null &&
+                    c.lastMessageRole != 'buyer' &&
+                    c.lastMessageRole != 'system'
                 ? 'Reply: '
                 : '') +
             c.lastMessagePreview.replaceAll(RegExp(r'\s+'), ' ');
@@ -1139,6 +1143,84 @@ class _MessageBubble extends StatelessWidget {
                 _LinkedStoneCard(card: card, onTap: onOpenCard),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Offer event written by the offer trigger: centred card with the event and
+/// amount. Unknown kinds (added later, e.g. counter-offers) show the row's
+/// own body text.
+class _OfferCard extends StatelessWidget {
+  final Message message;
+
+  const _OfferCard({required this.message});
+
+  static const _titles = {
+    'offer_made':      'Offer received',
+    'offer_accepted':  'Offer accepted',
+    'offer_declined':  'Offer declined',
+    'offer_expired':   'Offer expired',
+    'offer_withdrawn': 'Buyer withdrew the offer',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final title = _titles[message.kind];
+    final amount = message.offerAmount;
+    final accepted = message.kind == 'offer_accepted';
+    final closed = const {'offer_declined', 'offer_expired', 'offer_withdrawn'}
+        .contains(message.kind);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: accepted
+                  ? AppColors.success.withValues(alpha: 0.08)
+                  : AppColors.raised,
+              border: Border.all(
+                  color: accepted
+                      ? AppColors.success.withValues(alpha: 0.3)
+                      : AppColors.border),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  (title ?? message.body).toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: accepted ? AppColors.success : AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                if (title != null && amount != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    formatEur(amount),
+                    style: textTheme.titleLarge?.copyWith(
+                      color: closed ? AppColors.muted : AppColors.ink,
+                      decoration: closed ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Text(
+                  _formatBubbleTime(message.createdAt),
+                  style: textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                ),
+              ],
+            ),
           ),
         ),
       ),

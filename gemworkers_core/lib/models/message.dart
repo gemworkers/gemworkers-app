@@ -4,10 +4,15 @@ import '../core/utils/commission.dart';
 class Message {
   final String id;
   final String conversationId;
-  final String senderRole; // 'buyer' | 'seller' | 'owner'
+  final String senderRole; // 'buyer' | 'seller' | 'owner' | 'system'
   final String body;
   final String? linkedInventoryItemId;
   final DateTime createdAt;
+  /// 'text', or an offer event card written by the offer trigger
+  /// (offer_made, offer_accepted, …) — those are senderRole 'system'.
+  final String kind;
+  final String? offerId;
+  final double? offerAmount;
 
   const Message({
     required this.id,
@@ -16,9 +21,13 @@ class Message {
     required this.body,
     this.linkedInventoryItemId,
     required this.createdAt,
+    this.kind = 'text',
+    this.offerId,
+    this.offerAmount,
   });
 
   bool get isFromBuyer => senderRole == 'buyer';
+  bool get isOfferCard => kind != 'text';
 
   factory Message.fromMap(Map<String, dynamic> map) {
     return Message(
@@ -29,6 +38,9 @@ class Message {
       linkedInventoryItemId: map['linked_inventory_item_id']?.toString(),
       createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ??
           DateTime.now(),
+      kind:                  map['kind']?.toString() ?? 'text',
+      offerId:               map['offer_id']?.toString(),
+      offerAmount:           parseNumeric(map['offer_amount']),
     );
   }
 }

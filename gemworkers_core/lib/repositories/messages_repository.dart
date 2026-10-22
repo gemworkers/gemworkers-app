@@ -44,7 +44,7 @@ class MessagesRepository {
     final response = await supabase
         .from('messages')
         .select('id, conversation_id, sender_role, body, '
-            'linked_inventory_item_id, created_at')
+            'linked_inventory_item_id, created_at, kind, offer_id, offer_amount')
         .eq('conversation_id', conversationId)
         .order('created_at', ascending: true);
     return response.map<Message>((row) => Message.fromMap(row)).toList();
