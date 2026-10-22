@@ -1,20 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PhotoGalleryProps {
   imageUrls: string[];
   title: string;
 }
 
-// Square frame shared by every state, so the layout never jumps.
-const frameStyle: React.CSSProperties = {
-  width: '100%', aspectRatio: '1 / 1',
-  borderRadius: 18, background: '#F4EEE4', overflow: 'hidden',
-};
+// Etsy-style stone photos:
+//  - computer: thumbnail column on the left, big photo with ‹ › on its edges
+//  - phone: edge-to-edge swipe carousel with dots
+//  - full screen: photo fitted to the window, thumbnail row along the bottom,
+//    click to zoom (mouse moves around the zoomed photo), pinch to zoom on phones
+// Swiping uses native horizontal scroll with snapping, so it feels like the
+// phone's own photo app.
 
-// Swipe track: native horizontal scroll with snapping — smooth finger swipes
-// on phones, trackpad swipes on laptops, arrows for mice.
 function useSnapTrack(count: number) {
   const ref = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
@@ -37,6 +38,23 @@ function useSnapTrack(count: number) {
   return { ref, index, onScroll, goTo };
 }
 
+// Frame follows the first photo's shape (between 4:5 portrait and 4:3
+// landscape) so stones fill it with as little empty space as possible.
+function useFrameRatio(firstUrl: string | undefined) {
+  const [ratio, setRatio] = useState(1);
+  useEffect(() => {
+    if (!firstUrl) return;
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setRatio(Math.min(4 / 3, Math.max(4 / 5, img.naturalWidth / img.naturalHeight)));
+      }
+    };
+    img.src = firstUrl;
+  }, [firstUrl]);
+  return ratio;
+}
+
 function Arrow({ dir, onClick, dark = false }: { dir: 'prev' | 'next'; onClick: () => void; dark?: boolean }) {
   return (
     <button
@@ -50,6 +68,51 @@ function Arrow({ dir, onClick, dark = false }: { dir: 'prev' | 'next'; onClick: 
   );
 }
 
+function Thumb({ url, active, onClick, label }: { url: string; active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label} aria-current={active} className={`gallery-thumb${active ? ' is-active' : ''}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" />
+    </button>
+  );
+}
+
+// ── One full-screen slide with click-to-zoom ────────────────────────────────
+function ZoomSlide({
+  url, alt, zoomed, onToggleZoom,
+}: {
+  url: string; alt: string; zoomed: boolean; onToggleZoom: () => void;
+}) {
+  const [origin, setOrigin] = useState('50% 50%');
+
+  function trackMouse(e: React.MouseEvent<HTMLImageElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * 100;
+    const y = ((e.clientY - r.top) / r.height) * 100;
+    setOrigin(`${Math.min(100, Math.max(0, x))}% ${Math.min(100, Math.max(0, y))}%`);
+  }
+
+  return (
+    <div className="gallery-lightbox-slide">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={alt}
+        draggable={false}
+        className={`gallery-lightbox-img${zoomed ? ' is-zoomed' : ''}`}
+        style={{ transformOrigin: origin }}
+        onClick={e => {
+          // Touch screens zoom with a pinch instead (browser's own zoom).
+          if (window.matchMedia('(hover: none)').matches) return;
+          trackMouse(e);
+          onToggleZoom();
+        }}
+        onMouseMove={zoomed ? trackMouse : undefined}
+      />
+    </div>
+  );
+}
+
 // ── Full-screen viewer ──────────────────────────────────────────────────────
 function Lightbox({
   imageUrls, title, startIndex, onClose,
@@ -57,6 +120,8 @@ function Lightbox({
   imageUrls: string[]; title: string; startIndex: number; onClose: (index: number) => void;
 }) {
   const { ref, index, onScroll, goTo } = useSnapTrack(imageUrls.length);
+  const [zoomed, setZoomed] = useState(false);
+  const many = imageUrls.length > 1;
 
   // Open on the photo that was tapped; lock page scroll while open.
   useEffect(() => {
@@ -66,117 +131,128 @@ function Lightbox({
     return () => { document.body.style.overflow = prev; };
   }, [goTo, startIndex]);
 
+  // Changing photo always starts zoomed out.
+  const show = useCallback((i: number) => { setZoomed(false); goTo(i); }, [goTo]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose(index);
-      if (e.key === 'ArrowLeft') goTo(index - 1);
-      if (e.key === 'ArrowRight') goTo(index + 1);
+      if (e.key === 'Escape') { if (zoomed) setZoomed(false); else onClose(index); }
+      if (e.key === 'ArrowLeft') show(index - 1);
+      if (e.key === 'ArrowRight') show(index + 1);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [index, goTo, onClose]);
+  }, [index, zoomed, show, onClose]);
 
   return (
     <div className="gallery-lightbox" role="dialog" aria-modal="true" aria-label={`${title} photos`}>
       <div className="gallery-lightbox-bar">
-        <span>{imageUrls.length > 1 ? `${index + 1} / ${imageUrls.length}` : ''}</span>
+        <span>{many ? `${index + 1} / ${imageUrls.length}` : ''}</span>
+        <span className="gallery-lightbox-hint">{zoomed ? 'Click to zoom out' : 'Click photo to zoom'}</span>
         <button type="button" onClick={() => onClose(index)} aria-label="Close" className="gallery-close">✕</button>
       </div>
-      <div ref={ref} onScroll={onScroll} className="gallery-track gallery-lightbox-track">
+
+      <div
+        ref={ref}
+        onScroll={() => { onScroll(); }}
+        className={`gallery-track gallery-lightbox-track${zoomed ? ' is-zoomed' : ''}`}
+      >
         {imageUrls.map((url, i) => (
-          <div key={i} className="gallery-lightbox-slide" onClick={() => onClose(index)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt={`${title} — photo ${i + 1} of ${imageUrls.length}`}
-              className="gallery-lightbox-img"
-              onClick={e => e.stopPropagation()}
-            />
-          </div>
+          <ZoomSlide
+            key={i}
+            url={url}
+            alt={`${title} — photo ${i + 1} of ${imageUrls.length}`}
+            zoomed={zoomed && i === index}
+            onToggleZoom={() => setZoomed(z => !z)}
+          />
         ))}
       </div>
-      {imageUrls.length > 1 && index > 0 && <Arrow dir="prev" dark onClick={() => goTo(index - 1)} />}
-      {imageUrls.length > 1 && index < imageUrls.length - 1 && <Arrow dir="next" dark onClick={() => goTo(index + 1)} />}
+
+      {many && !zoomed && index > 0 && <Arrow dir="prev" dark onClick={() => show(index - 1)} />}
+      {many && !zoomed && index < imageUrls.length - 1 && <Arrow dir="next" dark onClick={() => show(index + 1)} />}
+
+      {many && (
+        <div className="gallery-lightbox-thumbs">
+          {imageUrls.map((url, i) => (
+            <Thumb key={i} url={url} active={i === index} onClick={() => show(i)} label={`Show photo ${i + 1}`} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export function PhotoGallery({ imageUrls, title }: PhotoGalleryProps) {
   const { ref, index, onScroll, goTo } = useSnapTrack(imageUrls.length);
+  const ratio = useFrameRatio(imageUrls[0]);
   const [lightboxAt, setLightboxAt] = useState<number | null>(null);
 
-  // ── 0 photos ──────────────────────────────────────────────────────────────
   if (imageUrls.length === 0) {
-    return <div style={frameStyle} aria-hidden="true" />;
+    return <div className="gallery-empty" aria-hidden="true" />;
   }
 
   const many = imageUrls.length > 1;
 
   return (
-    <div>
-      {/* Main swipe carousel */}
-      <div style={{ position: 'relative', marginBottom: many ? 12 : 0 }}>
-        <div ref={ref} onScroll={onScroll} className="gallery-track" style={frameStyle}>
-          {imageUrls.map((url, i) => (
-            <button
-              key={i}
-              type="button"
-              className="gallery-slide"
-              onClick={() => setLightboxAt(i)}
-              aria-label={`Open photo ${i + 1} full screen`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt={`${title} — photo ${i + 1} of ${imageUrls.length}`}
-                draggable={false}
-                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-              />
-            </button>
-          ))}
-        </div>
-        {many && index > 0 && <Arrow dir="prev" onClick={() => goTo(index - 1)} />}
-        {many && index < imageUrls.length - 1 && <Arrow dir="next" onClick={() => goTo(index + 1)} />}
-        {many && <span className="gallery-count">{index + 1} / {imageUrls.length}</span>}
-        <span className="gallery-expand" aria-hidden="true">⤢</span>
-      </div>
-
-      {/* Thumbnail strip */}
+    <div className={`gallery${many ? ' has-thumbs' : ''}`}>
+      {/* Computer: vertical thumbnail column */}
       {many && (
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: 4 }}>
+        <div className="gallery-side-thumbs">
           {imageUrls.map((url, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              aria-label={`View photo ${i + 1}`}
-              style={{
-                flex: '0 0 72px', height: 72,
-                padding: 0, border: 'none', cursor: 'pointer',
-                borderRadius: 12, overflow: 'hidden',
-                outline: i === index ? '2px solid #1F1B16' : '2px solid transparent',
-                outlineOffset: 2,
-                background: '#F4EEE4',
-                transition: 'outline-color 0.15s ease',
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            </button>
+            <Thumb key={i} url={url} active={i === index} onClick={() => goTo(i)} label={`View photo ${i + 1}`} />
           ))}
         </div>
       )}
 
-      {lightboxAt !== null && (
+      <div className="gallery-main">
+        <div className="gallery-stage">
+          <div
+            ref={ref}
+            onScroll={onScroll}
+            className="gallery-track gallery-frame"
+            style={{ aspectRatio: String(ratio) }}
+          >
+            {imageUrls.map((url, i) => (
+              <button
+                key={i}
+                type="button"
+                className="gallery-slide"
+                onClick={() => setLightboxAt(i)}
+                aria-label={`Open photo ${i + 1} full screen`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`${title} — photo ${i + 1} of ${imageUrls.length}`}
+                  draggable={false}
+                />
+              </button>
+            ))}
+          </div>
+          {many && index > 0 && <Arrow dir="prev" onClick={() => goTo(index - 1)} />}
+          {many && index < imageUrls.length - 1 && <Arrow dir="next" onClick={() => goTo(index + 1)} />}
+        </div>
+
+        {/* Phone: dots */}
+        {many && (
+          <div className="gallery-dots" aria-hidden="true">
+            {imageUrls.map((_, i) => (
+              <span key={i} className={i === index ? 'is-active' : ''} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Portal to <body>: page-enter animations use transform, which would
+          otherwise trap position: fixed inside the page. */}
+      {lightboxAt !== null && createPortal(
         <Lightbox
           imageUrls={imageUrls}
           title={title}
           startIndex={lightboxAt}
           onClose={i => { setLightboxAt(null); goTo(i, false); }}
-        />
+        />,
+        document.body,
       )}
     </div>
   );
