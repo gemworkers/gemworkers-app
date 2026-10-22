@@ -12,6 +12,7 @@ import { countryName } from '@/lib/countries';
 import { TrustList } from '@/app/components/TrustList';
 import { canStartOfferPayment } from '@/lib/offer-payment';
 import { formatEur } from '@/lib/money';
+import { makerVerb, makerHref } from '@/lib/makers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ type ListingDetail = {
   gemstones_used: string | null;
   total_weight_grams: number | null;
   total_weight_grams_unit: string | null;
+
+  // maker credit (optional; owner-managed makers, never the seller)
+  maker_id: string | null;
+  maker_name: string | null;
+  maker_place: string | null;
 
   // shipping
   seller_country: string | null;
@@ -350,6 +356,14 @@ export default async function StoneDetailPage({
           <h1 className="font-serif pd-title">{item.title}</h1>
 
           {metaLine && <p className="pd-meta">{metaLine}</p>}
+
+          {item.maker_id && item.maker_name && (
+            <p className="pd-maker">
+              {makerVerb(item.product_type)}{' '}
+              <Link href={makerHref(item.maker_id)}>{item.maker_name}</Link>
+              {item.maker_place && <> in {item.maker_place}</>}
+            </p>
+          )}
 
           {/* Price */}
           <div style={{ marginTop: 24, marginBottom: 28 }}>

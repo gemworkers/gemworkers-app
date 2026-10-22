@@ -11,6 +11,7 @@ import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
+import 'pages/makers/makers_page.dart';
 import 'pages/messages/messages_page.dart';
 import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
@@ -187,6 +188,7 @@ class _MainLayoutState extends State<MainLayout> {
         const PurchasesPage(),
         const SuppliersPage(),
         if (_isOwner) const SellersPage(),
+        if (_isOwner) const MakersPage(),
       ];
 
   List<ShopNavItem> get _destinations => [
@@ -239,6 +241,12 @@ class _MainLayoutState extends State<MainLayout> {
             icon: Icons.store_outlined,
             selectedIcon: Icons.store,
             label: 'Sellers',
+          ),
+        if (_isOwner)
+          const ShopNavItem(
+            icon: Icons.handyman_outlined,
+            selectedIcon: Icons.handyman,
+            label: 'Makers',
           ),
       ];
 

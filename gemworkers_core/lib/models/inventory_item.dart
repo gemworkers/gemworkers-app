@@ -37,6 +37,10 @@ class InventoryItem {
 
   final List<String> imageUrls;
 
+  // Maker credit (owner-only). Read here but NOT in toMap(): it is set only
+  // via InventoryRepository.setItemMaker, so no other save can clear it.
+  final String? makerId;
+
   // Supplier link — supplierId stored in DB; supplierName is join-derived (not in toMap).
   final String? supplierId;
   final String supplierName;
@@ -121,6 +125,7 @@ class InventoryItem {
     required this.status,
     required this.notes,
     required this.imageUrls,
+    this.makerId,
     this.supplierId,
     this.supplierName = '',
     this.sellerId,
@@ -192,6 +197,7 @@ class InventoryItem {
       status: map['status'] ?? 'available',
       notes: map['notes'] ?? '',
       imageUrls: parseUrls(map['image_urls']),
+      makerId: map['maker_id']?.toString(),
       supplierId: map['supplier_id']?.toString(),
       supplierName:
           (map['suppliers'] as Map<String, dynamic>?)?['name']?.toString() ??
@@ -400,6 +406,7 @@ class InventoryItem {
       status: status ?? this.status,
       notes: notes ?? this.notes,
       imageUrls: imageUrls ?? this.imageUrls,
+      makerId: makerId,
       supplierId:
           identical(supplierId, _omitted) ? this.supplierId : supplierId as String?,
       supplierName: supplierName ?? this.supplierName,

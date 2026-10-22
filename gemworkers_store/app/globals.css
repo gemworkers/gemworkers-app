@@ -345,6 +345,8 @@
   overflow-wrap: anywhere;
 }
 .pd-meta { font-size: 15px; color: #6B6052; margin-top: 12px; line-height: 1.5; }
+.pd-maker { font-size: 15px; color: #6B6052; margin-top: 6px; line-height: 1.5; font-style: italic; }
+.pd-maker a { color: #7A5A22; text-decoration: underline; text-underline-offset: 3px; }
 .pd-price { font-size: 28px; font-weight: 600; color: #1F1B16; line-height: 1.2; }
 .pd-shipline { font-size: 14px; color: #6B6052; margin-top: 6px; }
 

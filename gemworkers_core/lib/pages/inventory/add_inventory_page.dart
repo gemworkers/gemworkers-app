@@ -10,6 +10,7 @@ import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
+import 'widgets/maker_picker.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
 import 'listing_sheet.dart';
@@ -104,6 +105,10 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   List<Supplier> _suppliers = [];
   bool _loadingSuppliers = false;
   String? _supplierId;
+
+  // ── Maker (owner only) ────────────────────────────────────────────────────
+
+  String? _makerId;
 
   // ── Location ──────────────────────────────────────────────────────────────
 
@@ -285,6 +290,12 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       );
 
       final created = await _repository.addItem(item);
+
+      if (_makerId != null &&
+          created.id != null &&
+          UserProfileService.instance.isOwner) {
+        await _repository.setItemMaker(created.id!, _makerId);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -568,6 +579,16 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
 
+
+              if (UserProfileService.instance.isOwner) ...[
+                const FormSection('Maker credit'),
+                MakerPicker(
+                  productType: widget.productType,
+                  value: _makerId,
+                  onChanged: (v) => setState(() => _makerId = v),
+                  enabled: !_saving,
+                ),
+              ],
 
               const FormSection('Supplier'),
               _buildSupplierPicker(),

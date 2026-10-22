@@ -11,6 +11,7 @@ import 'widgets/inventory_form_widgets.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
+import 'widgets/maker_picker.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
 
@@ -103,6 +104,9 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   bool _loadingSuppliers = false;
   String? _supplierId;
 
+  // Maker credit — owner only; saved separately via setItemMaker.
+  String? _makerId;
+
   // ── Location ──────────────────────────────────────────────────────────────
 
   String? _locationId;
@@ -166,6 +170,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
     _totalWeightGrams =
         TextEditingController(text: i.totalWeightGrams?.toString() ?? '');
     _supplierId = i.supplierId;
+    _makerId = i.makerId;
     _locationId = i.locationId;
     _originalLocationId = i.locationId;
     _photos = i.imageUrls.map(PhotoItem.existing).toList();
@@ -309,6 +314,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         status: _status,
         notes: _notes.text.trim(),
         imageUrls: finalImageUrls,
+        makerId: _makerId,
         supplierId: _supplierId,
         supplierName: supplierName,
         locationId: _locationId,
@@ -355,6 +361,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       );
 
       await _repository.updateItem(widget.item.id!, updated);
+
+      if (_makerId != widget.item.makerId && UserProfileService.instance.isOwner) {
+        await _repository.setItemMaker(widget.item.id!, _makerId);
+      }
 
       if (_locationId != _originalLocationId && widget.item.id != null) {
         await _movementRepo.recordMovement(
@@ -594,6 +604,16 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           const FormSection('Private — only you see this'),
           FormTextField('Cost Price *', _costPrice,
               keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+
+          if (UserProfileService.instance.isOwner) ...[
+            const FormSection('Maker credit'),
+            MakerPicker(
+              productType: _productType,
+              value: _makerId,
+              onChanged: (v) => setState(() => _makerId = v),
+              enabled: !_saving,
+            ),
+          ],
 
           const FormSection('Supplier'),
           _buildSupplierPicker(),

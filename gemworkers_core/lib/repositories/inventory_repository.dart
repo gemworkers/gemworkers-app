@@ -138,6 +138,14 @@ class InventoryRepository {
   }
 
   /// Patches only the cost_price field of an item.
+  /// Owner only (DB trigger refuses anyone else). null = unknown / none.
+  Future<void> setItemMaker(String id, String? makerId) async {
+    await supabase
+        .from('inventory_items')
+        .update({'maker_id': makerId})
+        .eq('id', id);
+  }
+
   Future<void> updateItemCost(String id, double costPrice) async {
     await supabase
         .from('inventory_items')
