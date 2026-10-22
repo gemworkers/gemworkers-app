@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { formatEur } from '@/lib/money'
+import { ReviewList, reviewAverage, type PublicReview } from '@/app/reviews/ReviewList'
+import { Stars } from '@/app/reviews/Stars'
 
 export const metadata = { title: 'Our Makers · GemWorkers' }
 
@@ -33,7 +35,17 @@ export default async function MakersPage() {
   const makers = (makerData ?? []) as Maker[]
 
   const stonesByMaker = new Map<string, MakerStone[]>()
+  const reviewsByMaker = new Map<string, PublicReview[]>()
   if (makers.length > 0) {
+    const { data: reviewData } = await supabase
+      .from('public_reviews')
+      .select('id, rating, body, photo_url, reviewer_name, reviewer_country, owner_reply, created_at, maker_id, stone_title')
+      .in('maker_id', makers.map(m => m.id))
+      .order('created_at', { ascending: false })
+    for (const r of (reviewData ?? []) as PublicReview[]) {
+      if (r.maker_id) reviewsByMaker.set(r.maker_id, [...(reviewsByMaker.get(r.maker_id) ?? []), r])
+    }
+
     const { data: stoneData } = await supabase
       .from('public_listings')
       .select('id, title, image_url, selling_price, sale_method, maker_id')
@@ -97,6 +109,8 @@ export default async function MakersPage() {
         <div style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 28 }}>
           {makers.map(m => {
             const stones = stonesByMaker.get(m.id) ?? []
+            const makerReviews = reviewsByMaker.get(m.id) ?? []
+            const makerAvg = reviewAverage(makerReviews)
             return (
               <section
                 key={m.id}
@@ -125,6 +139,12 @@ export default async function MakersPage() {
                     {m.place && (
                       <p style={{ fontSize: 14, color: '#6b7280', margin: '6px 0 0' }}>{m.place}</p>
                     )}
+                    {makerAvg !== null && (
+                      <p style={{ fontSize: 13, color: '#6b7280', margin: '6px 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Stars rating={makerAvg} size={14} />
+                        {makerAvg.toFixed(1)} · {makerReviews.length} review{makerReviews.length === 1 ? '' : 's'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -135,6 +155,18 @@ export default async function MakersPage() {
                   }}>
                     {m.story}
                   </p>
+                )}
+
+                {makerReviews.length > 0 && (
+                  <div style={{ marginTop: 24 }}>
+                    <p style={{
+                      fontSize: 11, fontWeight: 700, letterSpacing: '0.12em',
+                      color: '#9ca3af', textTransform: 'uppercase', margin: '0 0 12px',
+                    }}>
+                      What customers say
+                    </p>
+                    <ReviewList reviews={makerReviews.slice(0, 2)} />
+                  </div>
                 )}
 
                 {stones.length > 0 && (

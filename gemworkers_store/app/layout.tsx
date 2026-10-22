@@ -40,6 +40,7 @@ const SHOP_LINKS = [
 const COMPANY_LINKS = [
   { label: 'About',      href: '/about' },
   { label: 'Our Makers', href: '/makers' },
+  { label: 'Reviews',    href: '/reviews' },
   { label: 'Journal',    href: '/journal' },
   { label: 'Contact',    href: '/contact' },
 ]

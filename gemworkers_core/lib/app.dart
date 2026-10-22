@@ -12,6 +12,7 @@ import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
 import 'pages/makers/makers_page.dart';
+import 'pages/reviews/reviews_page.dart';
 import 'pages/messages/messages_page.dart';
 import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
@@ -21,6 +22,7 @@ import 'repositories/inventory_repository.dart';
 import 'repositories/messages_repository.dart';
 import 'repositories/offers_repository.dart';
 import 'repositories/order_repository.dart';
+import 'repositories/review_repository.dart';
 import 'theme/app_theme.dart';
 import 'widgets/shop_sidebar.dart';
 
@@ -106,7 +108,9 @@ class _MainLayoutState extends State<MainLayout> {
   int _pendingOffersCount = 0;
   int _unreadMessagesCount = 0;
   int _awaitingApprovalCount = 0; // owner only: seller listing requests
+  int _pendingReviewsCount = 0; // owner only: reviews waiting for approval
   final _inventoryRepo = InventoryRepository();
+  final _reviewRepo = ReviewRepository();
   final _orderRepo = OrderRepository();
   final _offersRepo = OffersRepository();
   final _messagesRepo = MessagesRepository();
@@ -152,8 +156,16 @@ class _MainLayoutState extends State<MainLayout> {
         final count = await _inventoryRepo.getAwaitingApprovalCount();
         if (mounted) setState(() => _awaitingApprovalCount = count);
       } catch (_) {}
+      await _loadReviewsCount();
     }
     await _loadMessagesCount();
+  }
+
+  Future<void> _loadReviewsCount() async {
+    try {
+      final count = await _reviewRepo.getPendingCount();
+      if (mounted) setState(() => _pendingReviewsCount = count);
+    } catch (_) {}
   }
 
   bool get _isOwner => UserProfileService.instance.isOwner;
@@ -198,6 +210,7 @@ class _MainLayoutState extends State<MainLayout> {
         const SuppliersPage(),
         if (_isOwner) const SellersPage(),
         if (_isOwner) const MakersPage(),
+        if (_isOwner) ReviewsPage(onPendingChanged: _loadReviewsCount),
       ];
 
   List<ShopNavItem> get _destinations => [
@@ -257,6 +270,13 @@ class _MainLayoutState extends State<MainLayout> {
             icon: Icons.handyman_outlined,
             selectedIcon: Icons.handyman,
             label: 'Makers',
+          ),
+        if (_isOwner)
+          ShopNavItem(
+            icon: Icons.star_outline,
+            selectedIcon: Icons.star,
+            label: 'Reviews',
+            badgeCount: _pendingReviewsCount,
           ),
       ];
 

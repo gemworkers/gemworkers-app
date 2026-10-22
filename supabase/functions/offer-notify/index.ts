@@ -19,6 +19,9 @@
 // x-reminder-secret and {"type":"PAYMENT_REMINDER","order_id":…}:
 //   ~12 h before payment_due_at → buyer only ("Reminder: complete your payment …")
 // That job stamps orders.payment_reminder_sent_at before calling, so no claim here.
+// Same secret, {"type":"REVIEW_INVITE","order_ids":[…]} from send_review_invites:
+//   order received / shipped ≥ 14 days → buyer only ("How is your {stone}?")
+// That job stamps orders.review_invited_at before calling.
 // SERVER ONLY. Never reads seller_note. Never reveals the seller to the buyer.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
@@ -506,6 +509,10 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
     return json({ skipped: true, reason: "invalid JSON" })
   }
 
+  if (payload.type === "REVIEW_INVITE") {
+    return handleReviewInvite(payload as unknown as ReviewInvitePayload)
+  }
+
   if (payload.type !== "PAYMENT_REMINDER" || !payload.order_id) {
     console.error("[offer-notify] malformed reminder payload — type", payload.type)
     return json({ skipped: true, reason: "malformed reminder payload" })
@@ -589,6 +596,100 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
   const sent = await sendEmail(resendApiKey, buyerAddr, email, `order ${orderId} payment_reminder (buyer)`)
 
   console.log("[offer-notify] order", orderId, "payment_reminder — emails sent:", sent ? 1 : 0, "of 1")
+  return json({ ok: true, emailsSent: sent ? 1 : 0 })
+}
+
+// ── Review invite (pg_cron) ────────────────────────────────────────────────────
+// send_review_invites (sql/reviews_setup.sql) stamps orders.review_invited_at
+// and POSTs one checkout's eligible orders. Already authenticated by the
+// x-reminder-secret check in handlePaymentReminder.
+
+interface ReviewInvitePayload {
+  type:      string
+  order_ids: string[]
+}
+
+function buyerReviewInviteEmail(titles: string[]): Email {
+  const one     = titles.length === 1
+  const subject = one ? `How is your ${titles[0]}?` : "How are your new stones?"
+  const what    = one ? strong(titles[0]) : "your stones"
+  const list    = one ? "" : `<br>${titles.map(t => `&bull; ${esc(t)}`).join("<br>")}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `We hope you love ${what}.${list}`,
+        "Would you tell other collectors what you think? A star rating takes a few seconds; a few words and a photo help even more.",
+      ],
+      ORDERS_URL,
+      "Write a review",
+    ),
+    text:
+      `We hope you love ${one ? titles[0] : "your stones"}.\n` +
+      (one ? "" : titles.map(t => `- ${t}`).join("\n") + "\n") +
+      `\nWould you tell other collectors what you think? Write a review here: ${ORDERS_URL}\n`,
+  }
+}
+
+async function handleReviewInvite(payload: ReviewInvitePayload): Promise<Response> {
+  const ids = Array.isArray(payload.order_ids) ? payload.order_ids.filter(x => typeof x === "string") : []
+  if (ids.length === 0) {
+    return json({ skipped: true, reason: "no order_ids" })
+  }
+
+  const supabaseUrl        = Deno.env.get("SUPABASE_URL")
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const resendApiKey       = Deno.env.get("RESEND_API_KEY")
+  if (!supabaseUrl || !supabaseServiceKey || !resendApiKey) {
+    console.error("[offer-notify] review invite: env missing (supabase or RESEND_API_KEY)")
+    return json({ ok: true, emailsSent: 0, reason: "env missing" })
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: ordersData, error: ordersErr } = await supabase
+    .from("orders")
+    .select("id, buyer_id, order_email, status")
+    .in("id", ids)
+  const orders = (ordersData as { id: string; buyer_id: string | null; order_email: string | null; status: string }[] | null) ?? []
+  if (ordersErr || orders.length === 0) {
+    console.error("[offer-notify] review invite: orders not found", ids, ordersErr?.message)
+    return json({ skipped: true, reason: "orders not found" })
+  }
+
+  // Skip orders reviewed since the cron picked them.
+  const { data: reviewed } = await supabase.from("reviews").select("order_id").in("order_id", ids)
+  const done = new Set(((reviewed as { order_id: string }[] | null) ?? []).map(r => r.order_id))
+  const open = orders.filter(o => !done.has(o.id) && o.status !== "cancelled")
+  if (open.length === 0) {
+    return json({ skipped: true, reason: "already reviewed" })
+  }
+
+  const { data: itemsData } = await supabase
+    .from("order_items").select("order_id, inventory_item_id").in("order_id", open.map(o => o.id))
+  const items = (itemsData as { order_id: string; inventory_item_id: string }[] | null) ?? []
+  const { data: invData } = await supabase
+    .from("inventory_items").select("id, title").in("id", [...new Set(items.map(i => i.inventory_item_id))])
+  const titleOf = new Map(((invData as { id: string; title: string | null }[] | null) ?? []).map(i => [i.id, i.title?.trim() || "your stone"]))
+  const titles = open.map(o => {
+    const it = items.find(i => i.order_id === o.id)
+    return (it && titleOf.get(it.inventory_item_id)) || "your stone"
+  })
+
+  let to = open.find(o => o.order_email)?.order_email?.trim() ?? ""
+  if (!to && open[0].buyer_id) {
+    const { data: userData } = await supabase.auth.admin.getUserById(open[0].buyer_id)
+    to = userData?.user?.email?.trim() ?? ""
+  }
+  if (!to) {
+    console.error("[offer-notify] review invite: no buyer email for orders", ids)
+    return json({ ok: true, emailsSent: 0, reason: "no buyer email" })
+  }
+
+  const sent = await sendEmail(resendApiKey, to, buyerReviewInviteEmail(titles), `review invite ${ids.join(",")} (buyer)`)
+  console.log("[offer-notify] review invite for", ids.length, "order(s) — emails sent:", sent ? 1 : 0)
   return json({ ok: true, emailsSent: sent ? 1 : 0 })
 }
 

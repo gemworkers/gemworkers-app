@@ -110,6 +110,21 @@ function Received() {
   )
 }
 
+// Shipped / received orders can be reviewed once (submit_review).
+const REVIEWABLE = ['shipped', 'received', 'paid']
+
+function ReviewLink({ order, reviewed }: { order: BuyerOrder; reviewed: Set<string> }) {
+  if (!REVIEWABLE.includes(order.status)) return null
+  if (reviewed.has(order.id)) {
+    return <p className="order-muted" style={{ marginTop: 8 }}>✓ Thank you for your review</p>
+  }
+  return (
+    <Link href={`/reviews/write/${order.id}`} className="pd-link" style={{ display: 'inline-block', marginTop: 10, fontSize: 14 }}>
+      Write a review →
+    </Link>
+  )
+}
+
 function AwaitingShipment() {
   return <p className="order-muted" style={{ marginTop: 8 }}>Awaiting shipment</p>
 }
@@ -119,9 +134,11 @@ function AwaitingShipment() {
 function SingleOrderCard({
   order,
   listingMap,
+  reviewed,
 }: {
   order: BuyerOrder
   listingMap: Map<string, StoneDetails>
+  reviewed: Set<string>
 }) {
   const rawTotal    = order.order_total   == null ? null : Number(order.order_total)
   const rawShipping = order.shipping_cost == null ? null : Number(order.shipping_cost)
@@ -169,6 +186,7 @@ function SingleOrderCard({
             <div style={{ marginTop: 12 }}><MarkReceivedButton orderId={order.id} /></div>
           )}
           {order.status === 'received' && <Received />}
+          <ReviewLink order={order} reviewed={reviewed} />
           {awaitingOfferPayment && (
             <div style={{ marginTop: 14, maxWidth: 320 }}>
               {canStartOfferPayment(order.payment_due_at!) ? (
@@ -204,10 +222,12 @@ function GroupedOrderCard({
   groupId,
   orders,
   listingMap,
+  reviewed,
 }: {
   groupId: string
   orders: BuyerOrder[]
   listingMap: Map<string, StoneDetails>
+  reviewed: Set<string>
 }) {
   void groupId
   const status        = groupStatus(orders)
@@ -257,6 +277,7 @@ function GroupedOrderCard({
                   <div style={{ marginTop: 12 }}><MarkReceivedButton orderId={o.id} /></div>
                 )}
                 {o.status === 'received' && <Received />}
+                <ReviewLink order={o} reviewed={reviewed} />
               </div>
 
               {oTotal != null && (
@@ -317,6 +338,16 @@ export default async function BuyerOrdersPage() {
     }
   }
 
+  // reviews_buyer_select RLS: only this buyer's own reviews.
+  const reviewed = new Set<string>()
+  if (orders.length > 0) {
+    const { data: myReviews } = await supabase
+      .from('reviews')
+      .select('order_id')
+      .in('order_id', orders.map(o => o.id))
+    for (const r of myReviews ?? []) reviewed.add(r.order_id as string)
+  }
+
   const entries: DisplayEntry[] = []
   const groupIndex = new Map<string, number>()
 
@@ -360,12 +391,14 @@ export default async function BuyerOrdersPage() {
                   key={entry.order.id}
                   order={entry.order}
                   listingMap={listingMap}
+                  reviewed={reviewed}
                 />
               : <GroupedOrderCard
                   key={entry.groupId}
                   groupId={entry.groupId}
                   orders={entry.orders}
                   listingMap={listingMap}
+                  reviewed={reviewed}
                 />
           )}
         </div>
