@@ -4,7 +4,13 @@
 //   INSERT pending          → seller + owner         ("New offer on {SKU}")
 //   pending  → accepted     → buyer (pay within 48 h) + the staff side that didn't act
 //   pending  → declined     → buyer (or "reserved by another buyer" when system-declined)
-//   accepted → expired      → buyer + seller + owner (payment window ended)
+//   accepted → expired      → buyer + seller + owner (payment window ended;
+//                             amount = counter price when it was a counter)
+//   pending   → countered   → buyer (counter-offer, 48 h) + the staff side that didn't act
+//   countered → accepted    → buyer (pay within 48 h) + seller + owner
+//   countered → declined    → seller + owner (buyer declined), or buyer
+//                             ("reserved by another buyer") when system-declined
+//   countered → expired     → buyer + seller + owner (counter not answered in 48 h)
 //   anything else (withdrawn, claim stamps, …) → no email
 // Each event is sent at most once: public.claim_offer_notification stamps
 // <kind>_notified_at atomically before anything is sent.
@@ -28,6 +34,9 @@ interface OfferRecord {
   offered_price:     number | string
   status:            string
   responded_by_role: string | null
+  counter_price?:      number | string | null
+  counter_expires_at?: string | null
+  countered_by_role?:  string | null
 }
 
 interface WebhookPayload {
@@ -58,16 +67,24 @@ interface ReminderOrderRow extends OrderRow {
 
 // One event per webhook. Later parts add their own variants here
 // (e.g. "payment_reminder", "countered") plus a case in classify() and the handler switch.
-type OfferEvent = "new_offer" | "accepted" | "declined" | "expired"
+type OfferEvent =
+  | "new_offer" | "accepted" | "declined" | "expired"
+  | "countered" | "counter_accepted" | "counter_declined" | "counter_expired"
 
 // Must match the kinds accepted by public.claim_offer_notification.
-type ClaimKind = "new_offer" | "response" | "expired"
+type ClaimKind = "new_offer" | "countered" | "response" | "expired"
 
+// A countered offer never used 'response' / 'expired' before, so the
+// counter outcomes reuse those stamps.
 const CLAIM_KIND: Record<OfferEvent, ClaimKind> = {
-  new_offer: "new_offer",
-  accepted:  "response",
-  declined:  "response",
-  expired:   "expired",
+  new_offer:        "new_offer",
+  accepted:         "response",
+  declined:         "response",
+  expired:          "expired",
+  countered:        "countered",
+  counter_accepted: "response",
+  counter_declined: "response",
+  counter_expired:  "expired",
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -186,7 +203,137 @@ function staffExpiredEmail(sku: string, amount: string): Email {
   }
 }
 
+function staffCounterSentEmail(sku: string, offered: string, counter: string, actedBy: "seller" | "owner"): Email {
+  const who     = actedBy === "seller" ? "The seller" : "GemWorkers admin"
+  const subject = `Counter-offer sent on ${sku}: ${counter}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `${esc(who)} answered the offer of ${strong(offered)} for ${strong(sku)} with a counter-offer of ${strong(counter)}.`,
+        "The buyer has 48 hours to accept or decline it.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `${who} answered the offer of ${offered} for ${sku} with a counter-offer of ${counter}. The buyer has 48 hours to accept or decline it.\n${ADMIN_URL}\n`,
+  }
+}
+
+function staffCounterAcceptedEmail(sku: string, counter: string): Email {
+  const subject = `Counter-offer accepted on ${sku}: ${counter}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `The buyer accepted the counter-offer of ${strong(counter)} for ${strong(sku)}.`,
+        "The stone is reserved and the buyer has 48 hours to pay.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `The buyer accepted the counter-offer of ${counter} for ${sku}. The stone is reserved and the buyer has 48 hours to pay.\n${ADMIN_URL}\n`,
+  }
+}
+
+function staffCounterDeclinedEmail(sku: string, counter: string): Email {
+  const subject = `Counter-offer declined on ${sku}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `The buyer declined the counter-offer of ${strong(counter)} for ${strong(sku)}.`,
+        "The stone stays available.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `The buyer declined the counter-offer of ${counter} for ${sku}. The stone stays available.\n${ADMIN_URL}\n`,
+  }
+}
+
+function staffCounterExpiredEmail(sku: string, counter: string): Email {
+  const subject = `Counter-offer expired on ${sku}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `The buyer didn't answer the counter-offer of ${strong(counter)} for ${strong(sku)} within 48 hours, so it has expired.`,
+        "The stone stays available.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `The buyer didn't answer the counter-offer of ${counter} for ${sku} within 48 hours, so it has expired. The stone stays available.\n${ADMIN_URL}\n`,
+  }
+}
+
 // ── Buyer emails (never mention the seller) ────────────────────────────────────
+
+function buyerCounterEmail(stoneTitle: string, offered: string, counter: string, expiresAt: string, itemId: string): Email {
+  const url     = stoneUrl(itemId)
+  const subject = "We've sent you a counter-offer"
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Thank you for your offer of ${strong(offered)} for ${strong(stoneTitle)}. We can offer it to you for ${strong(counter)}.`,
+        `This counter-offer is open until ${strong(`${expiresAt} UTC`)}. You can accept or decline it on the stone page.`,
+      ],
+      url,
+      "View the counter-offer",
+    ),
+    text:
+      `Thank you for your offer of ${offered} for ${stoneTitle}. We can offer it to you for ${counter}.\n\n` +
+      `This counter-offer is open until ${expiresAt} UTC. You can accept or decline it on the stone page: ${url}\n`,
+  }
+}
+
+function buyerCounterAcceptedEmail(stoneTitle: string, counter: string, total: string, shipping: number, dueAt: string): Email {
+  const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
+  const subject   = "Your stone is reserved"
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `You accepted our counter-offer of ${strong(counter)} for ${strong(stoneTitle)}. The stone is reserved for you.`,
+        `Total to pay: ${strong(totalLine)}`,
+        `Please pay within 48 hours (by ${strong(`${dueAt} UTC`)}). After that the reservation ends and the stone goes back on sale.`,
+      ],
+      ORDERS_URL,
+      "Pay now",
+    ),
+    text:
+      `You accepted our counter-offer of ${counter} for ${stoneTitle}. The stone is reserved for you.\n\n` +
+      `Total to pay: ${totalLine}\n\n` +
+      `Please pay within 48 hours (by ${dueAt} UTC). After that the reservation ends and the stone goes back on sale.\n\n` +
+      `Pay here: ${ORDERS_URL}\n`,
+  }
+}
+
+function buyerCounterExpiredEmail(stoneTitle: string, counter: string, itemId: string): Email {
+  const url     = stoneUrl(itemId)
+  const subject = "Your counter-offer has expired"
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Our counter-offer of ${strong(counter)} for ${strong(stoneTitle)} was open for 48 hours and has now expired.`,
+        "If you're still interested, you can view the stone here.",
+      ],
+      url,
+      "View the stone",
+    ),
+    text: `Our counter-offer of ${counter} for ${stoneTitle} was open for 48 hours and has now expired.\n\nView the stone here: ${url}\n`,
+  }
+}
 
 function buyerAcceptedEmail(stoneTitle: string, amount: string, total: string, shipping: number, dueAt: string): Email {
   const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
@@ -290,6 +437,10 @@ function classify(payload: WebhookPayload): OfferEvent | null {
     if (before === "pending"  && now === "accepted") return "accepted"
     if (before === "pending"  && now === "declined") return "declined"
     if (before === "accepted" && now === "expired")  return "expired"
+    if (before === "pending"   && now === "countered") return "countered"
+    if (before === "countered" && now === "accepted")  return "counter_accepted"
+    if (before === "countered" && now === "declined")  return "counter_declined"
+    if (before === "countered" && now === "expired")   return "counter_expired"
   }
   return null
 }
@@ -516,6 +667,14 @@ Deno.serve(async (req: Request) => {
   const sku        = invRow?.sku?.trim()   || "a stone"
   const stoneTitle = invRow?.title?.trim() || "your stone"
   const amount     = eur(Number(offer.offered_price))
+  // Set once the offer was countered; an accepted offer with a counter price
+  // was accepted at that price.
+  const counterAmount = offer.counter_price != null ? eur(Number(offer.counter_price)) : null
+
+  if (event.startsWith("counter") && !counterAmount) {
+    console.error("[offer-notify] offer", offer.id, "event", event, "has no counter_price — no email")
+    return json({ skipped: true, reason: "counter_price missing" })
+  }
 
   const ownerEmail = Deno.env.get("OWNER_EMAIL")?.trim() ?? ""
   if (!ownerEmail && event !== "declined") {
@@ -631,7 +790,104 @@ Deno.serve(async (req: Request) => {
       if (buyerAddr) {
         outbox.push({ to: buyerAddr, who: "buyer", email: buyerExpiredEmail(stoneTitle, offer.inventory_item_id) })
       }
-      queueStaff(await loadSellerEmail(), staffExpiredEmail(sku, amount))
+      queueStaff(await loadSellerEmail(), staffExpiredEmail(sku, counterAmount ?? amount))
+      break
+    }
+
+    case "countered": {
+      const buyerAddr = await loadBuyerEmail()
+      if (!offer.counter_expires_at) {
+        console.error("[offer-notify] countered offer", offer.id, "has no counter_expires_at — buyer not emailed")
+      } else if (buyerAddr) {
+        outbox.push({
+          to:  buyerAddr,
+          who: "buyer",
+          email: buyerCounterEmail(
+            stoneTitle,
+            amount,
+            counterAmount!,
+            utcDate.format(new Date(offer.counter_expires_at)),
+            offer.inventory_item_id,
+          ),
+        })
+      }
+
+      // The staff side that didn't act; skipped when it's the same inbox as the actor.
+      const actedBy = offer.countered_by_role
+      if (actedBy === "seller" || actedBy === "owner") {
+        const sellerEmail = await loadSellerEmail()
+        const other       = actedBy === "seller" ? ownerEmail : sellerEmail
+        const actor       = actedBy === "seller" ? sellerEmail : ownerEmail
+        if (other && !sameAddress(other, actor)) {
+          outbox.push({
+            to:    other,
+            who:   actedBy === "seller" ? "owner" : "seller",
+            email: staffCounterSentEmail(sku, amount, counterAmount!, actedBy),
+          })
+        }
+      }
+      break
+    }
+
+    case "counter_accepted": {
+      const buyerAddr = await loadBuyerEmail()
+
+      const { data: orderData, error: orderErr } = await supabase
+        .from("orders")
+        .select("order_total, shipping_cost, payment_due_at")
+        .eq("offer_id", offer.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const order = orderData as OrderRow | null
+      if (orderErr || !order || order.order_total == null || !order.payment_due_at) {
+        // Without the total and deadline the buyer email would be misleading — don't send it.
+        console.error("[offer-notify] no order with total + payment_due_at for accepted counter", offer.id, orderErr?.message)
+      } else if (buyerAddr) {
+        outbox.push({
+          to:  buyerAddr,
+          who: "buyer",
+          email: buyerCounterAcceptedEmail(
+            stoneTitle,
+            counterAmount!,
+            eur(Number(order.order_total)),
+            Number(order.shipping_cost ?? 0),
+            utcDate.format(new Date(order.payment_due_at)),
+          ),
+        })
+      }
+
+      queueStaff(await loadSellerEmail(), staffCounterAcceptedEmail(sku, counterAmount!))
+      break
+    }
+
+    case "counter_declined": {
+      if (offer.responded_by_role === "system") {
+        // Another buyer's offer was accepted while this counter was open.
+        const buyerAddr = await loadBuyerEmail()
+        if (buyerAddr) {
+          outbox.push({
+            to:    buyerAddr,
+            who:   "buyer",
+            email: buyerDeclinedEmail(stoneTitle, amount, offer.inventory_item_id, true),
+          })
+        }
+      } else {
+        queueStaff(await loadSellerEmail(), staffCounterDeclinedEmail(sku, counterAmount!))
+      }
+      break
+    }
+
+    case "counter_expired": {
+      const buyerAddr = await loadBuyerEmail()
+      if (buyerAddr) {
+        outbox.push({
+          to:    buyerAddr,
+          who:   "buyer",
+          email: buyerCounterExpiredEmail(stoneTitle, counterAmount!, offer.inventory_item_id),
+        })
+      }
+      queueStaff(await loadSellerEmail(), staffCounterExpiredEmail(sku, counterAmount!))
       break
     }
   }
