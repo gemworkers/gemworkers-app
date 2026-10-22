@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -759,24 +760,64 @@ class _ImageGalleryPageState extends State<_ImageGalleryPage> {
         foregroundColor: Colors.white,
         title: Text('${_current + 1} / ${widget.imageUrls.length}'),
       ),
-      body: PageView.builder(
-        controller: _controller,
-        itemCount: widget.imageUrls.length,
-        onPageChanged: (i) => setState(() => _current = i),
-        itemBuilder: (_, index) => InteractiveViewer(
-          child: Center(
-            child: Image.network(
-              widget.imageUrls[index],
-              fit: BoxFit.contain,
-              loadingBuilder: (_, child, progress) => progress == null
-                  ? child
-                  : const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
+      body: Stack(
+        children: [
+          // Mouse and trackpad can drag pages too (web defaults to touch only).
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.trackpad,
+              },
+            ),
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: widget.imageUrls.length,
+              onPageChanged: (i) => setState(() => _current = i),
+              itemBuilder: (_, index) => InteractiveViewer(
+                child: Center(
+                  child: Image.network(
+                    widget.imageUrls[index],
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Icon(Icons.broken_image, color: Colors.white, size: 80),
                     ),
-              errorBuilder: (_, _, _) => const Center(
-                child: Icon(Icons.broken_image, color: Colors.white, size: 80),
+                  ),
+                ),
               ),
             ),
+          ),
+          if (_current > 0)
+            _arrow(Alignment.centerLeft, Icons.chevron_left, _current - 1),
+          if (_current < widget.imageUrls.length - 1)
+            _arrow(Alignment.centerRight, Icons.chevron_right, _current + 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrow(Alignment alignment, IconData icon, int page) {
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: IconButton.filled(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.15),
+            foregroundColor: Colors.white,
+          ),
+          iconSize: 32,
+          icon: Icon(icon),
+          onPressed: () => _controller.animateToPage(
+            page,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
           ),
         ),
       ),
