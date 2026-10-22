@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { sendBuyerMessage, markConversationRead, type AttachableStone } from '@/app/actions/messages'
 import { pillDarkSm, pillDisabledSm, inputStyle } from '@/lib/ui'
-import { LocalTime, MessageStoneCard, type StoneCardData, type ThreadMessage } from '../shared'
+import { LocalTime, MessageStoneCard, OfferCard, type StoneCardData, type ThreadMessage } from '../shared'
 import { AttachStonePicker, AttachedStoneChip } from '../AttachStonePicker'
 
 const MAX_LEN = 2000
@@ -91,6 +91,7 @@ export function ThreadView({
 
       <div className="msg-bubbles">
         {messages.map(m => {
+          if (m.kind !== 'text') return <OfferCard key={m.id} message={m} />
           const linked = m.linked_inventory_item_id
           return (
             <div key={m.id} className={`msg-bubble-row ${m.is_mine ? 'is-mine' : ''}`}>

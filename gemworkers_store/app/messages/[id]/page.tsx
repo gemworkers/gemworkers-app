@@ -27,7 +27,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       .maybeSingle(),
     supabase
       .from('buyer_messages')
-      .select('id, is_mine, sender_name, body, linked_inventory_item_id, created_at')
+      .select('id, is_mine, sender_name, body, linked_inventory_item_id, created_at, kind, offer_id, offer_amount')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true }),
   ])

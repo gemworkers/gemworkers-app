@@ -25,6 +25,10 @@ export type ThreadMessage = {
   body: string
   linked_inventory_item_id: string | null
   created_at: string
+  // 'text' or an offer event card (offer_made, offer_accepted, …)
+  kind: string
+  offer_id: string | null
+  offer_amount: number | string | null
 }
 
 // ── Local time ────────────────────────────────────────────────────────────────
@@ -54,6 +58,33 @@ export function LocalTime({ iso, mode }: { iso: string; mode: 'list' | 'thread' 
     <time dateTime={iso} suppressHydrationWarning>
       {formatTime(iso, mode, mounted ? undefined : 'UTC')}
     </time>
+  )
+}
+
+// ── Offer card ────────────────────────────────────────────────────────────────
+// System row written when an offer is made or answered. Unknown kinds (added
+// later, e.g. counter-offers) fall back to the row's own body text.
+
+const OFFER_CARD_TEXT: Record<string, { title: string; note?: string; ordersLink?: boolean }> = {
+  offer_made:      { title: 'You made an offer' },
+  offer_accepted:  { title: 'Offer accepted', note: 'Complete your payment in My orders.', ordersLink: true },
+  offer_declined:  { title: 'Offer declined' },
+  offer_expired:   { title: 'Offer expired' },
+  offer_withdrawn: { title: 'You withdrew your offer' },
+}
+
+export function OfferCard({ message }: { message: ThreadMessage }) {
+  const text = OFFER_CARD_TEXT[message.kind]
+  const amount = message.offer_amount != null ? formatEur(message.offer_amount) : null
+
+  return (
+    <div className={`msg-offer msg-offer-${message.kind}`}>
+      <p className="msg-offer-title">{text?.title ?? message.body}</p>
+      {text && amount && <p className="msg-offer-amount">{amount}</p>}
+      {text?.note && <p className="msg-offer-note">{text.note}</p>}
+      {text?.ordersLink && <Link href="/orders" className="pd-link" style={{ fontSize: 14 }}>Go to My orders →</Link>}
+      <p className="msg-time"><LocalTime iso={message.created_at} mode="thread" /></p>
+    </div>
   )
 }
 
