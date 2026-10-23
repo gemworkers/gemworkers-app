@@ -5,18 +5,22 @@ import Link from 'next/link'
 import { buyNow } from '@/app/actions/commerce'
 import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from '@/lib/ui'
 import { formatEur } from '@/lib/money'
+import { paidTotal } from '@/lib/tax'
 
 type Props = {
   itemId: string
   itemTitle: string
   sellingPrice: number | null
   shippingCost?: number | null
+  // VAT we collect for the buyer's ship-to country (lib/tax.ts); 0 = none.
+  vatAmount?: number
+  vatLabel?: string
   isLoggedIn: boolean
 }
 
 type State = 'idle' | 'confirm' | 'loading' | 'error'
 
-export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLoggedIn }: Props) {
+export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAmount = 0, vatLabel = 'VAT', isLoggedIn }: Props) {
   const [state, setState] = useState<State>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -60,7 +64,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
         <p style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', marginBottom: 10 }}>
           Confirm purchase
         </p>
-        {shippingCost != null && shippingCost > 0 ? (
+        {(shippingCost != null && shippingCost > 0) || vatAmount > 0 ? (
           <div style={{ marginBottom: 14 }}>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
@@ -69,20 +73,31 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, isLog
               <span>Stone</span>
               <span>{formatted}</span>
             </div>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              fontSize: 14, color: '#5A5045', marginBottom: 8,
-            }}>
-              <span>Shipping</span>
-              <span>{formatEur(shippingCost)}</span>
-            </div>
+            {shippingCost != null && shippingCost > 0 && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 14, color: '#5A5045', marginBottom: 8,
+              }}>
+                <span>Shipping</span>
+                <span>{formatEur(shippingCost)}</span>
+              </div>
+            )}
+            {vatAmount > 0 && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 14, color: '#5A5045', marginBottom: 8,
+              }}>
+                <span>{vatLabel}</span>
+                <span>{formatEur(vatAmount)}</span>
+              </div>
+            )}
             <div style={{ height: 1, background: '#ECE5D8', marginBottom: 8 }} />
             <div style={{
               display: 'flex', justifyContent: 'space-between',
               fontSize: 15, fontWeight: 600, color: '#1F1B16',
             }}>
               <span>Total</span>
-              <span>{formatEur(sellingPrice! + shippingCost)}</span>
+              <span>{formatEur(paidTotal(sellingPrice! + (shippingCost ?? 0), vatAmount))}</span>
             </div>
           </div>
         ) : (

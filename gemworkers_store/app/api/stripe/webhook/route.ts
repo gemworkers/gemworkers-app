@@ -6,6 +6,7 @@ import { stripe } from '@/lib/stripe/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
 import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
+import { paidTotal } from '@/lib/tax'
 import {
   sendLatePaymentOwnerEmail,
   sendLatePaymentBuyerEmail,
@@ -210,13 +211,13 @@ async function notifyCustomerSingleOrder(
 
   const { data: ordData } = await admin
     .from('orders')
-    .select('order_number, order_total, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .select('order_number, order_total, tax_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('id', orderId)
     .single()
   if (!ordData) { console.error('[webhook] customer email: order not found', orderId); return }
 
   const o = ordData as {
-    order_number: string; order_total: string | number
+    order_number: string; order_total: string | number; tax_amount: string | number | null
     shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
     shipping_city: string | null; shipping_state: string | null
     shipping_postal_code: string | null; shipping_country: string | null; shipping_phone: string | null
@@ -245,7 +246,7 @@ async function notifyCustomerSingleOrder(
 
   await sendOrderConfirmationEmail({
     to:       [customerEmail],
-    orders:   [{ orderNumber: o.order_number, itemTitle, orderTotal: Number(o.order_total) }],
+    orders:   [{ orderNumber: o.order_number, itemTitle, orderTotal: paidTotal(o.order_total, o.tax_amount) }],
     shipping,
   })
 }
@@ -257,7 +258,7 @@ async function notifyCustomerGroupOrder(
   stripeEmail: string | null,
 ): Promise<void> {
   type GroupOrderRow = {
-    id: string; buyer_id: string; order_number: string; order_total: string | number
+    id: string; buyer_id: string; order_number: string; order_total: string | number; tax_amount: string | number | null
     shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
     shipping_city: string | null; shipping_state: string | null
     shipping_postal_code: string | null; shipping_country: string | null; shipping_phone: string | null
@@ -265,7 +266,7 @@ async function notifyCustomerGroupOrder(
 
   const { data: ordersData } = await admin
     .from('orders')
-    .select('id, buyer_id, order_number, order_total, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .select('id, buyer_id, order_number, order_total, tax_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('checkout_group_id', groupId)
     .in('id', orderIdsInScope)
   const orders = (ordersData as GroupOrderRow[] | null) ?? []
@@ -320,7 +321,7 @@ async function notifyCustomerGroupOrder(
   const lines: EmailOrderLine[] = orders.map(o => ({
     orderNumber: o.order_number,
     itemTitle:   orderTitleMap.get(o.id) ?? 'Stone',
-    orderTotal:  Number(o.order_total),
+    orderTotal:  paidTotal(o.order_total, o.tax_amount),
   }))
 
   await sendOrderConfirmationEmail({ to: [customerEmail], orders: lines, shipping })
@@ -371,8 +372,8 @@ async function refundLateOrder(
 // Order number / title / total for the refund emails.
 async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<RefundedOrderLine[]> {
   const { data: ordersData } = await admin
-    .from('orders').select('id, order_number, order_total').in('id', orderIds)
-  const orders = (ordersData as { id: string; order_number: string; order_total: string | number }[] | null) ?? []
+    .from('orders').select('id, order_number, order_total, tax_amount').in('id', orderIds)
+  const orders = (ordersData as { id: string; order_number: string; order_total: string | number; tax_amount: string | number | null }[] | null) ?? []
 
   const { data: itemsData } = await admin
     .from('order_items').select('order_id, inventory_item_id').in('order_id', orderIds)
@@ -392,7 +393,7 @@ async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promis
       orderId:     id,
       orderNumber: o?.order_number ?? id,
       itemTitle:   titleMap.get(id) ?? 'Stone',
-      orderTotal:  Number(o?.order_total ?? 0),
+      orderTotal:  paidTotal(o?.order_total ?? 0, o?.tax_amount ?? 0),   // refunded = paid incl. VAT
     }
   })
 }
@@ -551,13 +552,13 @@ export async function POST(req: NextRequest) {
       // to see which orders actually got confirmed.
       const { data: groupData, error: groupErr } = await supabase
         .from('orders')
-        .select('id, status, order_total')
+        .select('id, status, order_total, tax_amount')
         .eq('checkout_group_id', groupId)
       if (groupErr) {
         console.error('[webhook] re-read of group', groupId, 'failed:', groupErr.message)
         return NextResponse.json({ error: 'Order confirmation failed' }, { status: 500 })
       }
-      const groupOrders = (groupData as { id: string; status: string; order_total: string | number }[] | null) ?? []
+      const groupOrders = (groupData as { id: string; status: string; order_total: string | number; tax_amount: string | number | null }[] | null) ?? []
 
       // Still pending = confirm failed for an unexpected reason. Retry the
       // whole event (confirm is idempotent; nothing has been sent yet).
@@ -582,10 +583,10 @@ export async function POST(req: NextRequest) {
         let refundedTotal = 0
         for (const o of lateOrders) {
           try {
-            const created = await refundLateOrder(pi, o.id, Math.round(Number(o.order_total) * 100))
+            const created = await refundLateOrder(pi, o.id, Math.round(paidTotal(o.order_total, o.tax_amount) * 100))
             if (created) {
               newlyRefunded.push(o.id)
-              refundedTotal += Number(o.order_total)
+              refundedTotal += paidTotal(o.order_total, o.tax_amount)
             }
           } catch (e) {
             console.error('[webhook] late-payment refund failed for order', o.id, 'in group', groupId, ':', e instanceof Error ? e.message : String(e))

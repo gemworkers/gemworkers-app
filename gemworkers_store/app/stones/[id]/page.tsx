@@ -15,6 +15,7 @@ import { canStartOfferPayment } from '@/lib/offer-payment';
 import { formatEur } from '@/lib/money';
 import { makerVerb, makerHref } from '@/lib/makers';
 import { currentShipToCode } from '@/lib/ship-to';
+import { taxQuote, taxNote, ratePercent } from '@/lib/tax';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -323,6 +324,12 @@ export default async function StoneDetailPage({
     .maybeSingle();
   const shipToRow = shipToData as { name: string; enabled: boolean } | null;
 
+  // VAT we must collect (NL → EU) or an import-tax reminder (everywhere else).
+  const quote = shipToRow?.enabled ? await taxQuote(supabase, item.id, shipToCode) : null;
+  const tax = shipToRow?.enabled
+    ? taxNote(quote, shipToRow.name, item.sale_method !== 'accept_offers' && item.selling_price != null)
+    : null;
+
   const shippingLine = joinParts([
     cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`,
     shipFromName ? `Ships from ${shipFromName}` : null,
@@ -401,6 +408,9 @@ export default async function StoneDetailPage({
                 country at the top, or <Link href="/contact" className="pd-link">contact us</Link>.
               </p>
             )}
+            {tax && (
+              <p className="pd-shipline" style={tax.warn ? { color: '#B42318' } : undefined}>{tax.text}</p>
+            )}
             <ReviewSummary style={{ marginTop: 10 }} />
           </div>
 
@@ -437,6 +447,8 @@ export default async function StoneDetailPage({
                   itemTitle={item.title}
                   sellingPrice={item.selling_price}
                   shippingCost={cost}
+                  vatAmount={quote?.taxAmount ?? 0}
+                  vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                   isLoggedIn={!!user}
                 />
               )}

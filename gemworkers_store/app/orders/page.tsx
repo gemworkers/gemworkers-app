@@ -6,6 +6,7 @@ import { pillOutline } from '@/lib/ui'
 import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { formatEur } from '@/lib/money'
+import { paidTotal } from '@/lib/tax'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ type BuyerOrder = {
   status: string;
   order_date: string;
   order_total: number | null;
+  tax_amount: number | string | null;
   shipping_cost: number | null;
   tracking_number: string | null;
   shipped_at: string | null;
@@ -143,6 +145,7 @@ function SingleOrderCard({
   const rawTotal    = order.order_total   == null ? null : Number(order.order_total)
   const rawShipping = order.shipping_cost == null ? null : Number(order.shipping_cost)
   const rawStone    = rawTotal != null ? rawTotal - (rawShipping ?? 0) : null
+  const rawVat      = Number(order.tax_amount ?? 0)
 
   const oi            = order.order_items[0]
   const itemId        = oi?.inventory_item_id ?? ''
@@ -205,11 +208,14 @@ function SingleOrderCard({
       {rawTotal != null && (
         <div className="order-total">
           <span className="order-muted">
-            {rawShipping != null && rawShipping > 0
-              ? `${formatEur(rawStone!)} + ${formatEur(rawShipping)} shipping`
+            {(rawShipping != null && rawShipping > 0) || rawVat > 0
+              ? [formatEur(rawStone!),
+                 rawShipping != null && rawShipping > 0 ? `${formatEur(rawShipping)} shipping` : null,
+                 rawVat > 0 ? `${formatEur(rawVat)} VAT` : null,
+                ].filter(Boolean).join(' + ')
               : 'Total'}
           </span>
-          <span className="order-total-amount">{formatEur(rawTotal)}</span>
+          <span className="order-total-amount">{formatEur(paidTotal(rawTotal, rawVat))}</span>
         </div>
       )}
     </article>
@@ -231,7 +237,7 @@ function GroupedOrderCard({
 }) {
   void groupId
   const status        = groupStatus(orders)
-  const combinedTotal = orders.reduce((sum, o) => sum + Number(o.order_total ?? 0), 0)
+  const combinedTotal = orders.reduce((sum, o) => paidTotal(sum, paidTotal(o.order_total, o.tax_amount)), 0)
   const date          = orders[0].order_date
   const allSameStatus = orders.every(o => o.status === status)
 
@@ -259,7 +265,7 @@ function GroupedOrderCard({
           const subtitle     = stone
             ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
             : null
-          const oTotal       = o.order_total != null ? Number(o.order_total) : null
+          const oTotal       = o.order_total != null ? paidTotal(o.order_total, o.tax_amount) : null
 
           return (
             <div key={o.id} className="order-item order-item-ruled">
@@ -312,7 +318,7 @@ export default async function BuyerOrdersPage() {
   const { data } = await supabase
     .from('orders')
     .select(`
-      id, order_number, status, order_date, order_total, shipping_cost,
+      id, order_number, status, order_date, order_total, tax_amount, shipping_cost,
       tracking_number, shipped_at, received_at, checkout_group_id,
       offer_id, payment_due_at,
       order_items ( inventory_item_id )

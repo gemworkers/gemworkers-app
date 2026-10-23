@@ -7,6 +7,8 @@ import { TrustList } from '@/app/components/TrustList'
 import { countryName } from '@/lib/countries'
 import { pillDark, pillOutline } from '@/lib/ui'
 import { formatEur } from '@/lib/money'
+import { currentShipToCode } from '@/lib/ship-to'
+import { taxQuote, taxNote, paidTotal, ratePercent, type TaxQuote } from '@/lib/tax'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -126,6 +128,26 @@ export default async function CartPage() {
   }, 0)
   const subtotal = grandTotal - shippingTotal
 
+  // ── Tax for the buyer's "Ship to" country (same calculation as checkout) ──
+  const shipToCode = await currentShipToCode()
+  const { data: shipToData } = await supabase
+    .from('shipping_countries').select('name, enabled').eq('code', shipToCode).maybeSingle()
+  const shipTo = shipToData as { name: string; enabled: boolean } | null
+  const buyableIds = cartItems.filter(({ listing }) => isBuyable(listing)).map(({ itemId }) => itemId)
+  const quoteList = shipTo?.enabled
+    ? await Promise.all(buyableIds.map(id => taxQuote(supabase, id, shipToCode)))
+    : []
+  const quoteMap = new Map<string, TaxQuote>()
+  quoteList.forEach((q, i) => { if (q) quoteMap.set(buyableIds[i], q) })
+  const quotes = [...quoteMap.values()]
+  const vatTotal = quotes.reduce((sum, q) => paidTotal(sum, q.taxAmount), 0)
+  const vatRates = [...new Set(quotes.filter(q => q.taxAmount > 0 && q.taxRate != null).map(q => ratePercent(q.taxRate!)))]
+  const payTotal = paidTotal(grandTotal, vatTotal)
+  // Under-minimum warning first (e.g. UK), else one import reminder if any stone needs it.
+  const cartTaxNote =
+    quotes.map(q => taxNote(q, shipTo?.name ?? shipToCode, true)).find(n => n?.warn) ??
+    taxNote(quotes.find(q => q.scheme === 'buyer_pays') ?? null, shipTo?.name ?? shipToCode, false)
+
   return (
     <PageShell>
       <PageTitle count={cartItems.length} />
@@ -134,7 +156,7 @@ export default async function CartPage() {
         <div className="cart-list">
           {cartItems.map(({ itemId, listing }) =>
             listing ? (
-              <AvailableItem key={itemId} itemId={itemId} listing={listing} />
+              <AvailableItem key={itemId} itemId={itemId} listing={listing} quote={quoteMap.get(itemId) ?? null} />
             ) : (
               <UnavailableItem key={itemId} itemId={itemId} />
             )
@@ -155,10 +177,21 @@ export default async function CartPage() {
                 <span>Shipping</span>
                 <span>{shippingTotal === 0 ? 'Free' : formatEur(shippingTotal)}</span>
               </div>
+              {vatTotal > 0 && (
+                <div className="cart-sum-row">
+                  <span>VAT{vatRates.length === 1 ? ` ${vatRates[0]}%` : ''} ({shipTo?.name})</span>
+                  <span>{formatEur(vatTotal)}</span>
+                </div>
+              )}
               <div className="cart-sum-row cart-sum-total">
                 <span>Total</span>
-                <span>{formatEur(grandTotal)}</span>
+                <span>{formatEur(payTotal)}</span>
               </div>
+              {cartTaxNote && (
+                <p style={{ fontSize: 13, color: cartTaxNote.warn ? '#B42318' : '#6B6052', marginBottom: 16, lineHeight: 1.5 }}>
+                  {cartTaxNote.text}
+                </p>
+              )}
               {buyableCount < cartItems.length && (
                 <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 16, lineHeight: 1.5 }}>
                   For the {buyableCount} available {buyableCount === 1 ? 'item' : 'items'} with a fixed price.
@@ -176,7 +209,7 @@ export default async function CartPage() {
 
 // ── Available item row ────────────────────────────────────────────────────────
 
-function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListing }) {
+function AvailableItem({ itemId, listing, quote }: { itemId: string; listing: CartListing; quote: TaxQuote | null }) {
   const subtitle = [listing.variety, listing.gem_type]
     .filter(Boolean)
     .join(' · ') || null
@@ -225,6 +258,8 @@ function AvailableItem({ itemId, listing }: { itemId: string; listing: CartListi
                 itemTitle={listing.title}
                 sellingPrice={listing.selling_price}
                 shippingCost={cost}
+                vatAmount={quote?.taxAmount ?? 0}
+                vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                 isLoggedIn={true}
               />
             </div>

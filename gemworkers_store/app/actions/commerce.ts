@@ -6,6 +6,7 @@ import { stripe } from '@/lib/stripe/server'
 import type Stripe from 'stripe'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { checkoutShipTo } from '@/lib/ship-to'
+import { applyOrderTax, vatLineItem } from '@/lib/tax'
 
 // Calls the create_platform_order SECURITY DEFINER RPC as the logged-in buyer,
 // then creates a Stripe Checkout Session for the authoritative order total.
@@ -39,17 +40,25 @@ export async function buyNow(
 
   const orderId = data as string
 
+  // VAT for the ship-to country (or a refusal, e.g. under the UK minimum).
+  const tax = await applyOrderTax(supabase, [orderId], shipTo.code)
+  if ('error' in tax) {
+    await cancelPendingOrder(orderId)
+    return { error: tax.error }
+  }
+
   // Read the authoritative total back from the DB — never trust a client value.
   // Supabase returns numeric columns as strings; coerce with Number().
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('order_total, order_number')
+    .select('order_total, order_number, tax_amount, tax_name, tax_rate')
     .eq('id', orderId)
     .single()
 
   if (orderErr || !order) {
     return { error: 'Could not load order total for payment' }
   }
+  const vatLine = vatLineItem(order, shipTo.name)
 
   const amountCents = Math.round(Number(order.order_total) * 100)
 
@@ -76,6 +85,7 @@ export async function buyNow(
             },
           },
         },
+        ...(vatLine ? [vatLine] : []),
       ],
       shipping_address_collection: {
         // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
@@ -153,6 +163,18 @@ export async function payAcceptedOffer(
   // We must ship to the buyer's chosen country (Stripe accepts only that one).
   const shipTo = await checkoutShipTo(supabase)
   if ('error' in shipTo) return { error: shipTo.error }
+
+  // VAT for the ship-to country. On refusal the offer order stays payable —
+  // the buyer can pick another "Ship to" and try again.
+  const tax = await applyOrderTax(supabase, [order.id], shipTo.code)
+  if ('error' in tax) return { error: tax.error }
+  const { data: taxRow, error: taxErr } = await supabase
+    .from('orders')
+    .select('tax_amount, tax_name, tax_rate')
+    .eq('id', order.id)
+    .single()
+  if (taxErr || !taxRow) return { error: SETUP_FAILED }
+  const vatLine = vatLineItem(taxRow, shipTo.name)
 
   const amountCents = Math.round(Number(order.order_total) * 100)
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
@@ -235,6 +257,7 @@ export async function payAcceptedOffer(
             },
           },
         },
+        ...(vatLine ? [vatLine] : []),
       ],
       shipping_address_collection: {
         // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
@@ -437,10 +460,17 @@ export async function checkoutCart(): Promise<
     return { error: 'Payment setup failed — please try again.' }
   }
 
+  // ── 4b. VAT for the ship-to country (or a refusal, e.g. UK minimum) ───────
+  const tax = await applyOrderTax(supabase, createdOrderIds, shipTo.code)
+  if ('error' in tax) {
+    await cleanupOrderGroup(createdOrderIds, groupId)
+    return { error: tax.error }
+  }
+
   // ── 5. Read authoritative totals back from DB ─────────────────────────────
   const { data: orderRows, error: totalsErr } = await supabase
     .from('orders')
-    .select('id, order_number, order_total')
+    .select('id, order_number, order_total, tax_amount, tax_name, tax_rate')
     .in('id', createdOrderIds)
 
   if (totalsErr || !orderRows || orderRows.length === 0) {
@@ -472,6 +502,8 @@ export async function checkoutCart(): Promise<
         },
       },
     })
+    const vatLine = vatLineItem(ord, shipTo.name)
+    if (vatLine) lineItems.push(vatLine)
   }
 
   // ── 5b. Create Stripe Checkout Session ────────────────────────────────────
