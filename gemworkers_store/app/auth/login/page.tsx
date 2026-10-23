@@ -78,6 +78,9 @@ export default function LoginPage() {
             onChange={e => setPassword(e.target.value)}
             style={inputStyle}
           />
+          <p style={{ fontSize: 13, margin: '8px 0 0', textAlign: 'right' }}>
+            <Link href="/auth/forgot-password" className="pd-link">Forgot password?</Link>
+          </p>
         </div>
 
         <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
