@@ -15,6 +15,7 @@ Color orderStatusColor(String status) => switch (status) {
       'pending_payment'                  => AppColors.warning,
       'confirmed' || 'paid' || 'received' => AppColors.success,
       'cancelled'                        => AppColors.error,
+      'refunded'                         => AppColors.accent,
       _                                  => AppColors.muted,
     };
 

@@ -527,7 +527,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   Widget? _buildActionBar(Order order) {
     final status = order.status;
-    if (status == 'cancelled' || status == 'pending_payment') return null;
+    // Refunded (returns_setup.sql): no shipping and never a payout.
+    if (status == 'cancelled' || status == 'pending_payment' || status == 'refunded') return null;
 
     final showPayoutButton = UserProfileService.instance.isOwner &&
         order.saleChannel == 'platform' &&
@@ -729,6 +730,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   String _payoutStatusLabel(Order order) {
+    if (order.status == 'refunded' && order.payoutStatus != 'paid') return 'Not paid — order refunded';
     if (order.payoutStatus != 'paid') return 'Unpaid';
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

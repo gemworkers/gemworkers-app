@@ -7,6 +7,7 @@ import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { formatEur } from '@/lib/money'
 import { paidTotal } from '@/lib/tax'
+import { ReturnPanel, canRequestReturn, type BuyerReturn } from './ReturnPanel'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ type DisplayEntry =
 // Pill text colour; background is always neutral #F4EEE4
 function statusColor(s: string): string {
   if (s === 'cancelled') return '#B42318'
+  if (s === 'refunded') return '#6B6052'
   if (s === 'pending_payment') return '#7A5A22'
   return '#2B7A3D'
 }
@@ -64,7 +66,7 @@ function statusLabel(s: string) {
 }
 
 const STATUS_ORDER = [
-  'pending_payment', 'confirmed', 'shipped', 'received', 'paid', 'cancelled',
+  'pending_payment', 'confirmed', 'shipped', 'received', 'paid', 'refunded', 'cancelled',
 ]
 function groupStatus(orders: BuyerOrder[]): string {
   if (orders.every(o => o.status === orders[0].status)) return orders[0].status
@@ -138,10 +140,12 @@ function SingleOrderCard({
   order,
   listingMap,
   reviewed,
+  returns,
 }: {
   order: BuyerOrder
   listingMap: Map<string, StoneDetails>
   reviewed: Set<string>
+  returns: Map<string, BuyerReturn>
 }) {
   const rawTotal    = order.order_total   == null ? null : Number(order.order_total)
   const rawShipping = order.shipping_cost == null ? null : Number(order.shipping_cost)
@@ -191,6 +195,7 @@ function SingleOrderCard({
           )}
           {order.status === 'received' && <Received />}
           <ReviewLink order={order} reviewed={reviewed} />
+          <ReturnPanel orderId={order.id} ret={returns.get(order.id) ?? null} eligible={canRequestReturn(order)} />
           {awaitingOfferPayment && (
             <div style={{ marginTop: 14, maxWidth: 320 }}>
               {canStartOfferPayment(order.payment_due_at!) ? (
@@ -233,11 +238,13 @@ function GroupedOrderCard({
   orders,
   listingMap,
   reviewed,
+  returns,
 }: {
   groupId: string
   orders: BuyerOrder[]
   listingMap: Map<string, StoneDetails>
   reviewed: Set<string>
+  returns: Map<string, BuyerReturn>
 }) {
   void groupId
   const status        = groupStatus(orders)
@@ -288,6 +295,7 @@ function GroupedOrderCard({
                 )}
                 {o.status === 'received' && <Received />}
                 <ReviewLink order={o} reviewed={reviewed} />
+                <ReturnPanel orderId={o.id} ret={returns.get(o.id) ?? null} eligible={canRequestReturn(o)} />
               </div>
 
               {oTotal != null && (
@@ -361,6 +369,16 @@ export default async function BuyerOrdersPage() {
     for (const r of myReviews ?? []) reviewed.add(r.order_id as string)
   }
 
+  // Returns (buyer_returns view: this buyer's own, buyer-safe columns).
+  const returns = new Map<string, BuyerReturn>()
+  if (orders.length > 0) {
+    const { data: myReturns } = await supabase
+      .from('buyer_returns')
+      .select('id, order_id, status, faulty, return_address, return_tracking, decision_note, refunded_at, refund_amount')
+      .in('order_id', orders.map(o => o.id))
+    for (const r of (myReturns ?? []) as BuyerReturn[]) returns.set(r.order_id, r)
+  }
+
   const entries: DisplayEntry[] = []
   const groupIndex = new Map<string, number>()
 
@@ -405,6 +423,7 @@ export default async function BuyerOrdersPage() {
                   order={entry.order}
                   listingMap={listingMap}
                   reviewed={reviewed}
+                  returns={returns}
                 />
               : <GroupedOrderCard
                   key={entry.groupId}
@@ -412,6 +431,7 @@ export default async function BuyerOrdersPage() {
                   orders={entry.orders}
                   listingMap={listingMap}
                   reviewed={reviewed}
+                  returns={returns}
                 />
           )}
         </div>

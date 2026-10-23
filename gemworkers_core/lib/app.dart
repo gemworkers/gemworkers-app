@@ -13,6 +13,8 @@ import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
 import 'pages/makers/makers_page.dart';
 import 'pages/reviews/reviews_page.dart';
+import 'pages/returns/returns_page.dart';
+import 'repositories/return_repository.dart';
 import 'pages/taxes/taxes_page.dart';
 import 'pages/messages/messages_page.dart';
 import 'pages/offers/offers_page.dart';
@@ -110,8 +112,10 @@ class _MainLayoutState extends State<MainLayout> {
   int _unreadMessagesCount = 0;
   int _awaitingApprovalCount = 0; // owner only: seller listing requests
   int _pendingReviewsCount = 0; // owner only: reviews waiting for approval
+  int _openReturnsCount = 0; // owner only: returns to approve or refund
   final _inventoryRepo = InventoryRepository();
   final _reviewRepo = ReviewRepository();
+  final _returnRepo = ReturnRepository();
   final _orderRepo = OrderRepository();
   final _offersRepo = OffersRepository();
   final _messagesRepo = MessagesRepository();
@@ -158,6 +162,7 @@ class _MainLayoutState extends State<MainLayout> {
         if (mounted) setState(() => _awaitingApprovalCount = count);
       } catch (_) {}
       await _loadReviewsCount();
+      await _loadReturnsCount();
     }
     await _loadMessagesCount();
   }
@@ -166,6 +171,13 @@ class _MainLayoutState extends State<MainLayout> {
     try {
       final count = await _reviewRepo.getPendingCount();
       if (mounted) setState(() => _pendingReviewsCount = count);
+    } catch (_) {}
+  }
+
+  Future<void> _loadReturnsCount() async {
+    try {
+      final count = await _returnRepo.getOpenCount();
+      if (mounted) setState(() => _openReturnsCount = count);
     } catch (_) {}
   }
 
@@ -212,6 +224,7 @@ class _MainLayoutState extends State<MainLayout> {
         if (_isOwner) const SellersPage(),
         if (_isOwner) const MakersPage(),
         if (_isOwner) ReviewsPage(onPendingChanged: _loadReviewsCount),
+        if (_isOwner) ReturnsPage(onOpenChanged: _loadReturnsCount),
         if (_isOwner) const TaxesPage(),
       ];
 
@@ -279,6 +292,13 @@ class _MainLayoutState extends State<MainLayout> {
             selectedIcon: Icons.star,
             label: 'Reviews',
             badgeCount: _pendingReviewsCount,
+          ),
+        if (_isOwner)
+          ShopNavItem(
+            icon: Icons.assignment_return_outlined,
+            selectedIcon: Icons.assignment_return,
+            label: 'Returns',
+            badgeCount: _openReturnsCount,
           ),
         if (_isOwner)
           const ShopNavItem(

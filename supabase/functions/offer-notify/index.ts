@@ -517,6 +517,9 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
   if (payload.type === "LISTING_EVENT") {
     return handleListingEvent(payload as unknown as ListingEventPayload)
   }
+  if (payload.type === "RETURN_EVENT") {
+    return handleReturnEvent(payload as unknown as ReturnEventPayload)
+  }
 
   if (payload.type !== "PAYMENT_REMINDER" || !payload.order_id) {
     console.error("[offer-notify] malformed reminder payload — type", payload.type)
@@ -825,6 +828,182 @@ async function handleListingEvent(payload: ListingEventPayload): Promise<Respons
 
   const sent = await sendEmail(resendApiKey, to, email, `listing ${event} ${item.id}`)
   console.log("[offer-notify] listing", event, "for", item.id, "— emails sent:", sent ? 1 : 0)
+  return json({ ok: true, emailsSent: sent ? 1 : 0 })
+}
+
+// ── Returns (DB trigger) ───────────────────────────────────────────────────────
+// returns_notify (sql/returns_setup.sql), once per status change:
+//   requested → owner ("Return requested")
+//   approved  → buyer (return address + packing / customs steps)
+//   rejected  → buyer (with the owner's reason)
+//   refunded  → buyer (amount refunded)
+// Buyer emails name the stone only — never the seller.
+
+interface ReturnEventPayload {
+  type:      string
+  return_id: string
+  event:     string
+}
+
+function ownerReturnRequestedEmail(orderNumber: string, title: string, reason: string, faulty: boolean): Email {
+  const subject = `Return requested: ${orderNumber}`
+  const lines = [
+    `A buyer wants to return ${strong(title)} (order ${esc(orderNumber)}).`,
+    ...(faulty ? [strong("They say it is damaged or not as described.")] : []),
+    ...(reason ? [`Reason: ${esc(reason)}`] : []),
+    "Approve or reject it in the admin under Returns.",
+  ]
+  return {
+    subject,
+    html: buildHtml(subject, lines, ADMIN_URL, "Open GemWorkers admin"),
+    text:
+      `A buyer wants to return ${title} (order ${orderNumber}).\n` +
+      (faulty ? "They say it is damaged or not as described.\n" : "") +
+      (reason ? `Reason: ${reason}\n` : "") +
+      `\nApprove or reject it in the admin under Returns: ${ADMIN_URL}\n`,
+  }
+}
+
+function buyerReturnApprovedEmail(title: string, orderNumber: string, address: string, faulty: boolean, note: string): Email {
+  const subject = `Your return is approved: ${title}`
+  const steps = [
+    "Pack the stone well, with its certificate and the original packaging.",
+    `Use a tracked and insured service${faulty ? " — we refund your return shipping" : ""}.`,
+    "Sending from outside the EU? Mark the customs form “Returned goods” and add your order number.",
+    "Add your tracking number in My orders.",
+  ]
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Please send ${strong(title)} (order ${esc(orderNumber)}) within 14 days to:`,
+        esc(address).replace(/\n/g, "<br>"),
+        ...steps.map(esc),
+        ...(note ? [`Note from GemWorkers: ${esc(note)}`] : []),
+        "We refund you once the stone has arrived and been checked.",
+      ],
+      ORDERS_URL,
+      "Open My orders",
+    ),
+    text:
+      `Please send ${title} (order ${orderNumber}) within 14 days to:\n\n${address}\n\n` +
+      steps.map(s => `- ${s}`).join("\n") +
+      (note ? `\n\nNote from GemWorkers: ${note}` : "") +
+      `\n\nWe refund you once the stone has arrived and been checked.\nMy orders: ${ORDERS_URL}\n`,
+  }
+}
+
+function buyerReturnRejectedEmail(title: string, orderNumber: string, note: string): Email {
+  const subject = `About your return: ${title}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `We can't accept the return of ${strong(title)} (order ${esc(orderNumber)}).`,
+        ...(note ? [`Reason: ${esc(note)}`] : []),
+        "Questions? Just reply to hello@gemworkers.com.",
+      ],
+      ORDERS_URL,
+      "Open My orders",
+    ),
+    text:
+      `We can't accept the return of ${title} (order ${orderNumber}).\n` +
+      (note ? `Reason: ${note}\n` : "") +
+      `\nQuestions? Email hello@gemworkers.com.\nMy orders: ${ORDERS_URL}\n`,
+  }
+}
+
+function buyerReturnRefundedEmail(title: string, orderNumber: string, amount: string, deductionReason: string): Email {
+  const subject = `Refund sent: ${title}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `We've refunded ${strong(amount)} for ${strong(title)} (order ${esc(orderNumber)}) to your original payment method.`,
+        ...(deductionReason ? [`A deduction was made: ${esc(deductionReason)}`] : []),
+        "It usually appears on your statement within 5–10 business days.",
+      ],
+      ORDERS_URL,
+      "Open My orders",
+    ),
+    text:
+      `We've refunded ${amount} for ${title} (order ${orderNumber}) to your original payment method.\n` +
+      (deductionReason ? `A deduction was made: ${deductionReason}\n` : "") +
+      `It usually appears on your statement within 5-10 business days.\n\nMy orders: ${ORDERS_URL}\n`,
+  }
+}
+
+async function handleReturnEvent(payload: ReturnEventPayload): Promise<Response> {
+  const event = payload.event
+  if (!payload.return_id || !["requested", "approved", "rejected", "refunded"].includes(event)) {
+    return json({ skipped: true, reason: "malformed return event" })
+  }
+
+  const supabaseUrl        = Deno.env.get("SUPABASE_URL")
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const resendApiKey       = Deno.env.get("RESEND_API_KEY")
+  if (!supabaseUrl || !supabaseServiceKey || !resendApiKey) {
+    console.error("[offer-notify] return event: env missing (supabase or RESEND_API_KEY)")
+    return json({ ok: true, emailsSent: 0, reason: "env missing" })
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: retData, error: retErr } = await supabase
+    .from("returns")
+    .select("id, order_id, buyer_id, status, reason, faulty, return_address, decision_note, refund_amount, deduction_reason")
+    .eq("id", payload.return_id)
+    .maybeSingle()
+  const ret = retData as {
+    id: string; order_id: string; buyer_id: string; status: string; reason: string | null; faulty: boolean
+    return_address: string | null; decision_note: string | null
+    refund_amount: number | string | null; deduction_reason: string | null
+  } | null
+  if (retErr || !ret) {
+    console.error("[offer-notify] return event: return not found", payload.return_id, retErr?.message)
+    return json({ skipped: true, reason: "return not found" })
+  }
+  // A late delivery after another change: only send for the current status.
+  if (ret.status !== event) return json({ skipped: true, reason: "status changed" })
+
+  const { data: ordData } = await supabase
+    .from("orders").select("order_number, order_email").eq("id", ret.order_id).maybeSingle()
+  const ord = ordData as { order_number: string | null; order_email: string | null } | null
+  const orderNumber = ord?.order_number ?? "your order"
+
+  const { data: itemRows } = await supabase
+    .from("order_items").select("inventory_items ( title )").eq("order_id", ret.order_id).limit(1)
+  const title = ((itemRows as unknown as { inventory_items: { title: string | null } | null }[] | null)?.[0]
+    ?.inventory_items?.title ?? "").trim() || "your stone"
+
+  let to = ""
+  let email: Email
+  if (event === "requested") {
+    to    = Deno.env.get("OWNER_EMAIL")?.trim() ?? ""
+    email = ownerReturnRequestedEmail(orderNumber, title, ret.reason?.trim() ?? "", ret.faulty)
+  } else {
+    to = ord?.order_email?.trim() ?? ""
+    if (!to) {
+      const { data } = await supabase.auth.admin.getUserById(ret.buyer_id)
+      to = data?.user?.email?.trim() ?? ""
+    }
+    email =
+      event === "approved" ? buyerReturnApprovedEmail(title, orderNumber, ret.return_address ?? "", ret.faulty, ret.decision_note?.trim() ?? "")
+      : event === "rejected" ? buyerReturnRejectedEmail(title, orderNumber, ret.decision_note?.trim() ?? "")
+      : buyerReturnRefundedEmail(title, orderNumber, eur(Number(ret.refund_amount ?? 0)), ret.deduction_reason?.trim() ?? "")
+  }
+
+  if (!to) {
+    console.log("[offer-notify] return", event, "for", ret.id, "— no recipient email")
+    return json({ ok: true, emailsSent: 0, reason: "no recipient" })
+  }
+
+  const sent = await sendEmail(resendApiKey, to, email, `return ${event} ${ret.id}`)
+  console.log("[offer-notify] return", event, "for", ret.id, "— emails sent:", sent ? 1 : 0)
   return json({ ok: true, emailsSent: sent ? 1 : 0 })
 }
 

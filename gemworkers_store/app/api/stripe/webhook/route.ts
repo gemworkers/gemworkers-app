@@ -546,6 +546,8 @@ export async function POST(req: NextRequest) {
       shipping_country:     addr?.address?.country    ?? null,
       shipping_phone:       session.customer_details?.phone ?? null,
       order_email:          custEmail,
+      // Needed to refund a return later (cart orders share one payment).
+      stripe_payment_intent: paymentIntentId(session),
     }
 
     if (groupId) {
