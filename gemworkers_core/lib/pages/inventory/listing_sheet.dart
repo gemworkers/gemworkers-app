@@ -302,8 +302,11 @@ class _ListingSheetState extends State<_ListingSheet> {
                 widget.item.isAwaitingApproval
                     ? 'Waiting for GemWorkers to approve this listing. You can '
                         'still change the details below.'
-                    : 'GemWorkers checks every new listing before it goes live '
-                        'on the store.',
+                    : widget.item.listingReviewNote != null
+                        ? 'Not approved last time — ${widget.item.listingReviewNote}\n'
+                            'Fix it and send it for approval again.'
+                        : 'GemWorkers checks every new listing before it goes '
+                            'live on the store.',
                 style: const TextStyle(fontSize: 13),
               ),
             ),

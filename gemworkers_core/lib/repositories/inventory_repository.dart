@@ -193,6 +193,8 @@ class InventoryRepository {
   }) async {
     await supabase.from('inventory_items').update({
       'is_listed': true,
+      // Sending (again) for approval or listing clears an old rejection note.
+      'listing_review_note': null,
       'selling_price': sellingPrice,
       'sale_method': saleMethod,
       'listed_at': DateTime.now().toIso8601String(),
@@ -221,16 +223,19 @@ class InventoryRepository {
     await supabase.from('inventory_items').update({
       'is_listed': true,
       'listed_at': DateTime.now().toIso8601String(),
+      'listing_review_note': null,
     }).eq('id', id);
   }
 
   /// Owner rejects, or the seller withdraws, a listing request. The stone
-  /// stays a draft.
-  Future<void> clearListingRequest(String id) async {
-    await supabase
-        .from('inventory_items')
-        .update({'listing_requested_at': null})
-        .eq('id', id);
+  /// stays a draft. [note] is the owner's optional reason, shown to the
+  /// seller in the admin and in their email (sql/listing_decision_emails.sql).
+  Future<void> clearListingRequest(String id, {String? note}) async {
+    final text = note?.trim() ?? '';
+    await supabase.from('inventory_items').update({
+      'listing_requested_at': null,
+      'listing_review_note': text.isEmpty ? null : text,
+    }).eq('id', id);
   }
 
   /// Seller listing requests waiting for the owner.

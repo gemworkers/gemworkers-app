@@ -22,6 +22,8 @@
 // Same secret, {"type":"REVIEW_INVITE","order_ids":[…]} from send_review_invites:
 //   order received / shipped ≥ 14 days → buyer only ("How is your {stone}?")
 // That job stamps orders.review_invited_at before calling.
+// Same secret, {"type":"LISTING_EVENT","item_id","event"} from the listing
+// approval trigger: requested → owner; approved / rejected → seller.
 // SERVER ONLY. Never reads seller_note. Never reveals the seller to the buyer.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
@@ -512,6 +514,9 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
   if (payload.type === "REVIEW_INVITE") {
     return handleReviewInvite(payload as unknown as ReviewInvitePayload)
   }
+  if (payload.type === "LISTING_EVENT") {
+    return handleListingEvent(payload as unknown as ListingEventPayload)
+  }
 
   if (payload.type !== "PAYMENT_REMINDER" || !payload.order_id) {
     console.error("[offer-notify] malformed reminder payload — type", payload.type)
@@ -690,6 +695,136 @@ async function handleReviewInvite(payload: ReviewInvitePayload): Promise<Respons
 
   const sent = await sendEmail(resendApiKey, to, buyerReviewInviteEmail(titles), `review invite ${ids.join(",")} (buyer)`)
   console.log("[offer-notify] review invite for", ids.length, "order(s) — emails sent:", sent ? 1 : 0)
+  return json({ ok: true, emailsSent: sent ? 1 : 0 })
+}
+
+// ── Listing approval (DB trigger) ──────────────────────────────────────────────
+// inventory_listing_decision_notify (sql/listing_decision_emails.sql):
+//   requested → owner ("New listing waiting for approval")
+//   approved  → seller ("Your stone is live")
+//   rejected  → seller ("Listing not approved" + the owner's optional reason)
+// Staff-only emails: seller names are fine here; nothing goes to buyers.
+
+interface ListingEventPayload {
+  type:    string
+  item_id: string
+  event:   string
+}
+
+function ownerListingRequestEmail(sku: string, title: string, sellerName: string): Email {
+  const subject = `New listing waiting for approval: ${sku}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [`${strong(sellerName)} sent ${strong(title)} (${esc(sku)}) for approval. Approve or reject it in Listings → Awaiting approval.`],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text: `${sellerName} sent ${title} (${sku}) for approval. Approve or reject it in Listings → Awaiting approval: ${ADMIN_URL}\n`,
+  }
+}
+
+function sellerListingApprovedEmail(sku: string, title: string, itemId: string): Email {
+  const url     = stoneUrl(itemId)
+  const subject = `Your stone is live: ${title}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [`Good news — ${strong(title)} (${esc(sku)}) was approved and is now for sale on GemWorkers.`],
+      url,
+      "View it on the store",
+    ),
+    text: `Good news - ${title} (${sku}) was approved and is now for sale on GemWorkers.\n\nView it: ${url}\n`,
+  }
+}
+
+function sellerListingRejectedEmail(sku: string, title: string, note: string): Email {
+  const subject = `Listing not approved: ${title}`
+  const reason  = note
+    ? [`Reason: ${strong(note)}`]
+    : []
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `${strong(title)} (${esc(sku)}) was not approved for the store yet. It is back in your Drafts.`,
+        ...reason,
+        "Please update the stone and send it for approval again.",
+      ],
+      ADMIN_URL,
+      "Open GemWorkers admin",
+    ),
+    text:
+      `${title} (${sku}) was not approved for the store yet. It is back in your Drafts.\n` +
+      (note ? `Reason: ${note}\n` : "") +
+      `\nPlease update the stone and send it for approval again: ${ADMIN_URL}\n`,
+  }
+}
+
+async function handleListingEvent(payload: ListingEventPayload): Promise<Response> {
+  const event = payload.event
+  if (!payload.item_id || !["requested", "approved", "rejected"].includes(event)) {
+    return json({ skipped: true, reason: "malformed listing event" })
+  }
+
+  const supabaseUrl        = Deno.env.get("SUPABASE_URL")
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const resendApiKey       = Deno.env.get("RESEND_API_KEY")
+  if (!supabaseUrl || !supabaseServiceKey || !resendApiKey) {
+    console.error("[offer-notify] listing event: env missing (supabase or RESEND_API_KEY)")
+    return json({ ok: true, emailsSent: 0, reason: "env missing" })
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const { data: itemData, error: itemErr } = await supabase
+    .from("inventory_items")
+    .select("id, sku, title, seller_id, listing_review_note")
+    .eq("id", payload.item_id)
+    .maybeSingle()
+  const item = itemData as { id: string; sku: string | null; title: string | null; seller_id: string | null; listing_review_note: string | null } | null
+  if (itemErr || !item) {
+    console.error("[offer-notify] listing event: stone not found", payload.item_id, itemErr?.message)
+    return json({ skipped: true, reason: "stone not found" })
+  }
+  const sku   = item.sku?.trim()   || "a stone"
+  const title = item.title?.trim() || "your stone"
+
+  let seller: { name: string | null; email: string | null } | null = null
+  if (item.seller_id) {
+    const { data } = await supabase.from("sellers").select("name, email").eq("id", item.seller_id).maybeSingle()
+    seller = data as { name: string | null; email: string | null } | null
+  }
+  const ownerEmail  = Deno.env.get("OWNER_EMAIL")?.trim() ?? ""
+  const sellerEmail = seller?.email?.trim() ?? ""
+
+  let to = ""
+  let email: Email
+  if (event === "requested") {
+    to    = ownerEmail
+    email = ownerListingRequestEmail(sku, title, seller?.name?.trim() || "A seller")
+  } else {
+    // The owner made the decision; skip when the seller's inbox is the owner's.
+    if (sameAddress(sellerEmail, ownerEmail)) {
+      return json({ skipped: true, reason: "seller is owner" })
+    }
+    to    = sellerEmail
+    email = event === "approved"
+      ? sellerListingApprovedEmail(sku, title, item.id)
+      : sellerListingRejectedEmail(sku, title, item.listing_review_note?.trim() ?? "")
+  }
+
+  if (!to) {
+    console.log("[offer-notify] listing", event, "for", item.id, "— no recipient email")
+    return json({ ok: true, emailsSent: 0, reason: "no recipient" })
+  }
+
+  const sent = await sendEmail(resendApiKey, to, email, `listing ${event} ${item.id}`)
+  console.log("[offer-notify] listing", event, "for", item.id, "— emails sent:", sent ? 1 : 0)
   return json({ ok: true, emailsSent: sent ? 1 : 0 })
 }
 

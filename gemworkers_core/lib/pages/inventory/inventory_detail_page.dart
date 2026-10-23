@@ -13,6 +13,7 @@ import '../../theme/app_theme.dart';
 import 'edit_inventory_page.dart';
 import 'listing_sheet.dart';
 import 'widgets/item_photo_manager.dart';
+import 'widgets/reject_listing_dialog.dart';
 import 'widgets/price_field.dart';
 import 'lot_sort_page.dart';
 import 'record_sale_sheet.dart';
@@ -171,8 +172,10 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
   Future<void> _rejectListing() async {
     if (_item.id == null) return;
+    final note = await showRejectListingDialog(context, _item.title);
+    if (note == null || !mounted) return;
     try {
-      await _repository.clearListingRequest(_item.id!);
+      await _repository.clearListingRequest(_item.id!, note: note);
       if (!mounted) return;
       setState(() => _item = _item.copyWith(listingRequestedAt: null));
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -639,7 +642,9 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                       ? 'Listed · €${_item.sellingPrice?.toStringAsFixed(2) ?? ''}'
                       : _item.isAwaitingApproval
                           ? 'Waiting for approval'
-                          : 'Private (not listed)',
+                          : _item.listingReviewNote != null
+                              ? 'Not approved — ${_item.listingReviewNote}'
+                              : 'Private (not listed)',
                 ),
               ),
               if (_item.isAwaitingApproval &&

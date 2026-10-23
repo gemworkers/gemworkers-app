@@ -56,6 +56,8 @@ class InventoryItem {
   // Seller asked to list; waiting for the owner (sql/listing_approval.sql).
   // Read only — not in toMap(), so a general save never touches it.
   final DateTime? listingRequestedAt;
+  // Owner's reason when a listing was rejected; read only, not in toMap().
+  final String? listingReviewNote;
   // 'buy_now' | 'accept_offers' | 'both' — mirrors CHECK constraint on inventory_items.
   final String saleMethod;
 
@@ -137,6 +139,7 @@ class InventoryItem {
     this.sellingPrice,
     this.listedAt,
     this.listingRequestedAt,
+    this.listingReviewNote,
     this.saleMethod = 'buy_now',
     this.isUnsortedLot = false,
     this.lotRemainingCount,
@@ -219,6 +222,7 @@ class InventoryItem {
       listedAt: map['listed_at'] != null
           ? DateTime.parse(map['listed_at'].toString())
           : null,
+      listingReviewNote: map['listing_review_note']?.toString(),
       listingRequestedAt: map['listing_requested_at'] != null
           ? DateTime.parse(map['listing_requested_at'].toString())
           : null,
@@ -419,6 +423,7 @@ class InventoryItem {
       notes: notes ?? this.notes,
       imageUrls: imageUrls ?? this.imageUrls,
       makerId: makerId,
+      listingReviewNote: listingReviewNote,
       supplierId:
           identical(supplierId, _omitted) ? this.supplierId : supplierId as String?,
       supplierName: supplierName ?? this.supplierName,

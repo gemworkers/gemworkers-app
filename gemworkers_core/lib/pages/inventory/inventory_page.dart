@@ -14,6 +14,7 @@ import 'inventory_detail_page.dart';
 import 'listing_sheet.dart';
 import 'record_sale_sheet.dart';
 import 'widgets/cascading_location_picker.dart';
+import 'widgets/reject_listing_dialog.dart';
 
 // ── Sort options ──────────────────────────────────────────────────────────────
 
@@ -404,25 +405,10 @@ class _InventoryPageState extends State<InventoryPage>
 
   Future<void> _rejectListing(InventoryItem item) async {
     if (item.id == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject this listing?'),
-        content: Text('"${item.title}" stays a draft and is not shown on the '
-            'store. The seller can fix it and send it again.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Reject')),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+    final note = await showRejectListingDialog(context, item.title);
+    if (note == null || !mounted) return;
     try {
-      await _repository.clearListingRequest(item.id!);
+      await _repository.clearListingRequest(item.id!, note: note);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Listing rejected — it is back in Draft.')));
