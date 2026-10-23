@@ -20,9 +20,14 @@ export default function LoginPage() {
   const canSubmit = !loading && (!TURNSTILE_ENABLED || !!captchaToken)
   const [next, setNext] = useState('/')
 
-  // Read ?next= on the client (validated to a same-site relative path)
+  // Read ?next= on the client (validated to a same-site relative path).
+  // ?error=confirmation_failed comes from /auth/confirm or /auth/callback.
   useEffect(() => {
-    setNext(safeNext(new URLSearchParams(window.location.search).get('next')))
+    const params = new URLSearchParams(window.location.search)
+    setNext(safeNext(params.get('next')))
+    if (params.get('error') === 'confirmation_failed') {
+      setError('That confirmation link has expired or was already used. If you already confirmed your email, just log in below — otherwise sign up again to get a new link.')
+    }
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

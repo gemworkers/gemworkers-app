@@ -4,8 +4,9 @@ import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { safeNext } from '@/lib/safe-next'
 
-// Email links that work on any device: the Supabase email template points
-// here with ?token_hash=…&type=recovery&next=/auth/reset-password, and the
+// Email links that work on any device: the Supabase email templates point
+// here — Reset password: ?token_hash=…&type=recovery&next=/auth/reset-password,
+// Confirm signup: ?token_hash=…&type=email&next=/ — and the
 // token is verified on the server (no PKCE verifier needed from the browser
 // that requested it — unlike /auth/callback?code=…).
 export async function GET(request: NextRequest) {
