@@ -27,14 +27,16 @@ export function ReturnPanel({ orderId, ret, eligible }: { orderId: string; ret: 
   const [tracking, setTracking] = useState(ret?.return_tracking ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
 
-  async function run(action: () => Promise<{ ok: true } | { error: string }>) {
+  async function run(action: () => Promise<{ ok: true } | { error: string }>): Promise<boolean> {
     setBusy(true)
     setError(null)
     const res = await action()
     setBusy(false)
-    if ('error' in res) setError(res.error)
-    else setOpen(false)
+    if ('error' in res) { setError(res.error); return false }
+    setOpen(false)
+    return true
   }
 
   const errorLine = error && <p style={{ fontSize: 13, color: '#B42318', marginTop: 8 }}>{error}</p>
@@ -64,12 +66,18 @@ export function ReturnPanel({ orderId, ret, eligible }: { orderId: string; ret: 
           <li>Sending from outside the EU? Mark the customs form &ldquo;Returned goods&rdquo; and add your order number.</li>
         </ul>
         {ret!.decision_note && <p style={{ ...muted, fontSize: 13 }}>Note from GemWorkers: {ret!.decision_note}</p>}
+        {(saved ?? ret!.return_tracking) && (
+          <p style={{ ...muted, fontSize: 13, color: '#2B7A3D' }}>✓ Tracking saved: {saved ?? ret!.return_tracking}</p>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <input value={tracking} onChange={e => setTracking(e.target.value)} maxLength={100}
             placeholder="Return tracking number" style={{ ...inputStyle, flex: '1 1 180px', width: 'auto', fontSize: 16 }} />
-          <button disabled={busy || !tracking.trim()} onClick={() => run(() => addReturnTracking(ret!.id, tracking))}
+          <button disabled={busy || !tracking.trim()} onClick={async () => {
+              setSaved(null)
+              if (await run(() => addReturnTracking(ret!.id, tracking))) setSaved(tracking.trim())
+            }}
             style={{ ...(busy || !tracking.trim() ? pillDisabledSm : pillDarkSm), width: 'auto', padding: '0 18px' }}>
-            Save tracking
+            {ret!.return_tracking || saved ? 'Update tracking' : 'Save tracking'}
           </button>
         </div>
         <button disabled={busy} onClick={() => run(() => withdrawReturn(ret!.id))}
