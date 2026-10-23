@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     console.error('[auth/confirm] verifyOtp failed:', error.message)
   }
 
-  // Expired or already-used link → the reset page explains and offers a new one.
-  const fallback = type === 'recovery' ? '/auth/reset-password' : '/auth/login?error=confirmation_failed'
+  // Expired or already-used link → the reset page shows "Link expired" (even
+  // when the browser is still signed in from the first click).
+  const fallback = type === 'recovery' ? '/auth/reset-password?expired=1' : '/auth/login?error=confirmation_failed'
   return NextResponse.redirect(`${origin}${fallback}`)
 }

@@ -20,6 +20,12 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
+    // ?expired=1 comes from /auth/confirm when the link was used or expired.
+    if (new URLSearchParams(window.location.search).get('expired') === '1') {
+      setSignedIn(false)
+      setChecking(false)
+      return
+    }
     createClient().auth.getUser().then(({ data }) => {
       setSignedIn(!!data.user)
       setChecking(false)
@@ -56,8 +62,8 @@ export default function ResetPasswordPage() {
     return (
       <AuthShell title="Link expired">
         <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, marginBottom: 20 }}>
-          This reset link has expired or was opened on a different device. Please request a new
-          one and open it on the same device.
+          This reset link has already been used or has expired. Each link works once, for one
+          hour. Please request a new one.
         </p>
         <Link href="/auth/forgot-password" className="pd-link">Send a new link</Link>
       </AuthShell>
