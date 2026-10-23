@@ -1,7 +1,8 @@
 // Supabase Edge Function — seller-invite
-// Called by the Flutter admin app (owner only) to send a Supabase auth invite
-// to a seller's email address. On success the seller receives a link to set
-// their password; after doing so they can log in to the Flutter admin app.
+// Called by the Flutter admin app (owner only) to invite a seller. It creates
+// the auth user with a Supabase invite link (generateLink) and emails that
+// link itself via Resend — not Supabase's rate-limited built-in mailer. The
+// seller sets a password on /seller/accept-invite, then logs in to the admin.
 // The function also creates the user_profiles row linking the auth user to the
 // seller record so current_seller_id() RLS works immediately on first sign-in.
 
@@ -30,6 +31,36 @@ const json = (body: unknown, status = 200) =>
 // accepts both invite and recovery links.
 
 type AdminClient = SupabaseClient
+
+// Invite / set-password email via Resend (same sender as the order emails).
+// Returns null on success, or a short error.
+async function sendSetPasswordEmail(to: string, link: string, subject: string): Promise<string | null> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY")
+  if (!resendApiKey) {
+    console.error("[seller-invite] RESEND_API_KEY not set — email not sent")
+    return "email not configured"
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "GemWorkers <orders@gemworkers.com>",
+      to: [to],
+      subject,
+      html:
+        `<p style="font-family:Arial,sans-serif;font-size:15px">Your GemWorkers seller account is ready.</p>` +
+        `<p style="font-family:Arial,sans-serif;font-size:15px">Click the button to choose your password, then log in at sell.gemworkers.com.</p>` +
+        `<p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;font-family:Arial,sans-serif;font-size:14px;text-decoration:none;border-radius:6px">Set my password</a></p>` +
+        `<p style="font-family:Arial,sans-serif;font-size:12px;color:#6b7280">If you didn't expect this email, you can ignore it.</p>`,
+      text: `Your GemWorkers seller account is ready.\n\nChoose your password here, then log in at sell.gemworkers.com:\n${link}\n`,
+    }),
+  })
+  if (!res.ok) {
+    console.error("[seller-invite] Resend returned", res.status, "for", to, "—", await res.text())
+    return `Resend ${res.status}`
+  }
+  return null
+}
 
 async function findUserIdByEmail(admin: AdminClient, email: string): Promise<string | null> {
   const target = email.toLowerCase()
@@ -96,30 +127,9 @@ async function relinkExistingLogin(
     return json({ error: "Login reconnected, but the set-password link could not be created." }, 500)
   }
 
-  const resendApiKey = Deno.env.get("RESEND_API_KEY")
-  if (!resendApiKey) {
-    console.error("[seller-invite] RESEND_API_KEY not set — set-password email not sent")
-    return json({ error: "Login reconnected, but the email could not be sent (email not configured)." }, 500)
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: "GemWorkers <orders@gemworkers.com>",
-      to: [sellerEmail],
-      subject: "Set your GemWorkers seller password",
-      html:
-        `<p style="font-family:Arial,sans-serif;font-size:15px">Your GemWorkers seller account is ready.</p>` +
-        `<p style="font-family:Arial,sans-serif;font-size:15px">Click the button to choose your password, then log in at sell.gemworkers.com.</p>` +
-        `<p><a href="${actionLink}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;font-family:Arial,sans-serif;font-size:14px;text-decoration:none;border-radius:6px">Set my password</a></p>` +
-        `<p style="font-family:Arial,sans-serif;font-size:12px;color:#6b7280">If you didn't expect this email, you can ignore it.</p>`,
-      text: `Your GemWorkers seller account is ready.\n\nChoose your password here, then log in at sell.gemworkers.com:\n${actionLink}\n`,
-    }),
-  })
-  if (!res.ok) {
-    console.error("[seller-invite] Resend returned", res.status, "for", sellerEmail, "—", await res.text())
-    return json({ error: "Login reconnected, but the email could not be sent. Please try again." }, 502)
+  const sendErr = await sendSetPasswordEmail(sellerEmail, actionLink, "Set your GemWorkers seller password")
+  if (sendErr) {
+    return json({ error: `Login reconnected, but the email could not be sent: ${sendErr}. Please try again.` }, 502)
   }
 
   console.log("[seller-invite] relinked existing login", userId, "to seller", sellerId, "and emailed a set-password link")
@@ -228,8 +238,10 @@ Deno.serve(async (req: Request) => {
   // seller logs in via the Flutter admin app using email + password.
   const redirectTo = "https://gemworkers.com/seller/accept-invite"
 
+  // generateLink creates the invited user and returns the link WITHOUT
+  // Supabase's built-in mailer (heavily rate-limited); we send it via Resend.
   const { data: invited, error: inviteErr } =
-    await admin.auth.admin.inviteUserByEmail(sellerEmail, { redirectTo })
+    await admin.auth.admin.generateLink({ type: "invite", email: sellerEmail, options: { redirectTo } })
 
   if (inviteErr) {
     // Supabase returns a "User already registered" style error when the email
@@ -287,6 +299,16 @@ Deno.serve(async (req: Request) => {
         error: `Invite sent but profile link failed: ${profileInsertErr.message}`,
       }, 500)
     }
+  }
+
+  const inviteLink = invited.properties?.action_link
+  if (!inviteLink) {
+    console.error("[seller-invite] generateLink returned no action_link for", sellerEmail)
+    return json({ error: "Seller created, but the invite link could not be made. Press Invite again." }, 500)
+  }
+  const sendErr = await sendSetPasswordEmail(sellerEmail, inviteLink, "You're invited to GemWorkers")
+  if (sendErr) {
+    return json({ error: `Seller created, but the invite email failed: ${sendErr}. Press Invite again.` }, 502)
   }
 
   console.log(
