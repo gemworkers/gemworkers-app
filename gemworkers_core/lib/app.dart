@@ -13,6 +13,7 @@ import 'pages/dashboard/dashboard_page.dart';
 import 'pages/inventory/inventory_page.dart';
 import 'pages/makers/makers_page.dart';
 import 'pages/reviews/reviews_page.dart';
+import 'pages/taxes/taxes_page.dart';
 import 'pages/messages/messages_page.dart';
 import 'pages/offers/offers_page.dart';
 import 'pages/orders/orders_page.dart';
@@ -211,6 +212,7 @@ class _MainLayoutState extends State<MainLayout> {
         if (_isOwner) const SellersPage(),
         if (_isOwner) const MakersPage(),
         if (_isOwner) ReviewsPage(onPendingChanged: _loadReviewsCount),
+        if (_isOwner) const TaxesPage(),
       ];
 
   List<ShopNavItem> get _destinations => [
@@ -277,6 +279,12 @@ class _MainLayoutState extends State<MainLayout> {
             selectedIcon: Icons.star,
             label: 'Reviews',
             badgeCount: _pendingReviewsCount,
+          ),
+        if (_isOwner)
+          const ShopNavItem(
+            icon: Icons.public_outlined,
+            selectedIcon: Icons.public,
+            label: 'Taxes & duties',
           ),
       ];
 
