@@ -7,7 +7,8 @@ import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { formatEur } from '@/lib/money'
 import { paidTotal } from '@/lib/tax'
-import { ReturnPanel, canRequestReturn, type BuyerReturn } from './ReturnPanel'
+import { ReturnPanel, type BuyerReturn } from './ReturnPanel'
+import { canRequestReturn } from '@/lib/returns'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
