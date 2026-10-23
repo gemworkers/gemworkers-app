@@ -33,6 +33,7 @@ class TaxRule {
   final double? dutyJewelry;
   final double? dutySpecimen;
   final double? freeBelowEur;
+  final double? minOrderEur; // orders below this are refused (UK £135 rule)
   final String customsUnion;
   final String notes;
   final bool verified;
@@ -46,6 +47,7 @@ class TaxRule {
     this.dutyJewelry,
     this.dutySpecimen,
     this.freeBelowEur,
+    this.minOrderEur,
     this.customsUnion = '',
     this.notes = '',
     this.verified = false,
@@ -60,6 +62,7 @@ class TaxRule {
         dutyJewelry: parseNumeric(m['duty_jewelry']),
         dutySpecimen: parseNumeric(m['duty_specimen']),
         freeBelowEur: parseNumeric(m['free_below_eur']),
+        minOrderEur: parseNumeric(m['min_order_eur']),
         customsUnion: m['customs_union']?.toString() ?? '',
         notes: m['notes']?.toString() ?? '',
         verified: m['verified'] == true,
@@ -74,6 +77,7 @@ class TaxRule {
         'duty_jewelry': dutyJewelry,
         'duty_specimen': dutySpecimen,
         'free_below_eur': freeBelowEur,
+        'min_order_eur': minOrderEur,
         'customs_union': customsUnion.isEmpty ? null : customsUnion,
         'notes': notes.isEmpty ? null : notes,
         'verified': verified,

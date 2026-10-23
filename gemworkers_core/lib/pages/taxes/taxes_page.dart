@@ -19,8 +19,8 @@ class TaxesPage extends StatefulWidget {
 }
 
 const _modeLabels = {
-  'collect': 'We collect at checkout',
-  'buyer_pays': 'Buyer pays on delivery',
+  'collect': 'We collect VAT (only when shipped from inside the union)',
+  'buyer_pays': 'Buyer pays on delivery (reminder shown)',
   'none': 'Nothing to pay',
 };
 
@@ -168,7 +168,9 @@ class _TaxesPageState extends State<TaxesPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Text(
             'Starting values are estimates — open a country to correct it and tick "Checked". '
-            'Countries without a rule: buyer pays on delivery, no estimate.',
+            'We only collect what the law requires (EU VAT on stones shipped from NL); '
+            'elsewhere the buyer pays on delivery and checkout shows a reminder. '
+            'Countries without a rule: buyer pays, no estimate.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
           ),
         ),
@@ -191,6 +193,7 @@ class _TaxesPageState extends State<TaxesPage> {
       if (rule == null) 'No rule' else _modeLabels[rule.mode] ?? rule.mode,
       if (rule?.taxRate != null) '${rule!.taxName.isEmpty ? 'Tax' : rule.taxName} ${_pct(rule.taxRate)}%',
       if (rule?.customsUnion.isNotEmpty ?? false) rule!.customsUnion,
+      if (rule?.minOrderEur != null) 'min ${formatEur(rule!.minOrderEur!)}',
     ];
     return ListTile(
       onTap: () => _editRule(c),
@@ -235,6 +238,8 @@ class _TaxesPageState extends State<TaxesPage> {
     final dSpecimen = TextEditingController(text: _pct(r.dutySpecimen));
     final freeBelow = TextEditingController(
         text: r.freeBelowEur == null ? '' : r.freeBelowEur.toString());
+    final minOrder = TextEditingController(
+        text: r.minOrderEur == null ? '' : r.minOrderEur.toString());
     final union = TextEditingController(text: r.customsUnion);
     final notes = TextEditingController(text: r.notes);
 
@@ -275,6 +280,7 @@ class _TaxesPageState extends State<TaxesPage> {
                     Expanded(child: _field(dSpecimen, 'Specimens', number: true)),
                   ]),
                   _field(freeBelow, 'No import tax/duty below € (optional)', number: true),
+                  _field(minOrder, 'Refuse orders below € (optional, e.g. UK 160)', number: true),
                   _field(union, 'Customs union (e.g. EU — same union = no import)'),
                   _field(notes, 'Notes', lines: 3),
                   CheckboxListTile(
@@ -315,6 +321,7 @@ class _TaxesPageState extends State<TaxesPage> {
           dutyJewelry: _fromPct(dJewelry.text),
           dutySpecimen: _fromPct(dSpecimen.text),
           freeBelowEur: parseDecimalInput(freeBelow.text),
+          minOrderEur: parseDecimalInput(minOrder.text),
           customsUnion: union.text.trim().toUpperCase(),
           notes: notes.text.trim(),
           verified: verified,
@@ -325,7 +332,7 @@ class _TaxesPageState extends State<TaxesPage> {
     } catch (e) {
       _snack(e, error: true);
     } finally {
-      for (final ctl in [taxName, taxRate, dLoose, dJewelry, dSpecimen, freeBelow, union, notes]) {
+      for (final ctl in [taxName, taxRate, dLoose, dJewelry, dSpecimen, freeBelow, minOrder, union, notes]) {
         ctl.dispose();
       }
     }
