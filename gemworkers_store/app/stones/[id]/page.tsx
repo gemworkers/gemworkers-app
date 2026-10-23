@@ -411,6 +411,13 @@ export default async function StoneDetailPage({
             {tax && (
               <p className="pd-shipline" style={tax.warn ? { color: '#B42318' } : undefined}>{tax.text}</p>
             )}
+            {user && quote && (quote.scheme === 'oss' || quote.scheme === 'reverse_charge') && (
+              <p className="pd-shipline">
+                <Link href="/business" className="pd-link">
+                  {quote.scheme === 'reverse_charge' ? 'Business details' : 'Buying for a business? Add your VAT number'}
+                </Link>
+              </p>
+            )}
             <ReviewSummary style={{ marginTop: 10 }} />
           </div>
 

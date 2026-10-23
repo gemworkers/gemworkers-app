@@ -187,6 +187,11 @@ export default async function CartPage() {
                 <span>Total</span>
                 <span>{formatEur(payTotal)}</span>
               </div>
+              {shipTo?.enabled && (
+                <p style={{ fontSize: 13, marginBottom: 12 }}>
+                  <Link href="/business" className="pd-link">Buying for a business? Add your VAT number</Link>
+                </p>
+              )}
               {cartTaxNote && (
                 <p style={{ fontSize: 13, color: cartTaxNote.warn ? '#B42318' : '#6B6052', marginBottom: 16, lineHeight: 1.5 }}>
                   {cartTaxNote.text}

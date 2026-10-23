@@ -6,8 +6,9 @@ import { stripe } from '@/lib/stripe/server'
 import type Stripe from 'stripe'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { checkoutShipTo } from '@/lib/ship-to'
-import { applyOrderTax, vatLineItem } from '@/lib/tax'
+import { applyOrderTax, vatLineItem, reverseChargeText } from '@/lib/tax'
 import { createCheckoutSession } from '@/lib/stripe/checkout'
+import { refreshBusinessCheck } from '@/lib/business'
 
 // Calls the create_platform_order SECURITY DEFINER RPC as the logged-in buyer,
 // then creates a Stripe Checkout Session for the authoritative order total.
@@ -42,6 +43,7 @@ export async function buyNow(
   const orderId = data as string
 
   // VAT for the ship-to country (or a refusal, e.g. under the UK minimum).
+  await refreshBusinessCheck(user.id)   // business buyer: keep the VIES check fresh
   const tax = await applyOrderTax(supabase, [orderId], shipTo.code)
   if ('error' in tax) {
     await cancelPendingOrder(orderId)
@@ -52,7 +54,7 @@ export async function buyNow(
   // Supabase returns numeric columns as strings; coerce with Number().
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('order_total, order_number, tax_amount, tax_name, tax_rate')
+    .select('order_total, order_number, tax_amount, tax_name, tax_rate, tax_scheme, buyer_company, buyer_vat_number')
     .eq('id', orderId)
     .single()
 
@@ -92,6 +94,7 @@ export async function buyNow(
         allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
+      custom_text: reverseChargeText([order]),
       // Stripe minimum is 30 min; our sweep cancels the order at 30 min.
       expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       success_url: `${base}/orders?paid=1&order=${orderId}`,
@@ -166,11 +169,12 @@ export async function payAcceptedOffer(
 
   // VAT for the ship-to country. On refusal the offer order stays payable —
   // the buyer can pick another "Ship to" and try again.
+  await refreshBusinessCheck(user.id)   // business buyer: keep the VIES check fresh
   const tax = await applyOrderTax(supabase, [order.id], shipTo.code)
   if ('error' in tax) return { error: tax.error }
   const { data: taxRow, error: taxErr } = await supabase
     .from('orders')
-    .select('tax_amount, tax_name, tax_rate')
+    .select('tax_amount, tax_name, tax_rate, tax_scheme, buyer_company, buyer_vat_number')
     .eq('id', order.id)
     .single()
   if (taxErr || !taxRow) return { error: SETUP_FAILED }
@@ -263,6 +267,7 @@ export async function payAcceptedOffer(
         allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
+      custom_text: reverseChargeText([taxRow]),
       expires_at: expiresAt,
       success_url: `${base}/orders?paid=1&order=${order.id}`,
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${order.id}`,
@@ -460,6 +465,7 @@ export async function checkoutCart(): Promise<
   }
 
   // ── 4b. VAT for the ship-to country (or a refusal, e.g. UK minimum) ───────
+  await refreshBusinessCheck(user.id)   // business buyer: keep the VIES check fresh
   const tax = await applyOrderTax(supabase, createdOrderIds, shipTo.code)
   if ('error' in tax) {
     await cleanupOrderGroup(createdOrderIds, groupId)
@@ -469,7 +475,7 @@ export async function checkoutCart(): Promise<
   // ── 5. Read authoritative totals back from DB ─────────────────────────────
   const { data: orderRows, error: totalsErr } = await supabase
     .from('orders')
-    .select('id, order_number, order_total, tax_amount, tax_name, tax_rate')
+    .select('id, order_number, order_total, tax_amount, tax_name, tax_rate, tax_scheme, buyer_company, buyer_vat_number')
     .in('id', createdOrderIds)
 
   if (totalsErr || !orderRows || orderRows.length === 0) {
@@ -517,6 +523,7 @@ export async function checkoutCart(): Promise<
         allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
+      custom_text: reverseChargeText(orderRows),
       // Stripe minimum is 30 min; our sweep cancels the orders at 30 min.
       expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       success_url: `${base}/orders?paid=1&group=${groupId}`,

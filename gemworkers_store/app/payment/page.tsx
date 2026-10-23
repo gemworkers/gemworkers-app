@@ -3,14 +3,15 @@ import { ContentPage } from '@/app/components/ContentPage'
 
 export const metadata = { title: 'Payment Information · GemWorkers' }
 
-// Facts here must match the code: Stripe Checkout, payment_method_types
-// ['card'], currency EUR (app/actions/commerce.ts); Buy now / cart orders are
+// Facts here must match the code: Stripe Checkout, methods in
+// lib/stripe/checkout.ts (card fallback), currency EUR; VAT per lib/tax.ts +
+// sql/order_tax.sql / order_tax_b2b.sql; Buy now / cart orders are
 // released after 30 min unpaid (sweep_expired_pending_orders); accepted
 // offers and counter-offers have 48 h with a reminder ~12 h before
 // (respond_to_offer / respond_to_counter, send_offer_payment_reminders).
 export default function PaymentPage() {
   return (
-    <ContentPage eyebrow="Customer Care" title="Payment" lastUpdated="22 October 2026">
+    <ContentPage eyebrow="Customer Care" title="Payment" lastUpdated="23 October 2026">
       {/* ACCOUNTANT REVIEW before payments go live: VAT wording + payment methods. */}
       <p>
         You buy directly from GemWorkers. Payments are handled by Stripe, one of the
@@ -20,7 +21,14 @@ export default function PaymentPage() {
       <h2>How you can pay</h2>
       <ul>
         <li>Credit and debit cards (such as Visa and Mastercard)</li>
+        <li>Apple Pay and Google Pay</li>
+        <li>PayPal</li>
+        <li>iDEAL (Netherlands) and Bancontact (Belgium)</li>
+        <li>Klarna</li>
       </ul>
+      <p>
+        The payment page shows the methods available for your country and device.
+      </p>
       <p>
         All prices are in euros (€). If your card is in another currency, your bank converts
         the amount and may charge a small fee for this.
@@ -46,19 +54,30 @@ export default function PaymentPage() {
         before the time runs out.
       </p>
       <p>
-        The total you pay — the stone plus shipping — is always shown before you pay.
+        The total you pay — the stone, shipping and any VAT — is always shown before you pay.
         You&apos;ll receive an order confirmation by email once your payment is complete.
       </p>
 
-      <h2>Customs, duties and taxes</h2>
+      <h2>VAT, customs and duties</h2>
       <p>
-        For orders shipped across borders, import duties or taxes may apply. See{' '}
-        <Link href="/shipping">Shipping</Link> for details.
+        <strong>Stones shipped from the Netherlands to the EU:</strong> VAT for your country
+        is added at checkout and shown as a separate line.
+      </p>
+      <p>
+        <strong>All other orders</strong> (stones shipped from Thailand or Pakistan, and
+        orders to countries outside the EU): no VAT is charged at checkout. Import taxes or
+        duties may be charged by the courier on delivery — we show an estimate on the stone
+        page where we can. See <Link href="/shipping">Shipping</Link> for details.
+      </p>
+      <p>
+        <strong>Buying for a business?</strong> Add your company and VAT number under{' '}
+        <Link href="/business">Buying for a business</Link>. EU businesses outside the
+        Netherlands with a verified VAT number pay 0% VAT (reverse charge).
       </p>
 
       <h2>Refunds</h2>
       <p>
-        Refunds always go back to the card you paid with. They usually appear on your
+        Refunds always go back to the payment method you used. They usually appear on your
         statement within 5–10 business days. If a payment reaches us after a reservation has
         already ended, we refund it automatically and let you know by email. Our{' '}
         <Link href="/returns">Returns &amp; Refunds</Link> page explains returns.
@@ -66,8 +85,8 @@ export default function PaymentPage() {
 
       <h2>Problems paying?</h2>
       <p>
-        If your payment doesn&apos;t go through, please check your card details or try another
-        card. Still stuck? Email us at{' '}
+        If your payment doesn&apos;t go through, please check your details or try another
+        payment method. Still stuck? Email us at{' '}
         <a href="mailto:hello@gemworkers.com">hello@gemworkers.com</a> — we&apos;re happy to help.
       </p>
     </ContentPage>

@@ -17,6 +17,7 @@ type BuyerOrder = {
   order_date: string;
   order_total: number | null;
   tax_amount: number | string | null;
+  tax_scheme: string | null;
   shipping_cost: number | null;
   tracking_number: string | null;
   shipped_at: string | null;
@@ -218,6 +219,9 @@ function SingleOrderCard({
           <span className="order-total-amount">{formatEur(paidTotal(rawTotal, rawVat))}</span>
         </div>
       )}
+      {order.tax_scheme === 'reverse_charge' && (
+        <p className="order-muted" style={{ marginTop: 6 }}>VAT reverse charged (intra-EU supply, 0% VAT)</p>
+      )}
     </article>
   )
 }
@@ -304,6 +308,9 @@ function GroupedOrderCard({
         <span className="order-muted">Total</span>
         <span className="order-total-amount">{formatEur(combinedTotal)}</span>
       </div>
+      {orders.some(o => o.tax_scheme === 'reverse_charge') && (
+        <p className="order-muted" style={{ marginTop: 6 }}>VAT reverse charged (intra-EU supply, 0% VAT)</p>
+      )}
     </article>
   )
 }
@@ -318,7 +325,7 @@ export default async function BuyerOrdersPage() {
   const { data } = await supabase
     .from('orders')
     .select(`
-      id, order_number, status, order_date, order_total, tax_amount, shipping_cost,
+      id, order_number, status, order_date, order_total, tax_amount, tax_scheme, shipping_cost,
       tracking_number, shipped_at, received_at, checkout_group_id,
       offer_id, payment_due_at,
       order_items ( inventory_item_id )

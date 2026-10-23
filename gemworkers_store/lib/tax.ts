@@ -5,7 +5,7 @@ import { formatEur } from '@/lib/money'
 // requires (stone ships from NL to an EU buyer); everywhere else the buyer
 // pays import tax/duty on delivery and we only show an estimate as a reminder.
 
-export type TaxScheme = 'domestic' | 'oss' | 'buyer_pays' | 'none'
+export type TaxScheme = 'domestic' | 'oss' | 'reverse_charge' | 'buyer_pays' | 'none'
 
 export type TaxQuote = {
   scheme: TaxScheme
@@ -62,6 +62,15 @@ export async function applyOrderTax(
 
 type OrderTaxRow = { tax_amount: string | number | null; tax_name: string | null; tax_rate: string | number | null }
 
+type OrderBuyerRow = { tax_scheme: string | null; buyer_company: string | null; buyer_vat_number: string | null }
+
+// Stripe page note for a verified EU business (0% VAT), or undefined.
+export function reverseChargeText(orders: OrderBuyerRow[]): { submit: { message: string } } | undefined {
+  const o = orders.find(x => x.tax_scheme === 'reverse_charge')
+  if (!o) return undefined
+  return { submit: { message: `VAT reverse charged (intra-EU supply, 0% VAT) — ${o.buyer_company ?? 'your business'}, VAT ${o.buyer_vat_number ?? ''}`.trim() } }
+}
+
 // Stripe line item for the collected VAT, or null when there is none.
 export function vatLineItem(order: OrderTaxRow, countryName: string) {
   const cents = Math.round(Number(order.tax_amount ?? 0) * 100)
@@ -90,6 +99,9 @@ export function taxNote(
   if (!q) return null
   if (hasPrice && q.minOrderEur != null && q.goodsTotal < q.minOrderEur) {
     return { text: `Orders shipped to ${countryName} must be at least ${formatEur(q.minOrderEur)}.`, warn: true }
+  }
+  if (q.scheme === 'reverse_charge') {
+    return { text: `0% VAT — reverse charge for your verified business (${countryName})`, warn: false }
   }
   if ((q.scheme === 'domestic' || q.scheme === 'oss') && q.taxRate != null) {
     const name = q.taxName || 'VAT'
