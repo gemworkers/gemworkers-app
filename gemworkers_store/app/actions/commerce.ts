@@ -7,6 +7,7 @@ import type Stripe from 'stripe'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { checkoutShipTo } from '@/lib/ship-to'
 import { applyOrderTax, vatLineItem } from '@/lib/tax'
+import { createCheckoutSession } from '@/lib/stripe/checkout'
 
 // Calls the create_platform_order SECURITY DEFINER RPC as the logged-in buyer,
 // then creates a Stripe Checkout Session for the authoritative order total.
@@ -71,9 +72,8 @@ export async function buyNow(
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    const session = await createCheckoutSession({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: [
         {
           quantity: 1,
@@ -243,9 +243,8 @@ export async function payAcceptedOffer(
 
   let session: Stripe.Checkout.Session
   try {
-    session = await stripe.checkout.sessions.create({
+    session = await createCheckoutSession({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: [
         {
           quantity: 1,
@@ -510,9 +509,8 @@ export async function checkoutCart(): Promise<
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    const session = await createCheckoutSession({
       mode: 'payment',
-      payment_method_types: ['card'],
       line_items: lineItems,
       shipping_address_collection: {
         // Only the buyer's chosen ship-to country (checked by checkoutShipTo).

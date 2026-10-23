@@ -515,8 +515,18 @@ export async function POST(req: NextRequest) {
   // confirm_order_paid and cancel_pending_payment_order.
   const supabase = createAdminClient()
 
-  if (event.type === 'checkout.session.completed') {
+  // async_payment_succeeded = a delayed method paid later; same path (a late
+  // payment for a released stone is refunded there).
+  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object as Stripe.Checkout.Session
+
+    // Only confirm money that has arrived. Every method we offer is instant
+    // (lib/stripe/checkout.ts), so this is a guard: an unpaid session is left
+    // pending and the 30-minute sweep releases the stone.
+    if (session.payment_status !== 'paid') {
+      console.error('[webhook] checkout completed but not paid (status', session.payment_status, ') — session', session.id, 'left pending')
+      return NextResponse.json({ received: true })
+    }
     const groupId = session.metadata?.checkout_group_id
     const orderId = session.metadata?.order_id
 
