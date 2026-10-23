@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
 import { createClient } from '@/lib/supabase/server'
 import { StoreHeader } from '@/app/components/StoreHeader'
+import { ShipToSelect } from '@/app/components/ShipToSelect'
+import { loadShipCountries, currentShipToCode } from '@/lib/ship-to'
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -114,6 +116,10 @@ function Footer() {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
+  const [shipCountries, shipTo] = await Promise.all([
+    loadShipCountries(supabase),
+    currentShipToCode(),
+  ])
   const { data: { user: authUser } } = await supabase.auth.getUser()
 
   let navUser: { displayName: string | null; unreadMessages: number } | null = null
@@ -138,6 +144,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div className="trust-strip">
             {TRUST_POINTS.map(t => <span key={t}>{t}</span>)}
+            <ShipToSelect countries={shipCountries} current={shipTo} />
           </div>
           <StoreHeader user={navUser} />
           {children}

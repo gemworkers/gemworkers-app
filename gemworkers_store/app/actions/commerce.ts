@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe/server'
 import type Stripe from 'stripe'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
+import { checkoutShipTo } from '@/lib/ship-to'
 
 // Calls the create_platform_order SECURITY DEFINER RPC as the logged-in buyer,
 // then creates a Stripe Checkout Session for the authoritative order total.
@@ -20,6 +21,10 @@ export async function buyNow(
   if (!user) {
     return { error: 'You must be logged in to buy.' }
   }
+
+  // Before any order exists: we must ship to the buyer's chosen country.
+  const shipTo = await checkoutShipTo(supabase)
+  if ('error' in shipTo) return { error: shipTo.error }
 
   const { data, error } = await supabase.rpc('create_platform_order', {
     p_inventory_item_id: itemId,
@@ -73,7 +78,8 @@ export async function buyNow(
         },
       ],
       shipping_address_collection: {
-        allowed_countries: ['NL','BE','DE','FR','GB','IE','IT','ES','PT','AT','SE','DK','FI','PL','US','CA','AU','AE','SA','TH','PK','IN','SG','JP'],
+        // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
+        allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
       // Stripe minimum is 30 min; our sweep cancels the order at 30 min.
@@ -143,6 +149,10 @@ export async function payAcceptedOffer(
   if (!canStartOfferPayment(order.payment_due_at)) {
     return { error: PAY_WINDOW_CLOSING_MESSAGE }
   }
+
+  // We must ship to the buyer's chosen country (Stripe accepts only that one).
+  const shipTo = await checkoutShipTo(supabase)
+  if ('error' in shipTo) return { error: shipTo.error }
 
   const amountCents = Math.round(Number(order.order_total) * 100)
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
@@ -227,7 +237,8 @@ export async function payAcceptedOffer(
         },
       ],
       shipping_address_collection: {
-        allowed_countries: ['NL','BE','DE','FR','GB','IE','IT','ES','PT','AT','SE','DK','FI','PL','US','CA','AU','AE','SA','TH','PK','IN','SG','JP'],
+        // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
+        allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
       expires_at: expiresAt,
@@ -366,6 +377,10 @@ export async function checkoutCart(): Promise<
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'You must be logged in.' }
 
+  // Before any order exists: we must ship to the buyer's chosen country.
+  const shipTo = await checkoutShipTo(supabase)
+  if ('error' in shipTo) return { error: shipTo.error }
+
   // ── 2. Read cart (same query as cart page, RLS-scoped to this buyer) ──────
   const { data: cartRows } = await supabase
     .from('storefront_cart')
@@ -468,7 +483,8 @@ export async function checkoutCart(): Promise<
       payment_method_types: ['card'],
       line_items: lineItems,
       shipping_address_collection: {
-        allowed_countries: ['NL','BE','DE','FR','GB','IE','IT','ES','PT','AT','SE','DK','FI','PL','US','CA','AU','AE','SA','TH','PK','IN','SG','JP'],
+        // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
+        allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
       // Stripe minimum is 30 min; our sweep cancels the orders at 30 min.

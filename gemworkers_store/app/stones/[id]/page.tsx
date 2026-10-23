@@ -14,6 +14,7 @@ import { ReviewSummary } from '@/app/components/ReviewSummary';
 import { canStartOfferPayment } from '@/lib/offer-payment';
 import { formatEur } from '@/lib/money';
 import { makerVerb, makerHref } from '@/lib/makers';
+import { currentShipToCode } from '@/lib/ship-to';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -313,6 +314,15 @@ export default async function StoneDetailPage({
     item.shape || item.cut_type,
     item.origin_country,
   ], ' · ');
+  // Buyer's "Ship to" choice (top bar) — does this stone ship there?
+  const shipToCode = await currentShipToCode();
+  const { data: shipToData } = await supabase
+    .from('shipping_countries')
+    .select('name, enabled')
+    .eq('code', shipToCode)
+    .maybeSingle();
+  const shipToRow = shipToData as { name: string; enabled: boolean } | null;
+
   const shippingLine = joinParts([
     cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`,
     shipFromName ? `Ships from ${shipFromName}` : null,
@@ -383,6 +393,14 @@ export default async function StoneDetailPage({
               <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}
             {shippingLine && <p className="pd-shipline">{shippingLine}</p>}
+            {shipToRow?.enabled ? (
+              <p className="pd-shipline">Ships to {shipToRow.name}</p>
+            ) : (
+              <p className="pd-shipline" style={{ color: '#B42318' }}>
+                We don&apos;t ship to {shipToRow?.name ?? shipToCode} — choose another &ldquo;Ship to&rdquo;
+                country at the top, or <Link href="/contact" className="pd-link">contact us</Link>.
+              </p>
+            )}
             <ReviewSummary style={{ marginTop: 10 }} />
           </div>
 

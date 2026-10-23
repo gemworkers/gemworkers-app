@@ -334,6 +334,14 @@
   display: flex; flex-wrap: wrap; justify-content: center;
   gap: 12px 40px; padding: 10px 16px; text-align: center;
 }
+.ship-to { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ship-to-label { color: rgba(243,237,226,0.7); }
+.ship-to-select {
+  background: transparent; color: #F3EDE2; border: 1px solid rgba(243,237,226,0.35);
+  border-radius: 6px; padding: 2px 6px; font-size: 13px; font-family: inherit; cursor: pointer;
+  max-width: 200px;
+}
+.ship-to-select option, .ship-to-select optgroup { color: #1F1B16; background: #FFFFFF; }
 
 /* ── Homepage ─────────────────────────────────────────────────── */
 .home-wrap { max-width: 1280px; margin: 0 auto; padding-left: 32px; padding-right: 32px; }
