@@ -225,6 +225,7 @@ INSERT INTO public.shipping_countries (code, name, region, enabled, sort_order) 
   ('PR', 'Puerto Rico', 'Latin America & Caribbean', true, 50),
   ('PS', 'Palestinian Territories', 'Middle East', true, 30),
   ('PT', 'Portugal', 'Europe', true, 11),
+  ('QA', 'Qatar', 'Middle East', true, 30),
   ('PY', 'Paraguay', 'Latin America & Caribbean', true, 50),
   ('RE', 'Réunion', 'Africa', true, 60),
   ('RO', 'Romania', 'Europe', true, 11),
