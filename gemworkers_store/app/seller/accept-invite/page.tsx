@@ -26,7 +26,9 @@ export default function SellerAcceptInvitePage() {
 
       window.history.replaceState(null, '', window.location.pathname)
 
-      if (type !== 'invite' || !accessToken || !refreshToken) {
+      // 'recovery' = re-invite of a seller whose login already existed
+      // (seller-invite sends a set-password link instead of an invite).
+      if ((type !== 'invite' && type !== 'recovery') || !accessToken || !refreshToken) {
         setSessionError(
           'This invite link is invalid or has expired. Please ask the GemWorkers owner to send a new invitation.'
         )

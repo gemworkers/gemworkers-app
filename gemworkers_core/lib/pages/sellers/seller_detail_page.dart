@@ -150,7 +150,9 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
       final data = res.data as Map<String, dynamic>?;
 
       String message;
-      if (data?['alreadyInvited'] == true) {
+      if (data?['message'] != null) {
+        message = data!['message'].toString();
+      } else if (data?['alreadyInvited'] == true) {
         message = 'This seller was already invited.';
       } else if (data?['ok'] == true || data?['invited'] == true) {
         message = 'Invitation sent to ${seller.email}.';

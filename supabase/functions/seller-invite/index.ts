@@ -5,7 +5,7 @@
 // The function also creates the user_profiles row linking the auth user to the
 // seller record so current_seller_id() RLS works immediately on first sign-in.
 
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
 // ── CORS headers — included on every response so browser clients don't block ──
 
@@ -22,6 +22,113 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   })
+
+// ── Existing login ─────────────────────────────────────────────────────────────
+// The email already has an auth user. Link it to this seller unless it is the
+// owner's login or still belongs to another existing seller, then email a
+// recovery ("set your password") link through Resend. The accept-invite page
+// accepts both invite and recovery links.
+
+type AdminClient = SupabaseClient
+
+async function findUserIdByEmail(admin: AdminClient, email: string): Promise<string | null> {
+  const target = email.toLowerCase()
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) {
+      console.error("[seller-invite] listUsers failed:", error.message)
+      return null
+    }
+    const hit = data.users.find(u => u.email?.toLowerCase() === target)
+    if (hit) return hit.id
+    if (data.users.length < 200) return null
+  }
+  return null
+}
+
+async function relinkExistingLogin(
+  admin: AdminClient,
+  sellerId: string,
+  sellerEmail: string,
+  redirectTo: string,
+): Promise<Response> {
+  const userId = await findUserIdByEmail(admin, sellerEmail)
+  if (!userId) {
+    console.error("[seller-invite] login exists but could not be found for", sellerEmail)
+    return json({ error: "This email already has a login, but it could not be found. Please try again." }, 500)
+  }
+
+  const { data: existing } = await admin
+    .from("user_profiles")
+    .select("role, seller_id")
+    .eq("id", userId)
+    .maybeSingle()
+  const prof = existing as { role: string | null; seller_id: string | null } | null
+
+  if (prof?.role === "owner") {
+    return json({ error: "This email is the owner's own login. Please use a different email for the seller." }, 400)
+  }
+
+  if (prof?.seller_id && prof.seller_id !== sellerId) {
+    const { data: other } = await admin.from("sellers").select("name").eq("id", prof.seller_id).maybeSingle()
+    if (other) {
+      const name = (other as { name: string | null }).name ?? "another seller"
+      return json({ error: `This email is already the login for ${name}. Please use a different email.` }, 409)
+    }
+  }
+
+  const { error: upsertErr } = await admin
+    .from("user_profiles")
+    .upsert({ id: userId, role: "seller", seller_id: sellerId }, { onConflict: "id" })
+  if (upsertErr) {
+    console.error("[seller-invite] relink failed for", userId, ":", upsertErr.message)
+    return json({ error: `Could not reconnect the login: ${upsertErr.message}` }, 500)
+  }
+
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "recovery",
+    email: sellerEmail,
+    options: { redirectTo },
+  })
+  const actionLink = link?.properties?.action_link
+  if (linkErr || !actionLink) {
+    console.error("[seller-invite] recovery link failed for", sellerEmail, ":", linkErr?.message)
+    return json({ error: "Login reconnected, but the set-password link could not be created." }, 500)
+  }
+
+  const resendApiKey = Deno.env.get("RESEND_API_KEY")
+  if (!resendApiKey) {
+    console.error("[seller-invite] RESEND_API_KEY not set — set-password email not sent")
+    return json({ error: "Login reconnected, but the email could not be sent (email not configured)." }, 500)
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "GemWorkers <orders@gemworkers.com>",
+      to: [sellerEmail],
+      subject: "Set your GemWorkers seller password",
+      html:
+        `<p style="font-family:Arial,sans-serif;font-size:15px">Your GemWorkers seller account is ready.</p>` +
+        `<p style="font-family:Arial,sans-serif;font-size:15px">Click the button to choose your password, then log in at sell.gemworkers.com.</p>` +
+        `<p><a href="${actionLink}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;font-family:Arial,sans-serif;font-size:14px;text-decoration:none;border-radius:6px">Set my password</a></p>` +
+        `<p style="font-family:Arial,sans-serif;font-size:12px;color:#6b7280">If you didn't expect this email, you can ignore it.</p>`,
+      text: `Your GemWorkers seller account is ready.\n\nChoose your password here, then log in at sell.gemworkers.com:\n${actionLink}\n`,
+    }),
+  })
+  if (!res.ok) {
+    console.error("[seller-invite] Resend returned", res.status, "for", sellerEmail, "—", await res.text())
+    return json({ error: "Login reconnected, but the email could not be sent. Please try again." }, 502)
+  }
+
+  console.log("[seller-invite] relinked existing login", userId, "to seller", sellerId, "and emailed a set-password link")
+  return json({
+    ok: true,
+    relinked: true,
+    message: `This email already had a login. It is now connected to this seller and a set-password link was emailed to ${sellerEmail}.`,
+  })
+}
 
 // ── Handler ────────────────────────────────────────────────────────────────────
 
@@ -134,8 +241,9 @@ Deno.serve(async (req: Request) => {
       msg.includes("already been invited") ||
       msg.includes("user already exists")
     ) {
-      console.log("[seller-invite] seller already invited:", sellerEmail)
-      return json({ ok: true, alreadyInvited: true, message: "This seller was already invited." })
+      // The login exists (e.g. the seller was deleted and added again):
+      // reconnect it to this seller and email a set-password link.
+      return relinkExistingLogin(admin, seller_id, sellerEmail, redirectTo)
     }
     console.error("[seller-invite] inviteUserByEmail failed for", sellerEmail, ":", inviteErr.message)
     return json({ error: inviteErr.message }, 400)
