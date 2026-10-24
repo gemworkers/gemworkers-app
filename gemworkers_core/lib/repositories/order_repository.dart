@@ -98,7 +98,7 @@ class OrderRepository {
   Future<Order> getOrderDetail(String id) async {
     final response = await supabase
         .from('orders')
-        .select('*, customers(name), sellers(name), order_items(*, inventory_items(sku, title))')
+        .select('*, customers(name), sellers(name), consignors(name), order_items(*, inventory_items(sku, title))')
         .eq('id', id)
         .single();
     return Order.fromMap(response);

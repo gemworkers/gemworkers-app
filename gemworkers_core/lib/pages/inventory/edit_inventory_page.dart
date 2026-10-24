@@ -13,6 +13,9 @@ import 'widgets/gem_and_variety_fields.dart';
 import 'widgets/item_photo_manager.dart';
 import 'widgets/item_video_picker.dart';
 import 'widgets/maker_picker.dart';
+import '../../models/consignor.dart';
+import '../../repositories/consignor_repository.dart';
+import '../../core/services/seller_service.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
 
@@ -108,6 +111,18 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   // Maker credit — owner only; saved separately via setItemMaker.
   String? _makerId;
 
+  // Who owns this stone (consignment) — owner only, My Shop stones only;
+  // saved separately via ConsignorRepository.setItemConsignment.
+  final _consignorRepo = ConsignorRepository();
+  List<Consignor> _owners = [];
+  String? _consignorId;
+  late final TextEditingController _consignorPrice;
+  late final TextEditingController _profitShare;
+
+  bool get _canSetOwner =>
+      UserProfileService.instance.isOwner &&
+      (widget.item.sellerId == null || widget.item.sellerId == kCurrentSellerId);
+
   // ── Location ──────────────────────────────────────────────────────────────
 
   String? _locationId;
@@ -173,11 +188,20 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         TextEditingController(text: i.totalWeightGrams?.toString() ?? '');
     _supplierId = i.supplierId;
     _makerId = i.makerId;
+    _consignorId = i.consignorId;
+    _consignorPrice = TextEditingController(text: i.consignorPrice?.toString() ?? '');
+    _profitShare = TextEditingController(
+        text: i.profitShare == null ? '50' : (i.profitShare! * 100).toStringAsFixed(0));
     _locationId = i.locationId;
     _originalLocationId = i.locationId;
     _photos = i.imageUrls.map(PhotoItem.existing).toList();
     _video = VideoChoice(currentUrl: i.videoUrl);
     _loadSuppliers();
+    if (_canSetOwner) {
+      _consignorRepo.getAll().then((o) {
+        if (mounted) setState(() => _owners = o);
+      }, onError: (Object e) => debugPrint('Owners not loaded: $e'));
+    }
   }
 
   @override
@@ -190,7 +214,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
       _description, _certificationLab, _certificationNumber, _treatment,
       _lengthCtrl, _widthCtrl, _heightCtrl, _clarity, _species, _locality, _matrix,
       _weightGrams, _jewelryType, _metal, _metalPurity, _sizeOrLength,
-      _gemstonesUsed, _totalWeightGrams,
+      _gemstonesUsed, _totalWeightGrams, _consignorPrice, _profitShare,
     ]) {
       c.dispose();
     }
@@ -388,6 +412,27 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         totalWeightGramsUnit: isJewelry ? _totalWeightGramsUnit : widget.item.totalWeightGramsUnit,
       );
 
+      // Owner terms first, with the new price in the same update (the DB
+      // refuses a price below the owner's price).
+      if (_canSetOwner) {
+        final price = _consignorId == null ? null : parseDecimalInput(_consignorPrice.text);
+        final share = _consignorId == null ? null : (parseDecimalInput(_profitShare.text) ?? 50).clamp(0, 100) / 100;
+        if (_consignorId != null && price == null) {
+          throw Exception("Enter the owner's price for this stone.");
+        }
+        if (_consignorId != widget.item.consignorId ||
+            price != widget.item.consignorPrice ||
+            share != widget.item.profitShare) {
+          await _consignorRepo.setItemConsignment(
+            widget.item.id!,
+            consignorId: _consignorId,
+            consignorPrice: price,
+            profitShare: share?.toDouble(),
+            sellingPrice: updated.sellingPrice,
+          );
+        }
+      }
+
       await _repository.updateItem(widget.item.id!, updated);
 
       // Replaced or removed an uploaded video: delete the old file (best effort).
@@ -435,6 +480,70 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   }
 
   // ── Supplier picker ───────────────────────────────────────────────────────
+
+  /// Mine (GemWorkers' own) or held for someone else: owner, their price and
+  /// their share of the profit (sql/consignment_setup.sql).
+  Widget _buildOwnerSection() {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String?>(
+            initialValue: _owners.any((o) => o.id == _consignorId) ? _consignorId : null,
+            decoration: const InputDecoration(labelText: 'Owner'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text("Mine — GemWorkers' own stone")),
+              for (final o in _owners.where((o) => o.active || o.id == _consignorId))
+                DropdownMenuItem(value: o.id, child: Text(o.name)),
+            ],
+            onChanged: _saving
+                ? null
+                : (v) => setState(() {
+                      _consignorId = v;
+                      final o = _owners.where((x) => x.id == v).firstOrNull;
+                      if (o != null && widget.item.consignorId != v) {
+                        _profitShare.text = (o.defaultShare * 100).toStringAsFixed(0);
+                      }
+                    }),
+          ),
+          if (_consignorId != null) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _consignorPrice,
+                  enabled: !_saving,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: "Owner's price € *"),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _profitShare,
+                  enabled: !_saving,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Their share of profit %'),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              "They get their price + their share of what's left after postage and the Stripe fee. "
+              "Offers below their price can't be accepted.",
+              style: textTheme.bodySmall,
+            ),
+          ] else if (_owners.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text("Holding someone else's stone? Add them first under Owners.", style: textTheme.bodySmall),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSupplierPicker() {
     if (_loadingSuppliers) {
@@ -657,6 +766,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
               onChanged: (v) => setState(() => _makerId = v),
               enabled: !_saving,
             ),
+          ],
+
+          if (_canSetOwner) ...[
+            const FormSection('Who owns this stone?'),
+            _buildOwnerSection(),
           ],
 
           const FormSection('Supplier'),

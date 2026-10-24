@@ -1,3 +1,5 @@
+import '../core/utils/commission.dart';
+
 class _Omitted {
   const _Omitted();
 }
@@ -40,6 +42,13 @@ class InventoryItem {
   // Maker credit (owner-only). Read here but NOT in toMap(): it is set only
   // via InventoryRepository.setItemMaker, so no other save can clear it.
   final String? makerId;
+
+  // Consignment (owner-only, sql/consignment_setup.sql): whose stone this is
+  // when it is not GemWorkers' own. Read here but NOT in toMap() — set only via
+  // InventoryRepository.setItemConsignment.
+  final String? consignorId;
+  final double? consignorPrice;
+  final double? profitShare;
 
   // Supplier link — supplierId stored in DB; supplierName is join-derived (not in toMap).
   final String? supplierId;
@@ -131,6 +140,9 @@ class InventoryItem {
     required this.notes,
     required this.imageUrls,
     this.makerId,
+    this.consignorId,
+    this.consignorPrice,
+    this.profitShare,
     this.supplierId,
     this.supplierName = '',
     this.sellerId,
@@ -209,6 +221,9 @@ class InventoryItem {
       notes: map['notes'] ?? '',
       imageUrls: parseUrls(map['image_urls']),
       makerId: map['maker_id']?.toString(),
+      consignorId: map['consignor_id']?.toString(),
+      consignorPrice: parseNumeric(map['consignor_price']),
+      profitShare: parseNumeric(map['profit_share']),
       supplierId: map['supplier_id']?.toString(),
       supplierName:
           (map['suppliers'] as Map<String, dynamic>?)?['name']?.toString() ??
@@ -423,6 +438,9 @@ class InventoryItem {
       notes: notes ?? this.notes,
       imageUrls: imageUrls ?? this.imageUrls,
       makerId: makerId,
+      consignorId: consignorId,
+      consignorPrice: consignorPrice,
+      profitShare: profitShare,
       listingReviewNote: listingReviewNote,
       supplierId:
           identical(supplierId, _omitted) ? this.supplierId : supplierId as String?,

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/services/user_profile_service.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
+import '../../core/utils/decimal_input.dart';
+import '../../repositories/consignor_repository.dart';
 import 'add_edit_order_page.dart';
 import 'mark_shipped_dialog.dart';
 import 'order_status.dart';
@@ -346,17 +348,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 ),
               ],
             ),
-            if (order.saleChannel == 'platform' &&
-                order.commissionAmount > 0) ...[
-              const Divider(height: 16),
-              _moneyRow(
-                'Platform fee (${_pct(order.commissionRate)})',
-                order.commissionAmount,
-                prefix: '−',
-              ),
-              _moneyRow('Seller payout', order.sellerPayout, bold: true),
-              _row('Payout', _payoutStatusLabel(order)),
-            ],
+            if (order.saleChannel == 'platform') ..._payoutRows(order),
           ],
         ),
       ),
@@ -684,6 +676,105 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         '${local.year}  '
         '${local.hour.toString().padLeft(2, '0')}:'
         '${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// Payout breakdown per kind (sql/consignment_setup.sql).
+  List<Widget> _payoutRows(Order order) {
+    final fee = order.stripeFee ?? 0;
+    final isOwner = UserProfileService.instance.isOwner;
+    switch (order.payoutKind) {
+      case 'consignment':
+        final goods = order.orderTotal - (order.shippingCost ?? 0);
+        final extra = ((order.postagePaid ?? 0) - (order.shippingCost ?? 0)).clamp(0, double.infinity).toDouble();
+        final profit = goods - (order.consignorPrice ?? 0) - extra - fee;
+        return [
+          const Divider(height: 16),
+          _row('Owner', order.consignorName ?? '—'),
+          _moneyRow('Stone price', goods),
+          _moneyRow("Owner's price", order.consignorPrice ?? 0, prefix: '−'),
+          if (extra > 0) _moneyRow('Postage (beyond shipping paid)', extra, prefix: '−'),
+          _moneyRow('Stripe fee', fee, prefix: '−'),
+          _moneyRow('Profit', profit),
+          const Divider(height: 12),
+          _moneyRow('Owner receives (price + ${_pct(order.profitShare ?? 0.5)} of profit)', order.sellerPayout, bold: true),
+          _moneyRow('GemWorkers keeps', order.commissionAmount, bold: true),
+          _row('Payout', _payoutStatusLabel(order)),
+          if (isOwner && order.payoutStatus != 'paid' && order.status != 'refunded')
+            _postageButton(order),
+        ];
+      case 'commission':
+        return [
+          const Divider(height: 16),
+          if (order.commissionAmount > 0)
+            _moneyRow('Platform fee (${_pct(order.commissionRate)})', order.commissionAmount, prefix: '−'),
+          if (fee > 0) _moneyRow('Stripe fee', fee, prefix: '−'),
+          _moneyRow('Seller payout', order.sellerPayout, bold: true),
+          _row('Payout', _payoutStatusLabel(order)),
+        ];
+      case 'own':
+        return [
+          const Divider(height: 16),
+          _row('Stone', "GemWorkers' own — no payout"),
+          if (fee > 0) _moneyRow('Stripe fee (your cost)', fee),
+        ];
+      default:
+        return [
+          if (order.commissionAmount > 0) ...[
+            const Divider(height: 16),
+            _moneyRow('Platform fee (${_pct(order.commissionRate)})', order.commissionAmount, prefix: '−'),
+            _moneyRow('Seller payout', order.sellerPayout, bold: true),
+            _row('Payout', _payoutStatusLabel(order)),
+          ],
+        ];
+    }
+  }
+
+  Widget _postageButton(Order order) => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          icon: const Icon(Icons.local_post_office_outlined, size: 18),
+          label: Text(order.postagePaid == null
+              ? 'Postage I paid'
+              : 'Postage paid: €${order.postagePaid!.toStringAsFixed(2)} — change'),
+          onPressed: () => _editPostage(order),
+        ),
+      );
+
+  Future<void> _editPostage(Order order) async {
+    final c = TextEditingController(text: order.postagePaid?.toString() ?? '');
+    final text = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Postage I paid'),
+        content: SizedBox(
+          width: 380,
+          child: TextField(
+            controller: c,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Postage €',
+              helperText: 'Anything above the shipping the buyer paid comes off the profit before the split.',
+              helperMaxLines: 3,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, c.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (text == null) return;
+    try {
+      await ConsignorRepository().setPostagePaid(order.id!, text.trim().isEmpty ? null : parseDecimalInput(text));
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+      }
+    }
   }
 
   Widget _row(String label, String value) {

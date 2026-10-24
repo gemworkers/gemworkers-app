@@ -382,6 +382,38 @@ async function issueInvoices(admin: AdminClient, orderIds: string[]): Promise<vo
   }
 }
 
+// Saves Stripe's real processing fee on the paid orders (orders.stripe_fee;
+// sql/consignment_setup.sql deducts it from the seller / owner payout). A cart
+// is one payment, so its fee is shared by order amount (cents, the last order
+// takes the rounding). Never throws; a missing fee only means no deduction.
+async function recordStripeFee(admin: AdminClient, session: Stripe.Checkout.Session, orderIds: string[]): Promise<void> {
+  try {
+    const pi = paymentIntentId(session)
+    if (!pi || orderIds.length === 0) return
+    const intent = await stripe.paymentIntents.retrieve(pi, { expand: ['latest_charge.balance_transaction'] })
+    const charge = intent.latest_charge
+    const bt = charge && typeof charge !== 'string' ? charge.balance_transaction : null
+    if (!bt || typeof bt === 'string' || bt.currency !== 'eur') {
+      console.error('[webhook] stripe fee not available for', pi)
+      return
+    }
+    const { data } = await admin.from('orders').select('id, order_total, tax_amount').in('id', orderIds)
+    const rows = ((data as { id: string; order_total: string | number; tax_amount: string | number | null }[] | null) ?? [])
+      .map(o => ({ id: o.id, cents: Math.round(paidTotal(o.order_total, o.tax_amount) * 100) }))
+    const totalCents = rows.reduce((s, r) => s + r.cents, 0)
+    if (totalCents <= 0) return
+    let left = bt.fee
+    for (const [i, r] of rows.entries()) {
+      const share = i === rows.length - 1 ? left : Math.round(bt.fee * r.cents / totalCents)
+      left -= share
+      const { error } = await admin.from('orders').update({ stripe_fee: share / 100 }).eq('id', r.id)
+      if (error) console.error('[webhook] stripe fee save failed for order', r.id, ':', error.message)
+    }
+  } catch (e) {
+    console.error('[webhook] stripe fee lookup threw:', e instanceof Error ? e.message : String(e))
+  }
+}
+
 // Order number / title / total for the refund emails.
 async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<RefundedOrderLine[]> {
   const { data: ordersData } = await admin
@@ -653,6 +685,7 @@ export async function POST(req: NextRequest) {
       // Invoices (sql/invoices_setup.sql) — after the address is saved so it's
       // on the invoice. Best-effort; issue_missing_invoices catches up.
       await issueInvoices(supabase, paidIds)
+      await recordStripeFee(supabase, session, paidIds)
 
       // Send new-order notification emails — best-effort, never fails the webhook.
       try {
@@ -737,6 +770,7 @@ export async function POST(req: NextRequest) {
 
       // Invoice (after the address is saved). Best-effort; the cron catches up.
       await issueInvoices(supabase, [orderId])
+      await recordStripeFee(supabase, session, [orderId])
 
       // Send new-order notification email — best-effort, never fails the webhook.
       try {

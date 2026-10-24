@@ -120,6 +120,24 @@ class Order {
 
   // ── Payout tracking ───────────────────────────────────────────────────────
 
+  // ── Payout rule (sql/consignment_setup.sql) ──────────────────────────────
+
+  /// 'own' (GemWorkers' own stone) | 'commission' (a seller's stone) |
+  /// 'consignment' (held for an owner) | null (manual / old orders).
+  final String? payoutKind;
+
+  /// Stripe's processing fee for this order (deducted from the payout).
+  final double? stripeFee;
+
+  /// Postage actually paid (consignment: extra beyond the buyer's shipping is
+  /// deducted from the profit before the split).
+  final double? postagePaid;
+
+  /// Consignment snapshot: owner's price, their profit share, their name.
+  final double? consignorPrice;
+  final double? profitShare;
+  final String? consignorName;
+
   /// 'unpaid' | 'paid' | null (legacy / manual orders).
   final String? payoutStatus;
 
@@ -190,6 +208,12 @@ class Order {
     this.shippingPostalCode,
     this.shippingCountry,
     this.shippingPhone,
+    this.payoutKind,
+    this.stripeFee,
+    this.postagePaid,
+    this.consignorPrice,
+    this.profitShare,
+    this.consignorName,
     this.payoutStatus,
     this.payoutPaidAt,
     this.payoutMethod,
@@ -253,6 +277,12 @@ class Order {
       shippingPostalCode: map['shipping_postal_code']?.toString(),
       shippingCountry:    map['shipping_country']?.toString(),
       shippingPhone:      map['shipping_phone']?.toString(),
+      payoutKind:      map['payout_kind']?.toString(),
+      stripeFee:       parseNumeric(map['stripe_fee']),
+      postagePaid:     parseNumeric(map['postage_paid']),
+      consignorPrice:  parseNumeric(map['consignor_price']),
+      profitShare:     parseNumeric(map['profit_share']),
+      consignorName:   (map['consignors'] as Map<String, dynamic>?)?['name']?.toString(),
       payoutStatus:    map['payout_status']?.toString(),
       payoutPaidAt:    map['payout_paid_at'] != null
           ? DateTime.parse(map['payout_paid_at'])
@@ -385,6 +415,12 @@ class Order {
           ? this.payoutMethod : payoutMethod as String?,
       payoutReference: identical(payoutReference, _omitted)
           ? this.payoutReference : payoutReference as String?,
+      payoutKind: payoutKind,
+      stripeFee: stripeFee,
+      postagePaid: postagePaid,
+      consignorPrice: consignorPrice,
+      profitShare: profitShare,
+      consignorName: consignorName,
       offerId: offerId,
       paidAt: paidAt,
       paymentDueAt: paymentDueAt,

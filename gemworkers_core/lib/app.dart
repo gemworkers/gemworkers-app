@@ -14,6 +14,7 @@ import 'pages/inventory/inventory_page.dart';
 import 'pages/makers/makers_page.dart';
 import 'pages/reviews/reviews_page.dart';
 import 'pages/returns/returns_page.dart';
+import 'pages/owners/owners_page.dart';
 import 'repositories/return_repository.dart';
 import 'pages/taxes/taxes_page.dart';
 import 'pages/messages/messages_page.dart';
@@ -222,6 +223,7 @@ class _MainLayoutState extends State<MainLayout> {
         const PurchasesPage(),
         const SuppliersPage(),
         if (_isOwner) const SellersPage(),
+        if (_isOwner) const OwnersPage(),
         if (_isOwner) const MakersPage(),
         if (_isOwner) ReviewsPage(onPendingChanged: _loadReviewsCount),
         if (_isOwner) ReturnsPage(onOpenChanged: _loadReturnsCount),
@@ -279,6 +281,12 @@ class _MainLayoutState extends State<MainLayout> {
             icon: Icons.store_outlined,
             selectedIcon: Icons.store,
             label: 'Sellers',
+          ),
+        if (_isOwner)
+          const ShopNavItem(
+            icon: Icons.handshake_outlined,
+            selectedIcon: Icons.handshake,
+            label: 'Owners',
           ),
         if (_isOwner)
           const ShopNavItem(
