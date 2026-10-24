@@ -126,6 +126,12 @@ class Order {
   /// 'consignment' (held for an owner) | null (manual / old orders).
   final String? payoutKind;
 
+  /// VAT collected at checkout (sql/order_tax.sql); the buyer paid
+  /// orderTotal + taxAmount. Not part of any payout.
+  final double taxAmount;
+  final double? taxRate;
+  final String? taxScheme;
+
   /// Stripe's processing fee for this order (deducted from the payout).
   final double? stripeFee;
 
@@ -208,6 +214,9 @@ class Order {
     this.shippingPostalCode,
     this.shippingCountry,
     this.shippingPhone,
+    this.taxAmount = 0,
+    this.taxRate,
+    this.taxScheme,
     this.payoutKind,
     this.stripeFee,
     this.postagePaid,
@@ -277,6 +286,9 @@ class Order {
       shippingPostalCode: map['shipping_postal_code']?.toString(),
       shippingCountry:    map['shipping_country']?.toString(),
       shippingPhone:      map['shipping_phone']?.toString(),
+      taxAmount:       parseNumeric(map['tax_amount']) ?? 0,
+      taxRate:         parseNumeric(map['tax_rate']),
+      taxScheme:       map['tax_scheme']?.toString(),
       payoutKind:      map['payout_kind']?.toString(),
       stripeFee:       parseNumeric(map['stripe_fee']),
       postagePaid:     parseNumeric(map['postage_paid']),
@@ -415,6 +427,9 @@ class Order {
           ? this.payoutMethod : payoutMethod as String?,
       payoutReference: identical(payoutReference, _omitted)
           ? this.payoutReference : payoutReference as String?,
+      taxAmount: taxAmount,
+      taxRate: taxRate,
+      taxScheme: taxScheme,
       payoutKind: payoutKind,
       stripeFee: stripeFee,
       postagePaid: postagePaid,

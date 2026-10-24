@@ -333,15 +333,24 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 _moneyRow('Shipping', order.shippingCost!),
               const SizedBox(height: 4),
             ],
+            if (order.saleChannel == 'platform' && order.taxAmount > 0) ...[
+              _moneyRow('Subtotal (excl. VAT)', order.orderTotal),
+              _moneyRow(
+                'VAT${order.taxRate != null ? ' ${_pct(order.taxRate!)}' : ''} — goes to the tax office',
+                order.taxAmount,
+              ),
+            ],
+            if (order.saleChannel == 'platform' && order.taxScheme == 'reverse_charge')
+              _row('VAT', 'Reverse charged (EU business, 0%)'),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total',
+                Text(order.saleChannel == 'platform' && order.taxAmount > 0 ? 'Buyer paid' : 'Total',
                     style: TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 16)),
                 Text(
                   order.saleChannel == 'platform'
-                      ? '€${order.orderTotal.toStringAsFixed(2)}'
+                      ? '€${(((order.orderTotal * 100).round() + (order.taxAmount * 100).round()) / 100).toStringAsFixed(2)}'
                       : '€${order.total.toStringAsFixed(2)}',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 18),
