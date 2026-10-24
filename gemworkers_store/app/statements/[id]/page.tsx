@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatEurExact } from '@/lib/money'
 import { PrintButton } from '@/app/invoices/[id]/PrintButton'
@@ -33,7 +33,18 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
     .eq('id', id)
     .maybeSingle()
   const p = data as PayoutRow | null
-  if (!p) notFound()
+  if (!p) {
+    // Not found, or not this login's document (RLS): say so instead of a bare 404.
+    return (
+      <main className="pd-wrap" style={{ paddingTop: 48, paddingBottom: 96, maxWidth: 640 }}>
+        <h1 className="font-serif" style={{ fontSize: 30, fontWeight: 400 }}>This statement isn&apos;t available</h1>
+        <p style={{ color: '#5A5045', lineHeight: 1.6 }}>
+          It can only be seen by GemWorkers and the person it was paid to. You&apos;re logged in as <strong>{user.email}</strong> —
+          log out and log in with the right account.
+        </p>
+      </main>
+    )
+  }
 
   const d = p.data
   const muted = { color: '#6B6052', fontSize: 13 } as const

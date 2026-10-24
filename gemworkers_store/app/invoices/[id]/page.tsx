@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatEurExact } from '@/lib/money'
 import { ratePercent } from '@/lib/tax'
@@ -50,7 +50,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   let { data } = await supabase.from('buyer_invoices').select(cols).eq('id', id).maybeSingle()
   if (!data) ({ data } = await supabase.from('invoices').select(cols).eq('id', id).maybeSingle())
   const inv = data as InvoiceRow | null
-  if (!inv) notFound()
+  if (!inv) {
+    // Not found, or not this login's document (RLS): say so instead of a bare 404.
+    return (
+      <main className="pd-wrap" style={{ paddingTop: 48, paddingBottom: 96, maxWidth: 640 }}>
+        <h1 className="font-serif" style={{ fontSize: 30, fontWeight: 400 }}>This invoice isn&apos;t available</h1>
+        <p style={{ color: '#5A5045', lineHeight: 1.6 }}>
+          It can only be seen by the buyer and GemWorkers. You&apos;re logged in as <strong>{user.email}</strong> —
+          log out and log in with the right account.
+        </p>
+      </main>
+    )
+  }
 
   const d = inv.data
   const credit = inv.kind === 'credit_note'
