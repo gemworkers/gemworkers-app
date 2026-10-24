@@ -77,7 +77,8 @@ class _TaxReportTabState extends State<TaxReportTab> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final years = [for (var y = DateTime.now().year; y >= 2026; y--) y];
+    // This year + next (to look ahead) back to the first year of sales.
+    final years = [for (var y = DateTime.now().year + 1; y >= 2026; y--) y];
 
     return ListView(
       padding: const EdgeInsets.all(16),
