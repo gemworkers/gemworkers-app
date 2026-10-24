@@ -9,7 +9,7 @@ import { formatEur } from '@/lib/money'
 export type BuyerReturn = {
   id: string
   order_id: string
-  status: 'requested' | 'approved' | 'received' | 'refunded' | 'rejected' | 'withdrawn'
+  status: 'requested' | 'approved' | 'received' | 'refunded' | 'rejected' | 'withdrawn' | 'expired'
   faulty: boolean
   return_address: string | null
   return_tracking: string | null
@@ -105,6 +105,15 @@ export function ReturnPanel({ orderId, ret, eligible }: { orderId: string; ret: 
   const rejected = status === 'rejected' && (
     <p style={{ ...muted, marginTop: 12 }}>Return declined{ret!.decision_note ? `: ${ret!.decision_note}` : '.'}</p>
   )
+
+  if (status === 'expired') {
+    return (
+      <p style={{ ...muted, marginTop: 12 }}>
+        Return closed — the stone wasn&apos;t sent back within 30 days. Already sent it? Email{' '}
+        <a href="mailto:hello@gemworkers.com">hello@gemworkers.com</a> with the tracking number.
+      </p>
+    )
+  }
 
   if (!eligible || status === 'rejected') return rejected || null
 

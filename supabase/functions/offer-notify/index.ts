@@ -837,6 +837,8 @@ async function handleListingEvent(payload: ListingEventPayload): Promise<Respons
 //   approved  → buyer (return address + packing / customs steps)
 //   rejected  → buyer (with the owner's reason)
 //   refunded  → buyer (amount refunded)
+//   expired   → buyer (closed: not sent back within 30 days)
+//   reminder  → buyer (sweep_quiet_returns, 10 days without tracking)
 // Buyer emails name the stone only — never the seller.
 
 interface ReturnEventPayload {
@@ -915,6 +917,47 @@ function buyerReturnRejectedEmail(title: string, orderNumber: string, note: stri
   }
 }
 
+function buyerReturnReminderEmail(title: string, orderNumber: string, address: string): Email {
+  const subject = `Reminder: please send back ${title}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Your return of ${strong(title)} (order ${esc(orderNumber)}) was approved, but we haven't received a tracking number yet.`,
+        "Please send the stone to:",
+        esc(address).replace(/\n/g, "<br>"),
+        "Then add the tracking number in My orders. Returns without tracking close after 30 days.",
+      ],
+      ORDERS_URL,
+      "Open My orders",
+    ),
+    text:
+      `Your return of ${title} (order ${orderNumber}) was approved, but we haven't received a tracking number yet.\n\n` +
+      `Please send the stone to:\n\n${address}\n\n` +
+      `Then add the tracking number in My orders. Returns without tracking close after 30 days.\n${ORDERS_URL}\n`,
+  }
+}
+
+function buyerReturnExpiredEmail(title: string, orderNumber: string): Email {
+  const subject = `Return closed: ${title}`
+  return {
+    subject,
+    html: buildHtml(
+      subject,
+      [
+        `Your return of ${strong(title)} (order ${esc(orderNumber)}) has been closed because the stone wasn't sent back within 30 days.`,
+        "Already sent it? Just reply to hello@gemworkers.com with the tracking number and we'll take care of it.",
+      ],
+      ORDERS_URL,
+      "Open My orders",
+    ),
+    text:
+      `Your return of ${title} (order ${orderNumber}) has been closed because the stone wasn't sent back within 30 days.\n` +
+      `Already sent it? Email hello@gemworkers.com with the tracking number.\n${ORDERS_URL}\n`,
+  }
+}
+
 function buyerReturnRefundedEmail(title: string, orderNumber: string, amount: string, deductionReason: string): Email {
   const subject = `Refund sent: ${title}`
   return {
@@ -938,7 +981,7 @@ function buyerReturnRefundedEmail(title: string, orderNumber: string, amount: st
 
 async function handleReturnEvent(payload: ReturnEventPayload): Promise<Response> {
   const event = payload.event
-  if (!payload.return_id || !["requested", "approved", "rejected", "refunded"].includes(event)) {
+  if (!payload.return_id || !["requested", "approved", "rejected", "refunded", "expired", "reminder"].includes(event)) {
     return json({ skipped: true, reason: "malformed return event" })
   }
 
@@ -968,7 +1011,8 @@ async function handleReturnEvent(payload: ReturnEventPayload): Promise<Response>
     return json({ skipped: true, reason: "return not found" })
   }
   // A late delivery after another change: only send for the current status.
-  if (ret.status !== event) return json({ skipped: true, reason: "status changed" })
+  // (A reminder is sent while the return is still 'approved'.)
+  if (ret.status !== (event === "reminder" ? "approved" : event)) return json({ skipped: true, reason: "status changed" })
 
   const { data: ordData } = await supabase
     .from("orders").select("order_number, order_email").eq("id", ret.order_id).maybeSingle()
@@ -994,6 +1038,8 @@ async function handleReturnEvent(payload: ReturnEventPayload): Promise<Response>
     email =
       event === "approved" ? buyerReturnApprovedEmail(title, orderNumber, ret.return_address ?? "", ret.faulty, ret.decision_note?.trim() ?? "")
       : event === "rejected" ? buyerReturnRejectedEmail(title, orderNumber, ret.decision_note?.trim() ?? "")
+      : event === "reminder" ? buyerReturnReminderEmail(title, orderNumber, ret.return_address ?? "")
+      : event === "expired"  ? buyerReturnExpiredEmail(title, orderNumber)
       : buyerReturnRefundedEmail(title, orderNumber, eur(Number(ret.refund_amount ?? 0)), ret.deduction_reason?.trim() ?? "")
   }
 

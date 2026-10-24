@@ -4,7 +4,7 @@ import '../core/utils/commission.dart';
 class ReturnRequest {
   final String id;
   final String orderId;
-  final String status; // requested | approved | received | refunded | rejected | withdrawn
+  final String status; // requested | approved | received | refunded | rejected | withdrawn | expired
   final String reason;
   final bool faulty;
   final DateTime requestedAt;

@@ -12,7 +12,7 @@ enum _ReturnsTab {
   requested('New', ['requested'], 'No new return requests.'),
   approved('On the way', ['approved'], 'No returns on the way back.'),
   received('To refund', ['received'], 'Nothing waiting for a refund.'),
-  closed('Closed', ['refunded', 'rejected', 'withdrawn'], 'No closed returns yet.');
+  closed('Closed', ['refunded', 'rejected', 'withdrawn', 'expired'], 'No closed returns yet.');
 
   final String label;
   final List<String> statuses;

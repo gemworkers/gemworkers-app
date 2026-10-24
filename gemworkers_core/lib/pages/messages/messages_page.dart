@@ -1168,6 +1168,15 @@ class _OfferCard extends StatelessWidget {
     'counter_accepted': 'Buyer accepted the counter-offer',
     'counter_declined': 'Buyer declined the counter-offer',
     'counter_expired':  'Counter-offer expired',
+    // Returns (sql/returns_cards_sweep.sql): the body line is shown below.
+    'return_requested': 'Return requested',
+    'return_approved':  'Return approved',
+    'return_rejected':  'Return declined',
+    'return_received':  'Return received',
+    'return_refunded':  'Refunded',
+    'return_withdrawn': 'Buyer cancelled the return',
+    'return_reminder':  'Return reminder sent',
+    'return_expired':   'Return closed (not sent back)',
   };
 
   @override
@@ -1175,7 +1184,7 @@ class _OfferCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final title = _titles[message.kind];
     final amount = message.offerAmount;
-    final accepted = const {'offer_accepted', 'counter_accepted'}
+    final accepted = const {'offer_accepted', 'counter_accepted', 'return_refunded'}
         .contains(message.kind);
     final closed = const {
       'offer_declined', 'offer_expired', 'offer_withdrawn',
@@ -1219,6 +1228,14 @@ class _OfferCard extends StatelessWidget {
                       color: closed ? AppColors.muted : AppColors.ink,
                       decoration: closed ? TextDecoration.lineThrough : null,
                     ),
+                  ),
+                ],
+                if (title != null && message.kind.startsWith('return_')) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    message.body,
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall,
                   ),
                 ],
                 const SizedBox(height: 4),

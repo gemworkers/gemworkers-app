@@ -80,6 +80,15 @@ const OFFER_CARD_TEXT: Record<string, {
   counter_accepted: { title: 'You accepted the counter-offer', note: 'Complete your payment in My orders.', ordersLink: true },
   counter_declined: { title: 'You declined the counter-offer' },
   counter_expired:  { title: 'Counter-offer expired' },
+  // Returns (sql/returns_cards_sweep.sql) — the row's body is the detail line.
+  return_requested: { title: 'You requested a return', ordersLink: true },
+  return_approved:  { title: 'Return approved', ordersLink: true },
+  return_rejected:  { title: 'Return declined' },
+  return_received:  { title: 'Return received' },
+  return_refunded:  { title: 'Refunded' },
+  return_withdrawn: { title: 'You cancelled the return' },
+  return_reminder:  { title: 'Reminder: send the stone back', ordersLink: true },
+  return_expired:   { title: 'Return closed' },
 }
 
 export function OfferCard({ message, stoneId }: { message: ThreadMessage; stoneId?: string | null }) {
@@ -91,6 +100,7 @@ export function OfferCard({ message, stoneId }: { message: ThreadMessage; stoneI
       <p className="msg-offer-title">{text?.title ?? message.body}</p>
       {text && amount && <p className="msg-offer-amount">{amount}</p>}
       {text?.note && <p className="msg-offer-note">{text.note}</p>}
+      {text && message.kind.startsWith('return_') && <p className="msg-offer-note">{message.body}</p>}
       {text?.ordersLink && <Link href="/orders" className="pd-link" style={{ fontSize: 14 }}>Go to My orders →</Link>}
       {text?.stoneLink && stoneId && (
         <Link href={`/stones/${stoneId}`} className="pd-link" style={{ fontSize: 14 }}>View counter-offer →</Link>
