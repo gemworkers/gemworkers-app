@@ -832,7 +832,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               Text(
                 order.payoutKind == 'own'
                     ? "Your own stone — the cost is yours."
-                    : "The cost (refund without VAT, plus the Stripe fee on a full refund) is charged to the stone's owner.",
+                    : order.payoutKind == 'consignment'
+                        ? "Partial refund: shared like the profit (owner's share charged to them). Full refund: the owner pays the lost Stripe fee."
+                        : "The cost (refund without VAT, plus the Stripe fee on a full refund) is charged to the seller.",
                 style: Theme.of(ctx).textTheme.bodySmall,
               ),
             ]),
