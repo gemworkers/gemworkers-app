@@ -5,6 +5,7 @@ import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import '../../core/utils/decimal_input.dart';
 import '../../repositories/consignor_repository.dart';
+import '../../repositories/refund_repository.dart';
 import 'add_edit_order_page.dart';
 import 'mark_shipped_dialog.dart';
 import 'order_status.dart';
@@ -22,6 +23,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   Order? _order;
   bool _loading = true;
+  final _refundRepo = RefundRepository();
+  List<OrderMoneyEvent> _refunds = [];
+  List<OrderMoneyEvent> _charges = [];
   bool _actionInProgress = false;
 
   @override
@@ -34,6 +38,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     setState(() => _loading = true);
     try {
       final order = await _repository.getOrderDetail(widget.orderId);
+      if (UserProfileService.instance.isOwner && order.saleChannel == 'platform') {
+        try {
+          final m = await _refundRepo.getForOrder(widget.orderId);
+          _refunds = m.refunds;
+          _charges = m.charges;
+        } catch (e) {
+          debugPrint('Refunds not loaded: $e');
+        }
+      }
       if (mounted) setState(() { _order = order; _loading = false; });
     } catch (e) {
       debugPrint(e.toString());
@@ -358,6 +371,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               ],
             ),
             if (order.saleChannel == 'platform') ..._payoutRows(order),
+            if (order.saleChannel == 'platform' && UserProfileService.instance.isOwner) ..._refundRows(order),
           ],
         ),
       ),
@@ -736,6 +750,115 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           ],
         ];
     }
+  }
+
+  /// Refunds without a return + charges to the stone's owner
+  /// (sql/refund_owner_costs.sql), and the Refund order button.
+  List<Widget> _refundRows(Order order) {
+    final canRefund = order.paidAt != null &&
+        !const {'pending_payment', 'cancelled', 'refunded', 'draft'}.contains(order.status);
+    return [
+      if (_refunds.isNotEmpty) ...[
+        const Divider(height: 16),
+        for (final r in _refunds) _moneyRow('Refunded — ${r.label}', r.amount, prefix: '−'),
+      ],
+      if (_charges.isNotEmpty) ...[
+        const Divider(height: 16),
+        for (final c in _charges)
+          _moneyRow(
+            c.amount >= 0 ? "Charged to the stone's owner — ${c.label}" : "Credited to the stone's owner — ${c.label}",
+            c.amount.abs(),
+          ),
+      ],
+      if (canRefund)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            icon: const Icon(Icons.currency_exchange, size: 18),
+            label: const Text('Refund order (no return)'),
+            onPressed: _actionInProgress ? null : () => _refundOrder(order),
+          ),
+        ),
+    ];
+  }
+
+  Future<void> _refundOrder(Order order) async {
+    double left;
+    try {
+      left = await _refundRepo.refundable(order.id!);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    if (!mounted) return;
+    final amount = TextEditingController(text: left.toStringAsFixed(2));
+    final reason = TextEditingController();
+    var fate = 'lost';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
+        final a = parseDecimalInput(amount.text) ?? 0;
+        final valid = a > 0 && a <= left + 0.0001 && reason.text.trim().isNotEmpty;
+        return AlertDialog(
+          title: const Text('Refund order'),
+          content: SizedBox(
+            width: 440,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Up to €${left.toStringAsFixed(2)} can be refunded (incl. VAT). Is the stone coming back? Use Returns instead.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amount,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setD(() {}),
+                decoration: const InputDecoration(labelText: 'Amount € (less = partial refund)'),
+              ),
+              TextField(
+                controller: reason,
+                maxLength: 500,
+                onChanged: (_) => setD(() {}),
+                decoration: const InputDecoration(labelText: 'Reason (on the credit note) *'),
+              ),
+              DropdownButtonFormField<String>(
+                initialValue: fate,
+                decoration: const InputDecoration(labelText: 'The stone'),
+                items: const [
+                  DropdownMenuItem(value: 'lost', child: Text('Lost in the post')),
+                  DropdownMenuItem(value: 'kept', child: Text('Buyer keeps it')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (v) => setD(() => fate = v ?? fate),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                order.payoutKind == 'own'
+                    ? "Your own stone — the cost is yours."
+                    : "The cost (refund without VAT, plus the Stripe fee on a full refund) is charged to the stone's owner.",
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: valid ? () => Navigator.pop(ctx, true) : null,
+              child: Text('Refund €${a.toStringAsFixed(2)}'),
+            ),
+          ],
+        );
+      }),
+    );
+    final a = parseDecimalInput(amount.text) ?? 0;
+    final why = reason.text.trim();
+    amount.dispose();
+    reason.dispose();
+    if (ok != true) return;
+    await _runAction(() async {
+      final done = await _refundRepo.refundOrder(order.id!, a, why, fate);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Refunded €${done.toStringAsFixed(2)} — credit note created.')));
+      }
+      await _load();
+    });
   }
 
   Widget _postageButton(Order order) => Align(
