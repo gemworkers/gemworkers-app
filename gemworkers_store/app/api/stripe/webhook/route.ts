@@ -414,6 +414,27 @@ async function recordStripeFee(admin: AdminClient, session: Stripe.Checkout.Sess
   }
 }
 
+// The orders behind a disputed payment, each with its share of it (a cart is
+// one payment): [{ order_id, share }]. Found by the saved payment reference,
+// or through the payment's metadata for older orders.
+async function disputeOrders(admin: AdminClient, dispute: Stripe.Dispute): Promise<{ order_id: string; share: number }[]> {
+  const pi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent?.id
+  if (!pi) return []
+  type Row = { id: string; order_total: string | number; tax_amount: string | number | null }
+  let { data } = await admin.from('orders').select('id, order_total, tax_amount').eq('stripe_payment_intent', pi)
+  if (!data || data.length === 0) {
+    const intent = await stripe.paymentIntents.retrieve(pi)
+    const group = intent.metadata?.checkout_group_id
+    const orderId = intent.metadata?.order_id
+    if (group) ({ data } = await admin.from('orders').select('id, order_total, tax_amount').eq('checkout_group_id', group).not('paid_at', 'is', null))
+    else if (orderId) ({ data } = await admin.from('orders').select('id, order_total, tax_amount').eq('id', orderId))
+  }
+  const rows = ((data as Row[] | null) ?? []).map(o => ({ id: o.id, cents: Math.round(paidTotal(o.order_total, o.tax_amount) * 100) }))
+  const total = rows.reduce((s, r) => s + r.cents, 0)
+  if (total <= 0) return []
+  return rows.map(r => ({ order_id: r.id, share: r.cents / total }))
+}
+
 // Order number / title / total for the refund emails.
 async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<RefundedOrderLine[]> {
   const { data: ordersData } = await admin
@@ -813,6 +834,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
+  } else if (event.type === 'charge.dispute.created' || event.type === 'charge.dispute.closed') {
+    // Chargeback (sql/payouts_setup.sql): charged to the stone's seller/owner.
+    const dispute = event.data.object as Stripe.Dispute
+    const orders = await disputeOrders(supabase, dispute)
+    if (orders.length === 0) {
+      console.error('[webhook] dispute', dispute.id, 'has no matching orders')
+      return NextResponse.json({ received: true })
+    }
+    // Stripe books the dispute fee as positive fees; a returned fee as negative.
+    const fees = (dispute.balance_transactions ?? []).map(bt => bt.fee)
+    if (event.type === 'charge.dispute.created') {
+      const fee = fees.filter(f => f > 0).reduce((a, b) => a + b, 0) / 100
+      const { error } = await supabase.rpc('record_dispute_opened', { p_dispute_id: dispute.id, p_orders: orders, p_fee: fee })
+      if (error) {
+        console.error('[webhook] record_dispute_opened failed for', dispute.id, ':', error.message)
+        return NextResponse.json({ error: 'Dispute save failed' }, { status: 500 })
+      }
+    } else if (dispute.status === 'won' || dispute.status === 'lost') {
+      const back = -fees.filter(f => f < 0).reduce((a, b) => a + b, 0) / 100
+      const { error } = await supabase.rpc('record_dispute_closed', {
+        p_dispute_id: dispute.id, p_status: dispute.status, p_fee_back: back, p_orders: orders,
+      })
+      if (error) {
+        console.error('[webhook] record_dispute_closed failed for', dispute.id, ':', error.message)
+        return NextResponse.json({ error: 'Dispute save failed' }, { status: 500 })
+      }
+    }
   }
   // All other event types are silently ignored.
 

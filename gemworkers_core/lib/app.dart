@@ -15,6 +15,7 @@ import 'pages/makers/makers_page.dart';
 import 'pages/reviews/reviews_page.dart';
 import 'pages/returns/returns_page.dart';
 import 'pages/owners/owners_page.dart';
+import 'pages/payouts/payouts_page.dart';
 import 'repositories/return_repository.dart';
 import 'pages/taxes/taxes_page.dart';
 import 'pages/messages/messages_page.dart';
@@ -219,6 +220,7 @@ class _MainLayoutState extends State<MainLayout> {
         OrdersPage(initialStatusFilter: _ordersStatus),
         const OffersPage(),
         MessagesPage(onUnreadChanged: _loadMessagesCount),
+        const PayoutsPage(),
         if (_isOwner) const CustomersPage(),
         const PurchasesPage(),
         const SuppliersPage(),
@@ -259,6 +261,11 @@ class _MainLayoutState extends State<MainLayout> {
           selectedIcon: Icons.chat_bubble,
           label: 'Messages',
           badgeCount: _unreadMessagesCount,
+        ),
+        const ShopNavItem(
+          icon: Icons.payments_outlined,
+          selectedIcon: Icons.payments,
+          label: 'Payouts',
         ),
         if (_isOwner)
           const ShopNavItem(

@@ -545,9 +545,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     // Refunded (returns_setup.sql): no shipping and never a payout.
     if (status == 'cancelled' || status == 'pending_payment' || status == 'refunded') return null;
 
+    // Brothers' and owners' sales are paid under Payouts (charges deducted).
     final showPayoutButton = UserProfileService.instance.isOwner &&
         order.saleChannel == 'platform' &&
-        order.payoutStatus != 'paid';
+        order.payoutStatus != 'paid' &&
+        !const {'commission', 'consignment', 'own'}.contains(order.payoutKind);
 
     // Payout button is available from 'confirmed' onward (not draft/cancelled).
     final showPayout = showPayoutButton &&
