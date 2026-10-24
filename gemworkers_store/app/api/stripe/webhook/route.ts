@@ -369,6 +369,19 @@ async function refundLateOrder(
   return true
 }
 
+// Issues the invoice for each paid order. Never throws — a failure is logged
+// and the 10-minute issue_missing_invoices cron issues it later.
+async function issueInvoices(admin: AdminClient, orderIds: string[]): Promise<void> {
+  for (const id of orderIds) {
+    try {
+      const { error } = await admin.rpc('issue_invoice', { p_order_id: id })
+      if (error) console.error('[webhook] issue_invoice failed for order', id, ':', error.message)
+    } catch (e) {
+      console.error('[webhook] issue_invoice threw for order', id, ':', e instanceof Error ? e.message : String(e))
+    }
+  }
+}
+
 // Order number / title / total for the refund emails.
 async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<RefundedOrderLine[]> {
   const { data: ordersData } = await admin
@@ -637,6 +650,10 @@ export async function POST(req: NextRequest) {
         console.error('[webhook] address update threw for group', groupId, ':', e instanceof Error ? e.message : String(e))
       }
 
+      // Invoices (sql/invoices_setup.sql) — after the address is saved so it's
+      // on the invoice. Best-effort; issue_missing_invoices catches up.
+      await issueInvoices(supabase, paidIds)
+
       // Send new-order notification emails — best-effort, never fails the webhook.
       try {
         await notifyGroupOrders(supabase, groupId, paidIds)
@@ -717,6 +734,9 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error('[webhook] address update threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
       }
+
+      // Invoice (after the address is saved). Best-effort; the cron catches up.
+      await issueInvoices(supabase, [orderId])
 
       // Send new-order notification email — best-effort, never fails the webhook.
       try {

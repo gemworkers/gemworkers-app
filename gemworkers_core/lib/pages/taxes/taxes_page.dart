@@ -6,6 +6,8 @@ import '../../core/utils/money.dart';
 import '../../models/tax_rule.dart';
 import '../../repositories/tax_repository.dart';
 import '../../theme/app_theme.dart';
+import 'company_details_dialog.dart';
+import 'invoices_tab.dart';
 
 /// Owner only. Where we ship, the tax & duty rule per destination, extra
 /// duties by origin (US tariffs) and shipping prices per route.
@@ -100,10 +102,18 @@ class _TaxesPageState extends State<TaxesPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Taxes & duties'),
+          actions: [
+            TextButton.icon(
+              onPressed: () => showCompanyDetailsDialog(context),
+              icon: const Icon(Icons.business_outlined, size: 18),
+              label: const Text('Company details'),
+            ),
+            const SizedBox(width: 8),
+          ],
           bottom: const TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
@@ -111,6 +121,7 @@ class _TaxesPageState extends State<TaxesPage> {
               Tab(text: 'Countries'),
               Tab(text: 'Tariffs by origin'),
               Tab(text: 'Shipping routes'),
+              Tab(text: 'Invoices'),
             ],
           ),
         ),
@@ -120,6 +131,7 @@ class _TaxesPageState extends State<TaxesPage> {
                 _buildCountries(),
                 _buildOrigins(),
                 _buildRoutes(),
+                const InvoicesTab(),
               ]),
       ),
     );

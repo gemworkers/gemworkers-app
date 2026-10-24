@@ -32,6 +32,25 @@ type BuyerOrder = {
   }[];
 };
 
+type InvoiceLink = { id: string; order_id: string; number: string; kind: 'invoice' | 'credit_note' }
+
+// "Invoice GW-2026-00001 · Credit note GW-2026-00002" (sql/invoices_setup.sql).
+function InvoiceLinks({ links }: { links: InvoiceLink[] | undefined }) {
+  if (!links?.length) return null
+  return (
+    <p className="order-muted" style={{ marginTop: 8, fontSize: 13 }}>
+      {links.map((l, i) => (
+        <span key={l.id}>
+          {i > 0 && ' · '}
+          <Link href={`/invoices/${l.id}`} className="pd-link">
+            {l.kind === 'credit_note' ? 'Credit note' : 'Invoice'} {l.number}
+          </Link>
+        </span>
+      ))}
+    </p>
+  )
+}
+
 type StoneDetails = {
   id: string;
   title: string;
@@ -142,11 +161,13 @@ function SingleOrderCard({
   listingMap,
   reviewed,
   returns,
+  invoices,
 }: {
   order: BuyerOrder
   listingMap: Map<string, StoneDetails>
   reviewed: Set<string>
   returns: Map<string, BuyerReturn>
+  invoices: Map<string, InvoiceLink[]>
 }) {
   const rawTotal    = order.order_total   == null ? null : Number(order.order_total)
   const rawShipping = order.shipping_cost == null ? null : Number(order.shipping_cost)
@@ -197,6 +218,7 @@ function SingleOrderCard({
           {order.status === 'received' && <Received />}
           <ReviewLink order={order} reviewed={reviewed} />
           <ReturnPanel orderId={order.id} ret={returns.get(order.id) ?? null} eligible={canRequestReturn(order)} />
+          <InvoiceLinks links={invoices.get(order.id)} />
           {awaitingOfferPayment && (
             <div style={{ marginTop: 14, maxWidth: 320 }}>
               {canStartOfferPayment(order.payment_due_at!) ? (
@@ -240,12 +262,14 @@ function GroupedOrderCard({
   listingMap,
   reviewed,
   returns,
+  invoices,
 }: {
   groupId: string
   orders: BuyerOrder[]
   listingMap: Map<string, StoneDetails>
   reviewed: Set<string>
   returns: Map<string, BuyerReturn>
+  invoices: Map<string, InvoiceLink[]>
 }) {
   void groupId
   const status        = groupStatus(orders)
@@ -297,6 +321,7 @@ function GroupedOrderCard({
                 {o.status === 'received' && <Received />}
                 <ReviewLink order={o} reviewed={reviewed} />
                 <ReturnPanel orderId={o.id} ret={returns.get(o.id) ?? null} eligible={canRequestReturn(o)} />
+                <InvoiceLinks links={invoices.get(o.id)} />
               </div>
 
               {oTotal != null && (
@@ -380,6 +405,19 @@ export default async function BuyerOrdersPage() {
     for (const r of (myReturns ?? []) as BuyerReturn[]) returns.set(r.order_id, r)
   }
 
+  // Invoices and credit notes (buyer_invoices: this buyer's own).
+  const invoices = new Map<string, InvoiceLink[]>()
+  if (orders.length > 0) {
+    const { data: myInvoices } = await supabase
+      .from('buyer_invoices')
+      .select('id, order_id, number, kind')
+      .in('order_id', orders.map(o => o.id))
+      .order('number')
+    for (const inv of (myInvoices ?? []) as InvoiceLink[]) {
+      invoices.set(inv.order_id, [...(invoices.get(inv.order_id) ?? []), inv])
+    }
+  }
+
   const entries: DisplayEntry[] = []
   const groupIndex = new Map<string, number>()
 
@@ -425,6 +463,7 @@ export default async function BuyerOrdersPage() {
                   listingMap={listingMap}
                   reviewed={reviewed}
                   returns={returns}
+                  invoices={invoices}
                 />
               : <GroupedOrderCard
                   key={entry.groupId}
@@ -433,6 +472,7 @@ export default async function BuyerOrdersPage() {
                   listingMap={listingMap}
                   reviewed={reviewed}
                   returns={returns}
+                  invoices={invoices}
                 />
           )}
         </div>

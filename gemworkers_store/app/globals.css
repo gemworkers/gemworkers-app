@@ -886,3 +886,10 @@
   }
   .msg-attach-list { max-height: none; flex: 1; padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* Printing an invoice (app/invoices/[id]): only the document itself. */
+@media print {
+  header, footer, .trust-strip, .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .invoice-doc { box-shadow: none !important; border: none !important; padding: 0 !important; }
+}
