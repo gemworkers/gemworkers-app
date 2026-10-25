@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   description: 'Natural gemstones, mineral specimens and jewellery, honestly described. Tracked worldwide shipping and 30-day returns.',
   openGraph: { siteName: 'GemWorkers', type: 'website', locale: 'en_GB' },
   twitter: { card: 'summary_large_image' },
+  // Google Search Console ownership (public token, URL-prefix property https://www.gemworkers.com)
+  verification: { google: '3Ae1n6rrisU5F5FXaPMEJCkHQUHpszaM5Lez8hcAIt0' },
 }
 
 const TRUST_POINTS = [
