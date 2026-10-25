@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Public company details for the store's legal pages
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-25
 --
 -- A webshop must show its name, address, KvK number, VAT number and email
 -- (Dutch / EU law). They live in store_settings (owner only, admin → Taxes &
