@@ -211,12 +211,13 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               <Link href="/messages" className="nav-link" style={navText}>
                 Messages<UnreadBadge count={user.unreadMessages} />
               </Link>
-              <span style={{
+              <Link href="/account" title="My account" style={{
                 fontSize: 11, color: '#6B6052', fontFamily: 'var(--font-inter, system-ui)',
                 maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                textDecoration: 'none',
               }}>
                 {user.displayName}
-              </span>
+              </Link>
               <form action={signOut} style={{ display: 'inline' }}>
                 <button type="submit" style={{
                   fontSize: 11, color: '#6B6052', background: 'none', border: 'none',
@@ -321,6 +322,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               <Link href="/messages" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>
                 Messages<UnreadBadge count={user.unreadMessages} />
               </Link>
+              <Link href="/account" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>My account</Link>
               <form action={signOut}>
                 <button type="submit" style={{
                   display: 'block', padding: '12px 0', fontSize: 18, fontWeight: 300,
