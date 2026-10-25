@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatEur } from '@/lib/money'
+import { priceText, type FxContext } from '@/lib/price-shown'
 
 // Tax at checkout (sql/order_tax.sql). We only collect VAT that the law
 // requires (stone ships from NL to an EU buyer); everywhere else the buyer
@@ -95,10 +96,12 @@ export function taxNote(
   q: TaxQuote | null,
   countryName: string,
   hasPrice: boolean,
+  fx?: FxContext | null,   // amounts in the buyer's currency when they pay in it
 ): { text: string; warn: boolean } | null {
   if (!q) return null
+  const money = (v: number) => priceText(v, fx)
   if (hasPrice && q.minOrderEur != null && q.goodsTotal < q.minOrderEur) {
-    return { text: `Orders shipped to ${countryName} must be at least ${formatEur(q.minOrderEur)}.`, warn: true }
+    return { text: `Orders shipped to ${countryName} must be at least ${money(q.minOrderEur)}.`, warn: true }
   }
   if (q.scheme === 'reverse_charge') {
     return { text: `0% VAT — reverse charge for your verified business (${countryName})`, warn: false }
@@ -111,7 +114,7 @@ export function taxNote(
   }
   if (q.scheme === 'buyer_pays') {
     return hasPrice && q.importEstimate != null && q.importEstimate > 0
-      ? { text: `Import taxes/duties of about ${formatEur(q.importEstimate)} may be charged by the courier on delivery — paid by you, not at checkout.`, warn: false }
+      ? { text: `Import taxes/duties of about ${money(q.importEstimate)} may be charged by the courier on delivery — paid by you, not at checkout.`, warn: false }
       : { text: 'Import taxes or duties may be charged by the courier on delivery — paid by you, not at checkout.', warn: false }
   }
   return null

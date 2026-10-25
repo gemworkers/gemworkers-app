@@ -1,6 +1,6 @@
 // SERVER ONLY — never import from client components.
 import { Resend } from 'resend'
-import { formatEur } from '@/lib/money'
+import { formatEur, formatMoney } from '@/lib/money'
 import type { EmailOrderLine } from './sendNewOrderEmail'
 
 const FROM = 'GemWorkers <orders@gemworkers.com>'
@@ -28,7 +28,7 @@ function itemRows(orders: RefundedOrderLine[], showIds: boolean): string {
           <span style="color:#9ca3af;font-size:12px">${esc(o.orderNumber)}${showIds ? ` &middot; ${esc(o.orderId)}` : ''}</span>
         </td>
         <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:14px;font-weight:700;color:#111;white-space:nowrap">
-          ${fmt(o.orderTotal)}
+          ${formatMoney(o.orderTotal, o.currency)}
         </td>
       </tr>`).join('')
 }
@@ -112,13 +112,14 @@ export async function sendLatePaymentBuyerEmail(opts: {
   to:            string
   orders:        RefundedOrderLine[]
   refundedTotal: number
+  currency?:     string   // what the buyer paid in (default EUR)
 }): Promise<void> {
   const plural = opts.orders.length !== 1
   const html = wrap(`
     <h1 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;margin:0 0 8px;color:#111;line-height:1.2">Your payment has been refunded</h1>
     <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6">Thank you for your payment, and we&rsquo;re sorry for the inconvenience. Unfortunately it reached us after the reservation had expired, so the stone${plural ? 's below were' : ' below was'} released and ${plural ? 'are' : 'is'} no longer held for you.</p>
     ${table(opts.orders, false)}
-    <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6">We have refunded <strong>${fmt(opts.refundedTotal)}</strong> to your original payment method. It usually takes 5&ndash;10 business days to appear on your statement.</p>
+    <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6">We have refunded <strong>${formatMoney(opts.refundedTotal, opts.currency)}</strong> to your original payment method. It usually takes 5&ndash;10 business days to appear on your statement.</p>
     <p style="font-size:14px;color:#374151;margin:0 0 32px;line-height:1.6">If you have any questions, or would still like the stone, just email us at <a href="mailto:hello@gemworkers.com" style="color:#111">hello@gemworkers.com</a>.</p>
     <p style="font-size:12px;color:#9ca3af;margin:0">This is an automated message &mdash; please do not reply.</p>`)
 

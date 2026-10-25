@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { StoneGrid } from '@/app/components/StoneGrid'
 import type { StoneCardItem } from '@/app/components/StoneCard'
-import { shownPrice } from '@/lib/price-shown'
+import { shownPrice, displayAmount, currencySymbol } from '@/lib/price-shown'
 import { countryName } from '@/lib/countries'
 import { favouriteIds } from '@/lib/favourites'
 import { fxContext } from '@/lib/fx'
@@ -140,8 +140,11 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
   }
   const minN = toNum(min)
   const maxN = toNum(max)
+  // Filters compare the price as the buyer sees it (incl. VAT / in their currency).
+  const fx = await fxContext()
   const priceOf = (i: StoneCardItem) =>
-    i.selling_price == null || i.sale_method === 'accept_offers' ? null : shownPrice(i.selling_price, i.seller_country, pctx).amount
+    i.selling_price == null || i.sale_method === 'accept_offers'
+      ? null : displayAmount(shownPrice(i.selling_price, i.seller_country, pctx).amount, fx)
 
   let items = allItems.filter(i => {
     if (gem && i.gem_type !== gem) return false
@@ -208,11 +211,11 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       <form method="get" action={`/shop/${type}`} className="browse-filters">
         {gem && <input type="hidden" name="gem" value={gem} />}
         <label className="browse-filter">
-          <span>Price from €</span>
+          <span>Price from {currencySymbol(fx)}</span>
           <input name="min" inputMode="decimal" defaultValue={min ?? ''} placeholder="0" />
         </label>
         <label className="browse-filter">
-          <span>to €</span>
+          <span>to {currencySymbol(fx)}</span>
           <input name="max" inputMode="decimal" defaultValue={max ?? ''} placeholder="any" />
         </label>
         {shipsFrom.length > 1 && (
@@ -249,7 +252,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
           <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
         </div>
       ) : (
-        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={pctx} favouriteIds={favs} fx={await fxContext()} />
+        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={pctx} favouriteIds={favs} fx={fx} />
       )}
     </main>
   )

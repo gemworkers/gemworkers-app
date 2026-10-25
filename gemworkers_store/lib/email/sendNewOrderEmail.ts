@@ -16,6 +16,7 @@ export type EmailOrderLine = {
   orderNumber: string
   itemTitle:   string
   orderTotal:  number   // authoritative total incl. shipping, read from DB
+  currency?:   string   // buyer emails: the currency they paid in (default EUR)
 }
 
 export type ShippingAddress = {

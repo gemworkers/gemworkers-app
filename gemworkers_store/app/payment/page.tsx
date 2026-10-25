@@ -4,14 +4,15 @@ import { ContentPage } from '@/app/components/ContentPage'
 export const metadata = { title: 'Payment Information · GemWorkers' }
 
 // Facts here must match the code: Stripe Checkout, methods in
-// lib/stripe/checkout.ts (card fallback), currency EUR; VAT per lib/tax.ts +
+// lib/stripe/checkout.ts (card fallback), currency EUR or the buyer's own
+// (US/GB/AU/CA: lib/fx.ts + sql/local_currency.sql, offers stay EUR); VAT per lib/tax.ts +
 // sql/order_tax.sql / order_tax_b2b.sql; Buy now / cart orders are
 // released after 30 min unpaid (sweep_expired_pending_orders); accepted
 // offers and counter-offers have 48 h with a reminder ~12 h before
 // (respond_to_offer / respond_to_counter, send_offer_payment_reminders).
 export default function PaymentPage() {
   return (
-    <ContentPage eyebrow="Customer Care" title="Payment" lastUpdated="23 October 2026">
+    <ContentPage eyebrow="Customer Care" title="Payment" lastUpdated="25 October 2026">
       {/* ACCOUNTANT REVIEW before payments go live: VAT wording + payment methods. */}
       <p>
         You buy directly from GemWorkers. Payments are handled by Stripe, one of the
@@ -30,11 +31,17 @@ export default function PaymentPage() {
         The payment page shows the methods most used in your country and on your device.
       </p>
       <p>
-        Our prices are in euros (€); in many countries we also show an approximate price in
-        your currency. On the payment page you can usually pay in your own currency — the
-        amount is shown before you pay, and the conversion is done by our payment provider.
-        If you pay in euros with a card in another currency, your bank converts it and may
-        charge a small fee.
+        <strong>Shipping to the United States, the United Kingdom, Australia or Canada?</strong>{' '}
+        You see our prices in your own currency (US$, £, A$ or C$) and pay exactly that amount —
+        no conversion by your bank. Prices in your currency are based on the day&apos;s exchange
+        rate and can change slightly from day to day; the amount you pay is fixed when you go to
+        payment, and refunds are made in the same currency.
+      </p>
+      <p>
+        Everywhere else our prices are in euros (€); in many countries we also show an
+        approximate price in your currency. If you pay in euros with a card in another
+        currency, your bank converts it and may charge a small fee. Offers are always made
+        and paid in euros.
       </p>
 
       <h2>Safe and secure</h2>

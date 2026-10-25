@@ -135,6 +135,13 @@ class Order {
   /// Stripe's processing fee for this order (deducted from the payout).
   final double? stripeFee;
 
+  /// US / UK / AU / CA buyers pay in their own currency (sql/local_currency.sql):
+  /// the currency, what they paid in it, and the euros Stripe credited.
+  /// Prices, payouts and VAT stay in euros (orderTotal).
+  final String chargeCurrency;
+  final double? chargeAmount;
+  final double? eurReceived;
+
   /// Postage actually paid (consignment: extra beyond the buyer's shipping is
   /// deducted from the profit before the split).
   final double? postagePaid;
@@ -219,6 +226,9 @@ class Order {
     this.taxScheme,
     this.payoutKind,
     this.stripeFee,
+    this.chargeCurrency = 'EUR',
+    this.chargeAmount,
+    this.eurReceived,
     this.postagePaid,
     this.consignorPrice,
     this.profitShare,
@@ -291,6 +301,9 @@ class Order {
       taxScheme:       map['tax_scheme']?.toString(),
       payoutKind:      map['payout_kind']?.toString(),
       stripeFee:       parseNumeric(map['stripe_fee']),
+      chargeCurrency:  map['charge_currency']?.toString() ?? 'EUR',
+      chargeAmount:    parseNumeric(map['charge_amount']),
+      eurReceived:     parseNumeric(map['eur_received']),
       postagePaid:     parseNumeric(map['postage_paid']),
       consignorPrice:  parseNumeric(map['consignor_price']),
       profitShare:     parseNumeric(map['profit_share']),
@@ -432,6 +445,9 @@ class Order {
       taxScheme: taxScheme,
       payoutKind: payoutKind,
       stripeFee: stripeFee,
+      chargeCurrency: chargeCurrency,
+      chargeAmount: chargeAmount,
+      eurReceived: eurReceived,
       postagePaid: postagePaid,
       consignorPrice: consignorPrice,
       profitShare: profitShare,

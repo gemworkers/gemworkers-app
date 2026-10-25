@@ -5,12 +5,29 @@ import { MarkReceivedButton } from './MarkReceivedButton'
 import { pillOutline } from '@/lib/ui'
 import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
-import { formatEur } from '@/lib/money'
+import { formatEur, formatMoney } from '@/lib/money'
 import { paidTotal } from '@/lib/tax'
 import { ReturnPanel, type BuyerReturn } from './ReturnPanel'
 import { canRequestReturn } from '@/lib/returns'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+// What the buyer paid: in their own currency for US / UK / AU / CA orders
+// (sql/local_currency.sql), else euros incl. VAT.
+function paidOf(o: BuyerOrder): { total: number; currency: string } | null {
+  if (o.charge_currency !== 'EUR' && o.charge_amount != null) return { total: Number(o.charge_amount), currency: o.charge_currency }
+  return o.order_total == null ? null : { total: paidTotal(o.order_total, o.tax_amount), currency: 'EUR' }
+}
+
+// A refund (euros) in the buyer's currency — same share as the refund itself
+// (lib/stripe/refunds.ts); a full refund is exactly what they paid.
+function refundShownFor(o: BuyerOrder, ret: BuyerReturn | null | undefined): string | null {
+  if (!ret || ret.refund_amount == null || o.charge_currency === 'EUR' || o.charge_amount == null || o.order_total == null) return null
+  const eurPaid = paidTotal(o.order_total, o.tax_amount)
+  const eur = Number(ret.refund_amount)
+  const local = eur >= eurPaid - 0.005 ? Number(o.charge_amount) : Math.round(eur * Number(o.charge_amount) / eurPaid * 100) / 100
+  return formatMoney(local, o.charge_currency)
+}
 
 type BuyerOrder = {
   id: string;
@@ -27,6 +44,9 @@ type BuyerOrder = {
   checkout_group_id: string | null;
   offer_id: string | null;
   payment_due_at: string | null;
+  charge_currency: string;
+  charge_amount: number | string | null;
+  charge_shipping: number | string | null;
   order_items: {
     inventory_item_id: string;
   }[];
@@ -217,7 +237,7 @@ function SingleOrderCard({
           )}
           {order.status === 'received' && <Received />}
           <ReviewLink order={order} reviewed={reviewed} />
-          <ReturnPanel orderId={order.id} ret={returns.get(order.id) ?? null} eligible={canRequestReturn(order)} />
+          <ReturnPanel orderId={order.id} ret={returns.get(order.id) ?? null} eligible={canRequestReturn(order)} refundShown={refundShownFor(order, returns.get(order.id))} />
           <InvoiceLinks links={invoices.get(order.id)} />
           {awaitingOfferPayment && (
             <div style={{ marginTop: 14, maxWidth: 320 }}>
@@ -234,7 +254,16 @@ function SingleOrderCard({
         </div>
       </div>
 
-      {rawTotal != null && (
+      {rawTotal != null && order.charge_currency !== 'EUR' && order.charge_amount != null ? (
+        <div className="order-total">
+          <span className="order-muted">
+            {Number(order.charge_shipping ?? 0) > 0
+              ? `${formatMoney(Number(order.charge_amount) - Number(order.charge_shipping), order.charge_currency)} + ${formatMoney(Number(order.charge_shipping), order.charge_currency)} shipping`
+              : 'Total'}
+          </span>
+          <span className="order-total-amount">{formatMoney(Number(order.charge_amount), order.charge_currency)}</span>
+        </div>
+      ) : rawTotal != null && (
         <div className="order-total">
           <span className="order-muted">
             {(rawShipping != null && rawShipping > 0) || rawVat > 0
@@ -273,7 +302,9 @@ function GroupedOrderCard({
 }) {
   void groupId
   const status        = groupStatus(orders)
-  const combinedTotal = orders.reduce((sum, o) => paidTotal(sum, paidTotal(o.order_total, o.tax_amount)), 0)
+  const paid          = orders.map(paidOf)
+  const groupCurrency = paid.find(p => p)?.currency ?? 'EUR'   // one payment = one currency
+  const combinedTotal = paid.reduce((sum, p) => paidTotal(sum, p?.total ?? 0), 0)
   const date          = orders[0].order_date
   const allSameStatus = orders.every(o => o.status === status)
 
@@ -301,7 +332,7 @@ function GroupedOrderCard({
           const subtitle     = stone
             ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
             : null
-          const oTotal       = o.order_total != null ? paidTotal(o.order_total, o.tax_amount) : null
+          const oPaid        = paidOf(o)
 
           return (
             <div key={o.id} className="order-item order-item-ruled">
@@ -320,13 +351,13 @@ function GroupedOrderCard({
                 )}
                 {o.status === 'received' && <Received />}
                 <ReviewLink order={o} reviewed={reviewed} />
-                <ReturnPanel orderId={o.id} ret={returns.get(o.id) ?? null} eligible={canRequestReturn(o)} />
+                <ReturnPanel orderId={o.id} ret={returns.get(o.id) ?? null} eligible={canRequestReturn(o)} refundShown={refundShownFor(o, returns.get(o.id))} />
                 <InvoiceLinks links={invoices.get(o.id)} />
               </div>
 
-              {oTotal != null && (
+              {oPaid != null && (
                 <span style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', flexShrink: 0 }}>
-                  {formatEur(oTotal)}
+                  {formatMoney(oPaid.total, oPaid.currency)}
                 </span>
               )}
             </div>
@@ -340,7 +371,7 @@ function GroupedOrderCard({
       {/* Combined total footer */}
       <div className="order-total">
         <span className="order-muted">Total</span>
-        <span className="order-total-amount">{formatEur(combinedTotal)}</span>
+        <span className="order-total-amount">{formatMoney(combinedTotal, groupCurrency)}</span>
       </div>
       {orders.some(o => o.tax_scheme === 'reverse_charge') && (
         <p className="order-muted" style={{ marginTop: 6 }}>VAT reverse charged (intra-EU supply, 0% VAT)</p>
@@ -361,7 +392,7 @@ export default async function BuyerOrdersPage() {
     .select(`
       id, order_number, status, order_date, order_total, tax_amount, tax_scheme, shipping_cost,
       tracking_number, shipped_at, received_at, checkout_group_id,
-      offer_id, payment_due_at,
+      offer_id, payment_due_at, charge_currency, charge_amount, charge_shipping,
       order_items ( inventory_item_id )
     `)
     .order('created_at', { ascending: false })

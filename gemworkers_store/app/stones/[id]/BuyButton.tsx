@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { buyNow } from '@/app/actions/commerce'
 import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from '@/lib/ui'
-import { formatEur } from '@/lib/money'
+import { formatEur, formatMoney } from '@/lib/money'
+import { localPrice, type FxContext } from '@/lib/price-shown'
 import { paidTotal } from '@/lib/tax'
 
 type Props = {
@@ -16,17 +17,24 @@ type Props = {
   vatAmount?: number
   vatLabel?: string
   isLoggedIn: boolean
+  // US / UK / AU / CA buyers: amounts in their currency, as checkout charges.
+  fx?: FxContext | null
 }
 
 type State = 'idle' | 'confirm' | 'loading' | 'error'
 
-export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAmount = 0, vatLabel = 'VAT', isLoggedIn }: Props) {
+export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAmount = 0, vatLabel = 'VAT', isLoggedIn, fx }: Props) {
   const [state, setState] = useState<State>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   if (sellingPrice == null) return null
 
-  const formatted = formatEur(sellingPrice)
+  const exact = !!fx?.exact && vatAmount === 0
+  const money = (eur: number) => (exact ? formatMoney(localPrice(eur, fx!.rate), fx!.code) : formatEur(eur))
+  const formatted = money(sellingPrice)
+  const totalText = exact
+    ? formatMoney(localPrice(sellingPrice, fx!.rate) + localPrice(shippingCost ?? 0, fx!.rate), fx!.code)
+    : formatEur(paidTotal(sellingPrice + (shippingCost ?? 0), vatAmount))
 
   // ── Logged-out ────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
@@ -79,7 +87,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
                 fontSize: 14, color: '#5A5045', marginBottom: 8,
               }}>
                 <span>Shipping</span>
-                <span>{formatEur(shippingCost)}</span>
+                <span>{money(shippingCost)}</span>
               </div>
             )}
             {vatAmount > 0 && (
@@ -97,7 +105,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
               fontSize: 15, fontWeight: 600, color: '#1F1B16',
             }}>
               <span>Total</span>
-              <span>{formatEur(paidTotal(sellingPrice! + (shippingCost ?? 0), vatAmount))}</span>
+              <span>{totalText}</span>
             </div>
           </div>
         ) : (

@@ -11,9 +11,10 @@ import { stripe } from './server'
 // the stone is held for 30 minutes and the webhook confirms only payments
 // that are 'paid' (charge.dispute / async_payment_succeeded handle the rest).
 //
-// Local currency: Stripe Adaptive Pricing (Dashboard → Settings → Adaptive
-// Pricing) lets buyers see and pay in their own currency; we always create the
-// session in EUR and receive EUR. Refunds convert back: lib/stripe/refunds.ts.
+// Local currency: US / UK / AU / CA buyers are charged in their own currency
+// at OUR price (app/actions/commerce.ts lockLocalCurrency, sql/local_currency.sql).
+// Keep Stripe Adaptive Pricing OFF — it would convert a second time. Refunds
+// convert back per order: lib/stripe/refunds.ts.
 export async function createCheckoutSession(
   params: Omit<Stripe.Checkout.SessionCreateParams, 'payment_method_types'>,
 ): Promise<Stripe.Checkout.Session> {

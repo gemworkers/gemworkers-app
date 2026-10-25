@@ -9,6 +9,32 @@ import { checkoutShipTo } from '@/lib/ship-to'
 import { applyOrderTax, vatLineItem, reverseChargeText } from '@/lib/tax'
 import { createCheckoutSession } from '@/lib/stripe/checkout'
 import { refreshBusinessCheck } from '@/lib/business'
+import { chargeCurrencyFor } from '@/lib/fx'
+
+// US / UK / AU / CA buyers pay in their own currency (sql/local_currency.sql):
+// locks today's rate on the pending orders and returns what to charge per
+// order. All orders of one payment share one currency — if they don't all
+// qualify, every order stays in EUR. Empty map = charge in EUR.
+async function lockLocalCurrency(orderIds: string[], country: string): Promise<{ currency: string; amounts: Map<string, number> } | null> {
+  const cc = await chargeCurrencyFor(country)
+  if (!cc || orderIds.length === 0) return null
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc('set_order_currency', { p_order_ids: orderIds, p_currency: cc.code, p_rate: cc.rate })
+  if (error) {
+    console.error('[checkout] local currency not set, charging EUR:', error.message)
+    return null
+  }
+  const rows = (data as { order_id: string; charge_currency: string; charge_amount: string | number | null }[] | null) ?? []
+  if (rows.length !== orderIds.length || rows.some(r => r.charge_currency !== cc.code || !(Number(r.charge_amount) > 0))) {
+    if (rows.some(r => r.charge_currency !== 'EUR')) {
+      await admin.from('orders')
+        .update({ charge_currency: 'EUR', charge_rate: null, charge_markup: null, charge_shipping: null, charge_amount: null })
+        .in('id', orderIds)
+    }
+    return null
+  }
+  return { currency: cc.code, amounts: new Map(rows.map(r => [r.order_id, Number(r.charge_amount)])) }
+}
 
 // Calls the create_platform_order SECURITY DEFINER RPC as the logged-in buyer,
 // then creates a Stripe Checkout Session for the authoritative order total.
@@ -62,8 +88,11 @@ export async function buyNow(
     return { error: 'Could not load order total for payment' }
   }
   const vatLine = vatLineItem(order, shipTo.name)
+  const eurCents = Math.round((Number(order.order_total) + Number(order.tax_amount ?? 0)) * 100)
+  const local = await lockLocalCurrency([orderId], shipTo.code)
+  const currency = local ? local.currency.toLowerCase() : 'eur'
 
-  const amountCents = Math.round(Number(order.order_total) * 100)
+  const amountCents = Math.round((local ? local.amounts.get(orderId)! : Number(order.order_total)) * 100)
 
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     return { error: 'Invalid order amount' }
@@ -80,14 +109,14 @@ export async function buyNow(
         {
           quantity: 1,
           price_data: {
-            currency: 'eur',
+            currency,
             unit_amount: amountCents,
             product_data: {
               name: `GemWorkers order ${orderId.substring(0, 8).toUpperCase()}`,
             },
           },
         },
-        ...(vatLine ? [vatLine] : []),
+        ...(vatLine && !local ? [vatLine] : []),
       ],
       shipping_address_collection: {
         // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
@@ -100,11 +129,12 @@ export async function buyNow(
       success_url: `${base}/orders?paid=1&order=${orderId}`,
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${orderId}`,
       // CRITICAL: the webhook uses this to advance the order to 'confirmed'.
-      metadata: { order_id: orderId },
+      metadata: { order_id: orderId, eur_total_cents: String(eurCents) },
       // Shown on the PaymentIntent in the Stripe dashboard.
       payment_intent_data: {
         description: order.order_number ? `GemWorkers ${order.order_number}` : 'GemWorkers order',
-        metadata: { order_id: orderId, ...(order.order_number && { order_number: order.order_number }) },
+        // eur_total_cents: refunds of a USD/GBP/… payment convert from it (lib/stripe/refunds.ts).
+        metadata: { order_id: orderId, eur_total_cents: String(eurCents), ...(order.order_number && { order_number: order.order_number }) },
       },
     })
 
@@ -484,6 +514,10 @@ export async function checkoutCart(): Promise<
     return { error: 'Payment setup failed — please try again.' }
   }
 
+  const local = await lockLocalCurrency(orderRows.map(o => o.id), shipTo.code)
+  const currency = local ? local.currency.toLowerCase() : 'eur'
+  const eurCents = orderRows.reduce((sum, o) => sum + Math.round((Number(o.order_total) + Number(o.tax_amount ?? 0)) * 100), 0)
+
   // Build one Stripe line item per order; validate each amount.
   // Supabase returns numeric columns as strings — coerce with Number().
   const lineItems: {
@@ -491,7 +525,7 @@ export async function checkoutCart(): Promise<
     price_data: { currency: string; unit_amount: number; product_data: { name: string } }
   }[] = []
   for (const ord of orderRows) {
-    const amountCents = Math.round(Number(ord.order_total) * 100)
+    const amountCents = Math.round((local ? local.amounts.get(ord.id)! : Number(ord.order_total)) * 100)
     if (!Number.isInteger(amountCents) || amountCents <= 0) {
       console.error('[checkoutCart] invalid amount for order', ord.id, ord.order_total)
       await cleanupOrderGroup(createdOrderIds, groupId)
@@ -500,7 +534,7 @@ export async function checkoutCart(): Promise<
     lineItems.push({
       quantity: 1,
       price_data: {
-        currency: 'eur',
+        currency,
         unit_amount: amountCents,
         product_data: {
           name: `GemWorkers order ${ord.id.substring(0, 8).toUpperCase()}`,
@@ -508,7 +542,7 @@ export async function checkoutCart(): Promise<
       },
     })
     const vatLine = vatLineItem(ord, shipTo.name)
-    if (vatLine) lineItems.push(vatLine)
+    if (vatLine && !local) lineItems.push(vatLine)
   }
 
   // ── 5b. Create Stripe Checkout Session ────────────────────────────────────
@@ -529,12 +563,13 @@ export async function checkoutCart(): Promise<
       success_url: `${base}/orders?paid=1&group=${groupId}`,
       cancel_url:  `${base}/cart?canceled=1&group=${groupId}`,
       // CRITICAL: the webhook uses this to confirm all orders in the group.
-      metadata: { checkout_group_id: groupId },
+      metadata: { checkout_group_id: groupId, eur_total_cents: String(eurCents) },
       // Shown on the PaymentIntent in the Stripe dashboard.
       payment_intent_data: {
         description: `GemWorkers cart — ${orderRows.length} item${orderRows.length === 1 ? '' : 's'}`,
         metadata: {
           checkout_group_id: groupId,
+          eur_total_cents: String(eurCents),
           order_ids: joinForMetadata(orderRows.map(o => o.id)),
           order_numbers: joinForMetadata(orderRows.map(o => o.order_number).filter(Boolean)),
         },

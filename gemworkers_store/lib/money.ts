@@ -21,3 +21,34 @@ export function formatEur(amount: number | string): string {
 export function formatEurExact(amount: number | string): string {
   return eurCents.format(Number(amount))
 }
+
+// Any currency the store charges in (EUR, USD, GBP, AUD, CAD) — same whole /
+// 2-decimal rule. Each in its home style: $395 for a US buyer, £310, A$…
+const LOCALE: Record<string, string> = { EUR: 'en-IE', USD: 'en-US', GBP: 'en-GB', AUD: 'en-AU', CAD: 'en-CA' }
+
+export function formatMoney(amount: number | string, currency: string = 'EUR'): string {
+  const code = (currency || 'EUR').toUpperCase()
+  if (code === 'EUR') return formatEur(amount)
+  const n = Math.round(Number(amount) * 100) / 100
+  const digits = Number.isInteger(n) ? 0 : 2
+  try {
+    return new Intl.NumberFormat(LOCALE[code] ?? 'en-GB', {
+      style: 'currency', currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits,
+    }).format(n)
+  } catch {
+    return `${n.toFixed(digits)} ${code}`
+  }
+}
+
+// Always 2 decimals in any currency — invoices ($395.00).
+export function formatMoneyExact(amount: number | string, currency: string = 'EUR'): string {
+  const code = (currency || 'EUR').toUpperCase()
+  if (code === 'EUR') return formatEurExact(amount)
+  try {
+    return new Intl.NumberFormat(LOCALE[code] ?? 'en-GB', {
+      style: 'currency', currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(Number(amount))
+  } catch {
+    return `${Number(amount).toFixed(2)} ${code}`
+  }
+}

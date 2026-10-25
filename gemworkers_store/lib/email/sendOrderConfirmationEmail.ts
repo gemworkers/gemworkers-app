@@ -1,6 +1,6 @@
 // SERVER ONLY — never import from client components.
 import { Resend } from 'resend'
-import { formatEur } from '@/lib/money'
+import { formatMoney } from '@/lib/money'
 import type { EmailOrderLine, ShippingAddress } from './sendNewOrderEmail'
 
 // Re-export types so callers only need one import.
@@ -39,7 +39,6 @@ function buildSubject(orders: EmailOrderLine[]): string {
 }
 
 function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
-  const fmt = formatEur
 
   const rows = orders.map(o => `
       <tr>
@@ -48,7 +47,7 @@ function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
           <span style="color:#9ca3af;font-size:12px">${esc(o.orderNumber)}</span>
         </td>
         <td style="padding:12px 16px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:14px;font-weight:700;color:#111;white-space:nowrap">
-          ${fmt(o.orderTotal)}
+          ${formatMoney(o.orderTotal, o.currency)}
         </td>
       </tr>`).join('')
 

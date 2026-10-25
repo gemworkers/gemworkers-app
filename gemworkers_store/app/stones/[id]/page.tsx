@@ -17,7 +17,7 @@ import { makerVerb, makerHref } from '@/lib/makers';
 import { currentShipToCode } from '@/lib/ship-to';
 import { taxQuote, taxNote, ratePercent } from '@/lib/tax';
 import { priceContext } from '@/lib/display-price';
-import { shownPrice, approxPrice } from '@/lib/price-shown';
+import { shownPrice, approxPrice, priceText } from '@/lib/price-shown';
 import { fxContext } from '@/lib/fx';
 import type { Metadata } from 'next';
 import { stoneSeoTitle, stoneSeoDescription, stoneJsonLd, type SeoStone } from '@/lib/seo';
@@ -314,8 +314,6 @@ export default async function StoneDetailPage({
   );
 
   const cost = item.shipping_cost == null ? null : Number(item.shipping_cost);
-  const shippingCostDisplay =
-    cost === null ? null : cost === 0 ? 'Free' : `${formatEur(cost)}`;
 
   const deliveryRange =
     item.delivery_days_min != null && item.delivery_days_max != null
@@ -351,21 +349,21 @@ export default async function StoneDetailPage({
     .maybeSingle();
   const shipToRow = shipToData as { name: string; enabled: boolean } | null;
 
+  const fx = await fxContext();
   // VAT we must collect (NL → EU) or an import-tax reminder (everywhere else).
   const quote = shipToRow?.enabled ? await taxQuote(supabase, item.id, shipToCode) : null;
   const tax = shipToRow?.enabled
-    ? taxNote(quote, shipToRow.name, item.sale_method !== 'accept_offers' && item.selling_price != null)
+    ? taxNote(quote, shipToRow.name, item.sale_method !== 'accept_offers' && item.selling_price != null, fx)
     : null;
 
   // EU consumers: prices incl. VAT when the stone ships from inside the EU.
   const pctx = shipToRow?.enabled ? await priceContext() : null;
   const favs = await favouriteIds();
-  const fx = await fxContext();
   const shownStone = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, pctx);
   const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx).amount;
 
   const shippingLine = joinParts([
-    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${formatEur(shownShip!)} shipping`,
+    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${priceText(shownShip!, fx)} shipping`,
     shipFromName ? `Ships from ${shipFromName}` : null,
   ], ' · ');
 
@@ -436,7 +434,7 @@ export default async function StoneDetailPage({
             ) : item.selling_price != null ? (
               <>
                 <p className="pd-price">
-                  {formatEur(shownStone!.amount)}
+                  {priceText(shownStone!.amount, fx)}
                   {shownStone!.inclVat && <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
                 </p>
                 {approxPrice(shownStone!.amount, fx) && (
@@ -509,6 +507,7 @@ export default async function StoneDetailPage({
                   vatAmount={quote?.taxAmount ?? 0}
                   vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                   isLoggedIn={!!user}
+                  fx={fx}
                 />
               )}
               <CartButton
@@ -616,7 +615,7 @@ export default async function StoneDetailPage({
             <DetailSection title="Shipping">
               <DetailRow label="Ships from" value={shipFromName} />
               <DetailRow label="Courier"    value={item.courier} />
-              <DetailRow label="Cost"       value={shippingCostDisplay} />
+              <DetailRow label="Cost"       value={cost === null ? null : cost === 0 ? 'Free' : priceText(shownShip!, fx)} />
               <DetailRow label="Delivery"   value={deliveryRange} />
               {item.prep_days != null && (
                 <DetailRow label="Handling" value={`Ready in ${item.prep_days} days`} />

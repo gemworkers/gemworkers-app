@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const refund = await stripe.refunds.create(
       {
         payment_intent: pi,
-        amount: await refundAmountInChargeCurrency(pi, cents),   // EUR → the buyer's currency
+        amount: await refundAmountInChargeCurrency(pi, cents, { orderId: order.id, final: cents >= Math.round(Number(left) * 100) }),   // EUR → the buyer's currency
         metadata: { order_id: order.id, order_number: order.order_number, reason: 'order_refund' },
       },
       { idempotencyKey: `order-refund-${order.id}-${count ?? 0}-${cents}` },

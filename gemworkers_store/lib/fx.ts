@@ -1,6 +1,8 @@
-// SERVER ONLY — approximate prices in the buyer's currency. Display only:
-// buyers always pay in EUR (their bank converts). Rates: the European Central
+// SERVER ONLY — prices in the buyer's currency. Rates: the European Central
 // Bank's daily reference rates, refreshed every 12 hours.
+// • US, UK, Australia, Canada: buyers SEE AND PAY local prices (Etsy style,
+//   sql/local_currency.sql locks the currency per order at checkout).
+// • Other non-euro countries: an "≈" hint only, they pay in EUR.
 
 import { cache } from 'react'
 import { currentShipToCode } from '@/lib/ship-to'
@@ -24,6 +26,9 @@ const EURO = new Set([
   'AT', 'BE', 'BG', 'CY', 'DE', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'IE', 'IT', 'LT', 'LU', 'LV',
   'MT', 'NL', 'PT', 'SI', 'SK', 'AD', 'MC', 'SM', 'VA', 'ME', 'XK',
 ])
+
+// Ship-to countries that see and pay their own currency.
+const EXACT: Record<string, string> = { US: 'USD', GB: 'GBP', AU: 'AUD', CA: 'CAD' }
 
 // Gulf currencies are fixed to the US dollar (official pegs).
 const USD_PEG: Record<string, number> = { AED: 3.6725, SAR: 3.75, QAR: 3.64, BHD: 0.376, OMR: 0.3845 }
@@ -50,5 +55,15 @@ export const fxContext = cache(async (): Promise<FxContext | null> => {
   const rates = await getRates()
   if (!rates) return null
   const rate = USD_PEG[code] ? rates.USD * USD_PEG[code] : rates[code]
-  return rate ? { code, rate } : null
+  return rate ? { code, rate, exact: EXACT[country] === code } : null
 })
+
+/** Checkout: the currency and rate to charge an order shipped to [country]
+ *  in (same rates as the prices shown), or null = charge in EUR. */
+export async function chargeCurrencyFor(country: string): Promise<{ code: string; rate: number } | null> {
+  const code = EXACT[country]
+  if (!code) return null
+  const rates = await getRates()
+  const rate = rates?.[code]
+  return rate ? { code, rate } : null
+}

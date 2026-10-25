@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { countryName } from '@/lib/countries'
-import { formatEur } from '@/lib/money'
-import { shownPrice, approxPrice, type PriceContext, type FxContext } from '@/lib/price-shown'
+import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext } from '@/lib/price-shown'
 import { FavouriteButton } from './FavouriteButton'
 
 export type StoneCardItem = {
@@ -101,7 +100,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
           </p>
         ) : item.selling_price != null ? (
           <p style={{ fontSize: 17, fontWeight: 600, color: '#1F1B16' }}>
-            {formatEur(price!.amount)}
+            {priceText(price!.amount, fx)}
             {price!.inclVat && <span style={{ fontSize: 12, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
             {approxPrice(price!.amount, fx) && (
               <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#6B6052' }}>{approxPrice(price!.amount, fx)}</span>
@@ -113,7 +112,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
 
         {cost !== null && (
           <p style={{ fontSize: 12, marginTop: 4, color: '#6B6052' }}>
-            {cost === 0 ? 'Free shipping' : `+ ${formatEur(shipShown!)} shipping`}
+            {cost === 0 ? 'Free shipping' : `+ ${priceText(shipShown!, fx)} shipping`}
           </p>
         )}
       </div>
