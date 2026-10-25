@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Favourites (buyers save stones)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-25
 --
 -- One row per (buyer, stone). Buyers see, add and remove only their own.
 -- The owner can read all (how many people saved a stone = demand signal).

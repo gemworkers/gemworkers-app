@@ -57,10 +57,12 @@ export default async function PrivacyPage() {
           receive only what is needed to ship and answer questions about the piece you bought.
         </li>
         <li>
-          Service providers that run our website, payments and email: Stripe (payments,
-          including PayPal and Klarna through Stripe), Supabase (database), Vercel (website
-          hosting), Resend (email delivery) and Cloudflare (spam protection on login). They may
-          only use your data to provide their service to us.
+          Service providers that run our shop: our payment provider Stripe (including PayPal
+          and Klarna through Stripe), and providers for website hosting, our database, email
+          delivery and spam protection at login. They may only use your data to provide their
+          service to us. Some of them are based outside the EU (for example in the United
+          States); where that is the case, your data is protected by the European
+          Commission&apos;s standard contractual clauses or an equivalent safeguard.
         </li>
       </ul>
       <p>We never sell your data.</p>
