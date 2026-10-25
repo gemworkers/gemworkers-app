@@ -207,6 +207,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
 
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <Link href="/favourites" className="nav-link" style={navText}>Favourites</Link>
               <Link href="/orders" className="nav-link" style={navText}>My Orders</Link>
               <Link href="/messages" className="nav-link" style={navText}>
                 Messages<UnreadBadge count={user.unreadMessages} />
@@ -318,6 +319,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
           {user ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               <Link href="/cart" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>Cart</Link>
+              <Link href="/favourites" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>Favourites</Link>
               <Link href="/orders" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>My Orders</Link>
               <Link href="/messages" className="mobile-menu-link" onClick={() => setMobileOpen(false)}>
                 Messages<UnreadBadge count={user.unreadMessages} />

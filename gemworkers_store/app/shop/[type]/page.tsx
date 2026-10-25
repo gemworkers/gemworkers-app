@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { StoneGrid } from '@/app/components/StoneGrid'
 import type { StoneCardItem } from '@/app/components/StoneCard'
+import { shownPrice } from '@/lib/price-shown'
+import { countryName } from '@/lib/countries'
+import { favouriteIds } from '@/lib/favourites'
 
 const TYPE_LABELS: Record<string, string> = {
   loose_stone: 'Loose Gemstones',
@@ -21,7 +24,8 @@ const VALID_TYPES = new Set(['loose_stone', 'specimen', 'jewelry'])
 
 type PageProps = {
   params:       Promise<{ type: string }>
-  searchParams: Promise<{ gem?: string }>
+  // Filters live in the URL so a filtered page can be bookmarked or shared.
+  searchParams: Promise<{ gem?: string; min?: string; max?: string; from?: string; cert?: string; sort?: string }>
 }
 
 type CategoryRow = {
@@ -37,6 +41,7 @@ type CategoryRow = {
   sale_method:    string | null
   shipping_cost:  number | null
   image_urls:     unknown
+  certification_lab?: string | null
   // Present once public_views_available_only.sql is applied; absent before.
   status?:        string | null
 }
@@ -71,7 +76,7 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
 
 export default async function ShopCategoryPage({ params, searchParams }: PageProps) {
   const { type } = await params
-  const { gem }  = await searchParams
+  const { gem, min, max, from, cert, sort } = await searchParams
 
   if (!VALID_TYPES.has(type)) {
     return (
@@ -123,7 +128,52 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
     ...new Set(allItems.map(i => i.gem_type).filter((g): g is string => !!g)),
   ].sort()
 
-  const items = gem ? allItems.filter(i => i.gem_type === gem) : allItems
+  // ── Filters (price is the price shown to this buyer, incl. VAT where it applies) ──
+  const pctx = await priceContext()
+  const certified = new Set(rows.filter(r => (r.certification_lab ?? '').trim() !== '').map(r => r.id))
+  const shipsFrom = [...new Set(allItems.map(i => i.seller_country).filter((c): c is string => !!c))]
+    .sort((a, b) => (countryName(a) ?? a).localeCompare(countryName(b) ?? b))
+  const toNum = (v?: string) => {
+    const n = Number((v ?? '').replace(',', '.'))
+    return v && Number.isFinite(n) && n >= 0 ? n : null
+  }
+  const minN = toNum(min)
+  const maxN = toNum(max)
+  const priceOf = (i: StoneCardItem) =>
+    i.selling_price == null || i.sale_method === 'accept_offers' ? null : shownPrice(i.selling_price, i.seller_country, pctx).amount
+
+  let items = allItems.filter(i => {
+    if (gem && i.gem_type !== gem) return false
+    if (from && i.seller_country !== from) return false
+    if (cert === '1' && !certified.has(i.id)) return false
+    if (minN != null || maxN != null) {
+      const p = priceOf(i)
+      if (p == null) return false
+      if (minN != null && p < minN) return false
+      if (maxN != null && p > maxN) return false
+    }
+    return true
+  })
+  if (sort === 'price_asc' || sort === 'price_desc') {
+    const dir = sort === 'price_asc' ? 1 : -1
+    items = [...items].sort((a, b) => {
+      const pa = priceOf(a), pb = priceOf(b)
+      if (pa == null) return 1
+      if (pb == null) return -1
+      return (pa - pb) * dir
+    })
+  }
+  const filtered = !!(min || max || from || cert || (sort && sort !== 'default'))
+
+  // Chip links keep the other filters.
+  const href = (over: Record<string, string | undefined>) => {
+    const p = new URLSearchParams()
+    const all = { gem, min, max, from, cert, sort, ...over }
+    for (const [k, v] of Object.entries(all)) if (v) p.set(k, v)
+    const q = p.toString()
+    return `/shop/${type}${q ? `?${q}` : ''}`
+  }
+  const favs = await favouriteIds()
 
   return (
     <main className="pd-wrap browse-main">
@@ -132,19 +182,19 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       {/* ── Heading ── */}
       <h1 className="font-serif browse-title">{label}</h1>
       <p className="browse-count">
-        {items.length} {items.length === 1 ? one : many}{gem ? ` · ${gem}` : ''}
+        {items.length} {items.length === 1 ? one : many}{gem ? ` · ${gem}` : ''}{filtered ? ' · filtered' : ''}
       </p>
 
       {/* ── Gem-type filter chips ── */}
       {gemTypes.length > 0 && (
         <div className="browse-chips">
-          <Link href={`/shop/${type}`} className={`browse-chip${!gem ? ' is-active' : ''}`}>
+          <Link href={href({ gem: undefined })} className={`browse-chip${!gem ? ' is-active' : ''}`}>
             All
           </Link>
           {gemTypes.map(g => (
             <Link
               key={g}
-              href={`/shop/${type}?gem=${encodeURIComponent(g)}`}
+              href={href({ gem: g })}
               className={`browse-chip${gem === g ? ' is-active' : ''}`}
             >
               {g}
@@ -153,16 +203,52 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
         </div>
       )}
 
+      {/* ── More filters (plain form: works without JavaScript) ── */}
+      <form method="get" action={`/shop/${type}`} className="browse-filters">
+        {gem && <input type="hidden" name="gem" value={gem} />}
+        <label className="browse-filter">
+          <span>Price from €</span>
+          <input name="min" inputMode="decimal" defaultValue={min ?? ''} placeholder="0" />
+        </label>
+        <label className="browse-filter">
+          <span>to €</span>
+          <input name="max" inputMode="decimal" defaultValue={max ?? ''} placeholder="any" />
+        </label>
+        {shipsFrom.length > 1 && (
+          <label className="browse-filter">
+            <span>Ships from</span>
+            <select name="from" defaultValue={from ?? ''}>
+              <option value="">Anywhere</option>
+              {shipsFrom.map(c => <option key={c} value={c}>{countryName(c)}</option>)}
+            </select>
+          </label>
+        )}
+        <label className="browse-filter">
+          <span>Sort</span>
+          <select name="sort" defaultValue={sort ?? 'default'}>
+            <option value="default">Recommended</option>
+            <option value="price_asc">Price: low to high</option>
+            <option value="price_desc">Price: high to low</option>
+          </select>
+        </label>
+        <label className="browse-filter browse-filter-check">
+          <input type="checkbox" name="cert" value="1" defaultChecked={cert === '1'} />
+          <span>Certified only</span>
+        </label>
+        <button type="submit" className="browse-chip is-active">Apply</button>
+        {filtered && <Link href={href({ min: undefined, max: undefined, from: undefined, cert: undefined, sort: undefined })} className="pd-link" style={{ fontSize: 14 }}>Clear filters</Link>}
+      </form>
+
       {/* ── Grid or empty state ── */}
       {items.length === 0 ? (
         <div className="browse-empty">
           <p>
-            {gem ? `No ${gem} listed in this category yet.` : 'Nothing listed in this category yet — check back soon.'}
+            {filtered ? 'Nothing matches these filters — try a wider price range or clear the filters.' : gem ? `No ${gem} listed in this category yet.` : 'Nothing listed in this category yet — check back soon.'}
           </p>
           <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
         </div>
       ) : (
-        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} />
+        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={pctx} favouriteIds={favs} />
       )}
     </main>
   )

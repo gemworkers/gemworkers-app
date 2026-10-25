@@ -1,3 +1,4 @@
+import { favouriteIds } from '@/lib/favourites'
 import { priceContext } from '@/lib/display-price'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
@@ -87,7 +88,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
         </p>
       )}
 
-      {items.length > 0 && <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} />}
+      {items.length > 0 && <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} favouriteIds={await favouriteIds()} />}
 
       {query && !hasError && items.length === 0 && (
         <div className="browse-empty">

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { countryName } from '@/lib/countries'
 import { formatEur } from '@/lib/money'
 import { shownPrice, type PriceContext } from '@/lib/price-shown'
+import { FavouriteButton } from './FavouriteButton'
 
 export type StoneCardItem = {
   id: string
@@ -18,7 +19,11 @@ export type StoneCardItem = {
   image_url: string | null
 }
 
-export function StoneCard({ item, index = 0, priceCtx = null }: { item: StoneCardItem; index?: number; priceCtx?: PriceContext | null }) {
+export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds }: {
+  item: StoneCardItem; index?: number; priceCtx?: PriceContext | null
+  /** This buyer's saved stones; null = logged out; undefined = no heart on this page. */
+  favouriteIds?: string[] | null
+}) {
   const gemLabel    = item.variety?.trim() || item.gem_type?.trim() || null
   const originLabel = item.origin_country?.trim() || null
   const hasWeight   = item.weight_value != null && Number(item.weight_value) > 0
@@ -45,6 +50,9 @@ export function StoneCard({ item, index = 0, priceCtx = null }: { item: StoneCar
         position: 'relative', aspectRatio: '1 / 1', overflow: 'hidden',
         borderRadius: 18, background: '#F4EEE4',
       }}>
+        {favouriteIds !== undefined && (
+          <FavouriteButton itemId={item.id} initial={!!favouriteIds?.includes(item.id)} loggedIn={favouriteIds !== null} />
+        )}
         {item.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

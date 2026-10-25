@@ -1,3 +1,4 @@
+import { favouriteIds } from '@/lib/favourites'
 import { priceContext } from '@/lib/display-price'
 import { existsSync } from 'fs'
 import { join } from 'path'
@@ -140,7 +141,7 @@ export default async function HomePage() {
         {newArrivals.length === 0 ? (
           <p className="home-empty">New stones are being added — check back soon.</p>
         ) : (
-          <StoneGrid items={newArrivals} className="home-arrivals-grid" priceCtx={await priceContext()} />
+          <StoneGrid items={newArrivals} className="home-arrivals-grid" priceCtx={await priceContext()} favouriteIds={await favouriteIds()} />
         )}
       </section>
 

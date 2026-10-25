@@ -4,7 +4,9 @@ import { useEffect, useRef } from 'react'
 import { StoneCard, type StoneCardItem } from './StoneCard'
 import type { PriceContext } from '@/lib/price-shown'
 
-export function StoneGrid({ items, className = 'stones-grid', priceCtx = null }: { items: StoneCardItem[]; className?: string; priceCtx?: PriceContext | null }) {
+export function StoneGrid({ items, className = 'stones-grid', priceCtx = null, favouriteIds }: {
+  items: StoneCardItem[]; className?: string; priceCtx?: PriceContext | null; favouriteIds?: string[] | null
+}) {
   const gridRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function StoneGrid({ items, className = 'stones-grid', priceCtx = null }:
 
   return (
     <div ref={gridRef} className={className}>
-      {items.map((item, i) => <StoneCard key={item.id} item={item} index={i} priceCtx={priceCtx} />)}
+      {items.map((item, i) => <StoneCard key={item.id} item={item} index={i} priceCtx={priceCtx} favouriteIds={favouriteIds} />)}
     </div>
   )
 }

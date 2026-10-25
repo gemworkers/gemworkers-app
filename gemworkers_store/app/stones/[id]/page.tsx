@@ -20,6 +20,8 @@ import { priceContext } from '@/lib/display-price';
 import { shownPrice } from '@/lib/price-shown';
 import type { Metadata } from 'next';
 import { stoneSeoTitle, stoneSeoDescription, stoneJsonLd, type SeoStone } from '@/lib/seo';
+import { favouriteIds } from '@/lib/favourites';
+import { FavouriteButton } from '@/app/components/FavouriteButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -356,6 +358,7 @@ export default async function StoneDetailPage({
 
   // EU consumers: prices incl. VAT when the stone ships from inside the EU.
   const pctx = shipToRow?.enabled ? await priceContext() : null;
+  const favs = await favouriteIds();
   const shownStone = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, pctx);
   const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx).amount;
 
@@ -456,6 +459,9 @@ export default async function StoneDetailPage({
               </p>
             )}
             <ReviewSummary style={{ marginTop: 10 }} />
+            <div style={{ marginTop: 12 }}>
+              <FavouriteButton variant="page" itemId={item.id} initial={!!favs?.includes(item.id)} loggedIn={favs !== null} />
+            </div>
           </div>
 
           {/* Actions */}
