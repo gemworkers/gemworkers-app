@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
 import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
 import { paidTotal } from '@/lib/tax'
+import { sendDisputeAlertEmail } from '@/lib/email/sendDisputeAlertEmail'
 import {
   sendLatePaymentOwnerEmail,
   sendLatePaymentBuyerEmail,
@@ -435,6 +436,36 @@ async function disputeOrders(admin: AdminClient, dispute: Stripe.Dispute): Promi
   return rows.map(r => ({ order_id: r.id, share: r.cents / total }))
 }
 
+async function alertOwnerOfDispute(admin: AdminClient, dispute: Stripe.Dispute, orderIds: string[]): Promise<void> {
+  const to = process.env.OWNER_EMAIL?.trim()
+  if (!to) return
+  const { data } = await admin
+    .from('orders')
+    .select('id, order_number, payout_kind, sellers(name), consignors(name), order_items(inventory_items(title))')
+    .in('id', orderIds)
+  type Row = {
+    order_number: string; payout_kind: string | null
+    sellers: { name: string } | null; consignors: { name: string } | null
+    order_items: { inventory_items: { title: string } | null }[]
+  }
+  const rows = (data as unknown as Row[] | null) ?? []
+  const due = dispute.evidence_details?.due_by ? new Date(dispute.evidence_details.due_by * 1000) : null
+  await sendDisputeAlertEmail({
+    to,
+    disputeId: dispute.id,
+    amount: dispute.amount / 100,
+    reason: dispute.reason ?? 'unknown',
+    respondBy: due,
+    orders: rows.map(r => ({
+      orderNumber: r.order_number,
+      title: r.order_items?.[0]?.inventory_items?.title ?? 'Stone',
+      owner: r.payout_kind === 'consignment' ? (r.consignors?.name ?? 'owner')
+           : r.payout_kind === 'commission' ? (r.sellers?.name ?? 'seller')
+           : 'your own stone',
+    })),
+  })
+}
+
 // Order number / title / total for the refund emails.
 async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<RefundedOrderLine[]> {
   const { data: ordersData } = await admin
@@ -850,6 +881,12 @@ export async function POST(req: NextRequest) {
       if (error) {
         console.error('[webhook] record_dispute_opened failed for', dispute.id, ':', error.message)
         return NextResponse.json({ error: 'Dispute save failed' }, { status: 500 })
+      }
+      // Owner alert — best-effort, never fails the webhook.
+      try {
+        await alertOwnerOfDispute(supabase, dispute, orders.map(o => o.order_id))
+      } catch (e) {
+        console.error('[webhook] dispute alert email failed for', dispute.id, ':', e instanceof Error ? e.message : String(e))
       }
     } else if (dispute.status === 'won' || dispute.status === 'lost') {
       const back = -fees.filter(f => f < 0).reduce((a, b) => a + b, 0) / 100

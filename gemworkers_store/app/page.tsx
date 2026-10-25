@@ -1,3 +1,4 @@
+import { priceContext } from '@/lib/display-price'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import Link from 'next/link'
@@ -139,7 +140,7 @@ export default async function HomePage() {
         {newArrivals.length === 0 ? (
           <p className="home-empty">New stones are being added — check back soon.</p>
         ) : (
-          <StoneGrid items={newArrivals} className="home-arrivals-grid" />
+          <StoneGrid items={newArrivals} className="home-arrivals-grid" priceCtx={await priceContext()} />
         )}
       </section>
 

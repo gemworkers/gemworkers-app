@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { formatEur } from '@/lib/money'
+import { priceContext } from '@/lib/display-price'
+import { shownPrice } from '@/lib/price-shown'
 import { ReviewList, reviewAverage, PUBLIC_REVIEW_COLUMNS, type PublicReview } from '@/app/reviews/ReviewList'
 import { Stars } from '@/app/reviews/Stars'
 
@@ -23,9 +25,11 @@ type MakerStone = {
   selling_price: number | string | null
   sale_method: string | null
   maker_id: string
+  seller_country: string | null
 }
 
 export default async function MakersPage() {
+  const pctx = await priceContext()
   const supabase = await createClient()
 
   const { data: makerData } = await supabase
@@ -48,7 +52,7 @@ export default async function MakersPage() {
 
     const { data: stoneData } = await supabase
       .from('public_listings')
-      .select('id, title, image_url, selling_price, sale_method, maker_id')
+      .select('id, title, image_url, selling_price, sale_method, maker_id, seller_country')
       .in('maker_id', makers.map(m => m.id))
     for (const s of (stoneData ?? []) as MakerStone[]) {
       stonesByMaker.set(s.maker_id, [...(stonesByMaker.get(s.maker_id) ?? []), s])
@@ -200,7 +204,7 @@ export default async function MakersPage() {
                           <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
                             {s.sale_method === 'accept_offers' || s.selling_price == null
                               ? 'Make an offer'
-                              : formatEur(s.selling_price)}
+                              : formatEur(shownPrice(Number(s.selling_price), s.seller_country, pctx).amount)}
                           </p>
                         </Link>
                       ))}

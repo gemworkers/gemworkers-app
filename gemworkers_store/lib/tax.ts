@@ -106,8 +106,8 @@ export function taxNote(
   if ((q.scheme === 'domestic' || q.scheme === 'oss') && q.taxRate != null) {
     const name = q.taxName || 'VAT'
     return hasPrice
-      ? { text: `+ ${formatEur(q.taxAmount)} ${name} (${ratePercent(q.taxRate)}%) for ${countryName} · total ${formatEur(paidTotal(q.goodsTotal, q.taxAmount))} incl. shipping`, warn: false }
-      : { text: `${name} for ${countryName} (${ratePercent(q.taxRate)}%) is added at checkout`, warn: false }
+      ? { text: `Includes ${formatEur(q.taxAmount)} ${name} (${ratePercent(q.taxRate)}%) for ${countryName} · total ${formatEur(paidTotal(q.goodsTotal, q.taxAmount))} with shipping`, warn: false }
+      : { text: `Offers are before ${name} — ${ratePercent(q.taxRate)}% ${name} for ${countryName} is added at checkout`, warn: false }
   }
   if (q.scheme === 'buyer_pays') {
     return hasPrice && q.importEstimate != null && q.importEstimate > 0

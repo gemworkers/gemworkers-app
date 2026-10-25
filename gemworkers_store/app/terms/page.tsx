@@ -1,24 +1,30 @@
 import Link from 'next/link'
 import { ContentPage } from '@/app/components/ContentPage'
+import { companyInfo } from '@/lib/company'
 
-export default function TermsPage() {
+export const metadata = { title: 'Terms & Conditions · GemWorkers' }
+
+export default async function TermsPage() {
+  const c = await companyInfo()
   return (
-    <ContentPage eyebrow="Legal" title="Terms & Conditions" lastUpdated="15 October 2026">
-      {/* LEGAL REVIEW before payments go live. ADD business address to "Who we are" before launch. */}
+    <ContentPage eyebrow="Legal" title="Terms & Conditions" lastUpdated="25 October 2026">
+      {/* LEGAL REVIEW before payments go live. Company details come from admin → Company details. */}
 
       <h2>Who we are</h2>
       <p>
-        GemWorkers is a trading name of Gem Workers, registered in the Netherlands.
+        GemWorkers is the trading name of {c.name}, registered in the Netherlands.
       </p>
       <ul>
-        <li>Chamber of Commerce (KvK): 88333418</li>
-        <li>VAT number: NL004582014B42</li>
-        <li>Email: <a href="mailto:hello@gemworkers.com">hello@gemworkers.com</a></li>
+        {c.address && <li style={{ whiteSpace: 'pre-line' }}>Address: {c.address}</li>}
+        {c.kvk && <li>Chamber of Commerce (KvK): {c.kvk}</li>}
+        {c.vat && <li>VAT number: {c.vat}</li>}
+        <li>Email: <a href={`mailto:${c.email}`}>{c.email}</a></li>
       </ul>
       <p>
-        When you buy from GemWorkers, your contract is with Gem Workers. Some pieces are
-        shipped directly from our partners in Thailand and Pakistan; the product page shows
-        where each piece ships from.
+        When you buy from GemWorkers, your contract is with {c.name}. GemWorkers sells
+        every piece in its own name, including pieces it sells on behalf of partners. Some
+        pieces are shipped directly from our partners in Thailand and Pakistan; the product
+        page shows where each piece ships from.
       </p>
 
       <h2>These terms</h2>
@@ -38,10 +44,28 @@ export default function TermsPage() {
       <h2>Prices</h2>
       {/* ACCOUNTANT REVIEW: VAT/duties wording */}
       <p>
-        Prices are shown at checkout. Shipping costs are shown before you pay. Import
-        duties or taxes charged by your country may apply; see{' '}
-        <Link href="/shipping">Shipping</Link>.
+        All prices are in euros. Choose your country under &ldquo;Ship to&rdquo; at the top of
+        the page; prices, shipping and taxes are then shown for that country.
       </p>
+      <ul>
+        <li>
+          <strong>Pieces shipped from the Netherlands to the EU:</strong> prices shown include
+          the VAT of your country. The VAT is also shown separately at checkout and on your
+          invoice.
+        </li>
+        <li>
+          <strong>All other orders</strong> (pieces shipped from Thailand or Pakistan, and
+          orders to countries outside the EU): no VAT is charged by us. Import VAT, duties or
+          customs fees may be charged by your country on delivery and are paid by you; we show
+          an estimate where we can. See <Link href="/shipping">Shipping</Link>.
+        </li>
+        <li>
+          <strong>Business buyers in the EU</strong> outside the Netherlands with a verified VAT
+          number buy at 0% VAT (reverse charge). See{' '}
+          <Link href="/business">Buying for a business</Link>.
+        </li>
+      </ul>
+      <p>The total you pay, including shipping and any VAT, is always shown before you pay.</p>
 
       <h2>Orders</h2>
       <p>
@@ -52,8 +76,9 @@ export default function TermsPage() {
 
       <h2>Payment</h2>
       <p>
-        Payments are processed securely by our payment providers. We never see or store
-        your full card details. How and when you pay is explained on our{' '}
+        Payments are processed securely by Stripe. Depending on your country you can pay by
+        card, Apple Pay, Google Pay, PayPal, iDEAL, Bancontact or Klarna. We never see or
+        store your full card details. How and when you pay is explained on our{' '}
         <Link href="/payment">Payment</Link> page.
       </p>
 
@@ -106,7 +131,7 @@ export default function TermsPage() {
       <h2>Contact</h2>
       <p>
         Questions about these terms? Email{' '}
-        <a href="mailto:hello@gemworkers.com">hello@gemworkers.com</a>.
+        <a href={`mailto:${c.email}`}>{c.email}</a>.
       </p>
     </ContentPage>
   )

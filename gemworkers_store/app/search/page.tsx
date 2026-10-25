@@ -1,3 +1,4 @@
+import { priceContext } from '@/lib/display-price'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { StoneGrid } from '@/app/components/StoneGrid'
@@ -86,7 +87,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
         </p>
       )}
 
-      {items.length > 0 && <StoneGrid items={items} className="home-arrivals-grid" />}
+      {items.length > 0 && <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} />}
 
       {query && !hasError && items.length === 0 && (
         <div className="browse-empty">

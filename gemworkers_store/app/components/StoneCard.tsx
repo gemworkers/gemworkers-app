@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { countryName } from '@/lib/countries'
 import { formatEur } from '@/lib/money'
+import { shownPrice, type PriceContext } from '@/lib/price-shown'
 
 export type StoneCardItem = {
   id: string
@@ -17,7 +18,7 @@ export type StoneCardItem = {
   image_url: string | null
 }
 
-export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: number }) {
+export function StoneCard({ item, index = 0, priceCtx = null }: { item: StoneCardItem; index?: number; priceCtx?: PriceContext | null }) {
   const gemLabel    = item.variety?.trim() || item.gem_type?.trim() || null
   const originLabel = item.origin_country?.trim() || null
   const hasWeight   = item.weight_value != null && Number(item.weight_value) > 0
@@ -26,6 +27,9 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
   const initial     = gemLabel ? gemLabel.charAt(0).toUpperCase() : ''
   const shipsFrom   = countryName(item.seller_country)
   const cost        = item.shipping_cost == null ? null : Number(item.shipping_cost)
+  // EU consumers see prices incl. VAT when the stone ships from inside the EU.
+  const price       = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, priceCtx)
+  const shipShown   = cost == null ? null : shownPrice(cost, item.seller_country, priceCtx).amount
 
   return (
     <Link
@@ -89,7 +93,8 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
           </p>
         ) : item.selling_price != null ? (
           <p style={{ fontSize: 17, fontWeight: 600, color: '#1F1B16' }}>
-            {formatEur(Number(item.selling_price))}
+            {formatEur(price!.amount)}
+            {price!.inclVat && <span style={{ fontSize: 12, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
           </p>
         ) : (
           <p style={{ fontSize: 17, color: '#6B6052' }}>—</p>
@@ -97,7 +102,7 @@ export function StoneCard({ item, index = 0 }: { item: StoneCardItem; index?: nu
 
         {cost !== null && (
           <p style={{ fontSize: 12, marginTop: 4, color: '#6B6052' }}>
-            {cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`}
+            {cost === 0 ? 'Free shipping' : `+ ${formatEur(shipShown!)} shipping`}
           </p>
         )}
       </div>

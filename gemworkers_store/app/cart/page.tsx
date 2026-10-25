@@ -8,6 +8,8 @@ import { countryName } from '@/lib/countries'
 import { pillDark, pillOutline } from '@/lib/ui'
 import { formatEur } from '@/lib/money'
 import { currentShipToCode } from '@/lib/ship-to'
+import { priceContext } from '@/lib/display-price'
+import { shownPrice, type PriceContext } from '@/lib/price-shown'
 import { taxQuote, taxNote, paidTotal, ratePercent, type TaxQuote } from '@/lib/tax'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -140,6 +142,7 @@ export default async function CartPage() {
   const quoteMap = new Map<string, TaxQuote>()
   quoteList.forEach((q, i) => { if (q) quoteMap.set(buyableIds[i], q) })
   const quotes = [...quoteMap.values()]
+  const pctx = shipTo?.enabled ? await priceContext() : null
   const vatTotal = quotes.reduce((sum, q) => paidTotal(sum, q.taxAmount), 0)
   const vatRates = [...new Set(quotes.filter(q => q.taxAmount > 0 && q.taxRate != null).map(q => ratePercent(q.taxRate!)))]
   const payTotal = paidTotal(grandTotal, vatTotal)
@@ -156,7 +159,7 @@ export default async function CartPage() {
         <div className="cart-list">
           {cartItems.map(({ itemId, listing }) =>
             listing ? (
-              <AvailableItem key={itemId} itemId={itemId} listing={listing} quote={quoteMap.get(itemId) ?? null} />
+              <AvailableItem key={itemId} itemId={itemId} listing={listing} quote={quoteMap.get(itemId) ?? null} pctx={pctx} />
             ) : (
               <UnavailableItem key={itemId} itemId={itemId} />
             )
@@ -170,7 +173,7 @@ export default async function CartPage() {
                 Summary
               </h2>
               <div className="cart-sum-row">
-                <span>Subtotal</span>
+                <span>Subtotal{vatTotal > 0 ? ' (excl. VAT)' : ''}</span>
                 <span>{formatEur(subtotal)}</span>
               </div>
               <div className="cart-sum-row">
@@ -214,7 +217,7 @@ export default async function CartPage() {
 
 // ── Available item row ────────────────────────────────────────────────────────
 
-function AvailableItem({ itemId, listing, quote }: { itemId: string; listing: CartListing; quote: TaxQuote | null }) {
+function AvailableItem({ itemId, listing, quote, pctx }: { itemId: string; listing: CartListing; quote: TaxQuote | null; pctx: PriceContext | null }) {
   const subtitle = [listing.variety, listing.gem_type]
     .filter(Boolean)
     .join(' · ') || null
@@ -243,12 +246,17 @@ function AvailableItem({ itemId, listing, quote }: { itemId: string; listing: Ca
             {listing.sale_method === 'accept_offers'
               ? <span style={{ fontSize: 14, fontWeight: 500, color: '#7A5A22' }}>Accepting offers</span>
               : listing.selling_price != null
-                ? formatEur(listing.selling_price)
+                ? <>
+                    {formatEur(shownPrice(Number(listing.selling_price), listing.seller_country, pctx).amount)}
+                    {shownPrice(0, listing.seller_country, pctx).inclVat && (
+                      <span style={{ fontSize: 12, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>
+                    )}
+                  </>
                 : <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}>Price on request</span>
             }
             {cost !== null && listing.selling_price != null && listing.sale_method !== 'accept_offers' && (
               <span className="cart-sub" style={{ display: 'block', fontWeight: 400 }}>
-                {cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`}
+                {cost === 0 ? 'Free shipping' : `+ ${formatEur(shownPrice(cost, listing.seller_country, pctx).amount)} shipping`}
               </span>
             )}
           </div>

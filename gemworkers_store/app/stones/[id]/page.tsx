@@ -16,6 +16,8 @@ import { formatEur } from '@/lib/money';
 import { makerVerb, makerHref } from '@/lib/makers';
 import { currentShipToCode } from '@/lib/ship-to';
 import { taxQuote, taxNote, ratePercent } from '@/lib/tax';
+import { priceContext } from '@/lib/display-price';
+import { shownPrice } from '@/lib/price-shown';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -330,8 +332,13 @@ export default async function StoneDetailPage({
     ? taxNote(quote, shipToRow.name, item.sale_method !== 'accept_offers' && item.selling_price != null)
     : null;
 
+  // EU consumers: prices incl. VAT when the stone ships from inside the EU.
+  const pctx = shipToRow?.enabled ? await priceContext() : null;
+  const shownStone = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, pctx);
+  const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx).amount;
+
   const shippingLine = joinParts([
-    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${formatEur(cost)} shipping`,
+    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${formatEur(shownShip!)} shipping`,
     shipFromName ? `Ships from ${shipFromName}` : null,
   ], ' · ');
 
@@ -395,7 +402,10 @@ export default async function StoneDetailPage({
             {item.sale_method === 'accept_offers' ? (
               <p className="pd-price">Make an offer</p>
             ) : item.selling_price != null ? (
-              <p className="pd-price">{formatEur(Number(item.selling_price))}</p>
+              <p className="pd-price">
+                {formatEur(shownStone!.amount)}
+                {shownStone!.inclVat && <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
+              </p>
             ) : (
               <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}

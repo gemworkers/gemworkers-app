@@ -1,8 +1,10 @@
 import { ContentPage } from '@/app/components/ContentPage'
 
+export const metadata = { title: 'Shipping · GemWorkers' }
+
 export default function ShippingPage() {
   return (
-    <ContentPage eyebrow="Customer Care" title="Shipping" lastUpdated="15 October 2026">
+    <ContentPage eyebrow="Customer Care" title="Shipping" lastUpdated="25 October 2026">
       <p>
         Every GemWorkers piece is packed by hand and shipped with care, wherever you are in
         the world.
@@ -54,12 +56,26 @@ export default function ShippingPage() {
       </p>
 
       <h2>Customs, duties and taxes</h2>
-      {/* ACCOUNTANT REVIEW: duties/VAT wording, incl. EU IOSS for orders ≤ €150 */}
+      {/* ACCOUNTANT REVIEW: duties/VAT wording (no IOSS: import VAT is paid on delivery). */}
       <p>
-        Orders shipped across borders may be subject to import duties, taxes or customs fees
-        charged by the destination country. Unless these are shown at checkout, they are the
-        buyer's responsibility and are usually collected by the courier before delivery. If
-        you're unsure what applies in your country, please contact your local customs office.
+        <strong>Shipped from the Netherlands to the EU:</strong> no customs. The VAT of your
+        country is included in the price and charged at checkout.
+      </p>
+      <p>
+        <strong>All other orders</strong>, meaning pieces shipped from Thailand or Pakistan
+        (also to EU countries) and orders to countries outside the EU, may be subject to import
+        VAT, duties or customs fees in your country. We don&apos;t charge these at checkout: the
+        courier usually collects them before delivery, and they are paid by you. Where we can,
+        the product page shows an estimate. Some countries charge nothing below a certain value.
+      </p>
+      <p>
+        Every parcel travels with our invoice showing the real price paid, as customs
+        require. We never mark parcels as gifts. If you&apos;re unsure what applies in your
+        country, please contact your local customs office.
+      </p>
+      <p>
+        <strong>United Kingdom:</strong> orders must be at least €160, so UK VAT is paid at the
+        border like other imports.
       </p>
 
       <h2>Questions</h2>

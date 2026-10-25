@@ -1,3 +1,4 @@
+import { priceContext } from '@/lib/display-price'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { StoneGrid } from '@/app/components/StoneGrid'
@@ -143,7 +144,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
           <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
         </div>
       ) : (
-        <StoneGrid items={items} className="home-arrivals-grid" />
+        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} />
       )}
     </main>
   )
