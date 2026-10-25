@@ -44,6 +44,20 @@ class InventoryRepository {
     return InventoryItem.fromMap(response);
   }
 
+  /// The seller's most recently added item of [productType] (remembered
+  /// defaults on Add stone). Null when they have none yet.
+  Future<InventoryItem?> getLastItemOfType(String sellerId, String productType) async {
+    final row = await supabase
+        .from('inventory_items')
+        .select('*, suppliers(name)')
+        .eq('seller_id', sellerId)
+        .eq('product_type', productType)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    return row == null ? null : InventoryItem.fromMap(row);
+  }
+
   Future<List<InventoryItem>> getItemsByPurchase(String purchaseId) async {
     final response = await supabase
         .from('inventory_items')

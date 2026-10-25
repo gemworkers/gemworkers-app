@@ -10,6 +10,7 @@ import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
 import '../../repositories/order_repository.dart';
 import '../../theme/app_theme.dart';
+import 'add_inventory_page.dart';
 import 'edit_inventory_page.dart';
 import 'listing_sheet.dart';
 import 'widgets/item_photo_manager.dart';
@@ -217,6 +218,23 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     if (updated != null && mounted) {
       setState(() => _item = updated);
       _loadLocationAndMovements();
+    }
+  }
+
+  // ── Duplicate ─────────────────────────────────────────────────────────────
+
+  /// Opens Add stone filled in as a copy of this one (a new row, new SKU).
+  Future<void> _openDuplicate() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddInventoryPage(productType: _item.productType, template: _item),
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copy saved — find it at the top of Inventory.')),
+      );
     }
   }
 
@@ -560,6 +578,12 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             onPressed: _openEdit,
             tooltip: 'Edit',
           ),
+          if (!_item.isUnsortedLot)
+            IconButton(
+              icon: const Icon(Icons.copy_outlined),
+              onPressed: _openDuplicate,
+              tooltip: 'Duplicate (add a similar stone)',
+            ),
           IconButton(
             icon: _deleting
                 ? const SizedBox(

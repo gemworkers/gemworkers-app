@@ -19,7 +19,11 @@ import 'listing_sheet.dart';
 class AddInventoryPage extends StatefulWidget {
   final String productType;
 
-  const AddInventoryPage({super.key, required this.productType});
+  /// Duplicate stone: the form starts as a copy of this item (no photos,
+  /// video or certificate number — those belong to one physical stone).
+  final InventoryItem? template;
+
+  const AddInventoryPage({super.key, required this.productType, this.template});
 
   @override
   State<AddInventoryPage> createState() => _AddInventoryPageState();
@@ -128,10 +132,194 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   bool _saving = false;
   String _savingStatus = '';
 
+  // ── Shipping (no fields here — carried over so the listing sheet is
+  //    already filled in) ────────────────────────────────────────────────────
+
+  String? _courier;
+  double? _shippingCost;
+  int? _deliveryDaysMin;
+  int? _deliveryDaysMax;
+  int? _prepDays;
+
+  // ── Automatic title / remembered defaults ─────────────────────────────────
+
+  /// The last title we filled in. While the title still equals it, the user
+  /// hasn't typed their own, so we keep updating it.
+  String _autoTitle = '';
+  String? _prefillNote;
+  int _prefillVersion = 0;   // rebuilds the fields that read their value once
+
   @override
   void initState() {
     super.initState();
     _loadSuppliers();
+    final t = widget.template;
+    if (t != null) {
+      _applyTemplate(t);
+    } else {
+      _loadRememberedDefaults();
+    }
+    for (final c in [
+      _gemType, _variety, _weightValue, _shapeOther, _species, _locality,
+      _jewelryType, _metal, _gemstonesUsed, _weightGrams,
+    ]) {
+      c.addListener(_refreshTitle);
+    }
+  }
+
+  // ── Automatic title ───────────────────────────────────────────────────────
+
+  /// e.g. "Blue Sapphire 2.15 ct Oval", "Tourmaline specimen, Minas Gerais",
+  /// "Silver ring with Ruby".
+  String _suggestTitle() {
+    String clean(String s) => s.trim() == 'Other' ? '' : s.trim();
+    final gemRaw = clean(_gemType.text);
+    final gem = gemRaw == 'Diamonds' ? 'Diamond' : gemRaw;
+    final variety = clean(_variety.text);
+    final name = variety.isEmpty
+        ? gem
+        : (gem.isEmpty || variety.toLowerCase().contains(gem.toLowerCase()))
+            ? variety
+            : '$variety $gem';
+    String weight(String text, String unit) {
+      final v = parseDecimalInput(text);
+      if (v == null || v <= 0) return '';
+      final s = v.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+      return '$s $unit';
+    }
+
+    final List<String> parts;
+    switch (widget.productType) {
+      case 'specimen':
+        final species = _species.text.trim();
+        final locality = _locality.text.trim();
+        final base = [species.isNotEmpty ? species : name, 'specimen']
+            .where((s) => s.isNotEmpty).join(' ');
+        parts = [
+          locality.isEmpty ? base : '$base, $locality',
+          weight(_weightGrams.text, _weightGramsUnit),
+        ];
+      case 'jewelry':
+        final type = _jewelryType.text.trim();
+        final metal = _metal.text.trim();
+        final stones = _gemstonesUsed.text.trim().isNotEmpty ? _gemstonesUsed.text.trim() : name;
+        final piece = [metal, type.isNotEmpty ? type.toLowerCase() : 'jewellery']
+            .where((s) => s.isNotEmpty).join(' ');
+        parts = [stones.isEmpty ? piece : '$piece with $stones'];
+      default:
+        final shape = _shapeSelection == 'Other' ? _shapeOther.text.trim() : _shapeSelection;
+        parts = [name, weight(_weightValue.text, _weightUnit), shape];
+    }
+    final title = parts.where((s) => s.isNotEmpty).join(' ');
+    if (title.isEmpty || title == 'jewellery') return '';
+    return title[0].toUpperCase() + title.substring(1);
+  }
+
+  void _refreshTitle() {
+    final current = _title.text.trim();
+    if (current.isNotEmpty && current != _autoTitle) return;   // typed by hand
+    final next = _suggestTitle();
+    _autoTitle = next;
+    if (_title.text != next) _title.text = next;
+  }
+
+  // ── Duplicate / remembered defaults ───────────────────────────────────────
+
+  String _fmt(double? v) =>
+      v == null ? '' : v.toStringAsFixed(4).replaceFirst(RegExp(r'\.?0+$'), '');
+
+  void _applyShipping(InventoryItem t) {
+    _courier = t.courier;
+    _shippingCost = t.shippingCost;
+    _deliveryDaysMin = t.deliveryDaysMin;
+    _deliveryDaysMax = t.deliveryDaysMax;
+    _prepDays = t.prepDays;
+  }
+
+  void _applyTemplate(InventoryItem t) {
+    _gemType.text = t.gemType;
+    _variety.text = t.variety;
+    _originCountry.text = t.originCountry;
+    _originRegion.text = t.originRegion;
+    if (_shapeOptions.contains(t.shape)) {
+      _shapeSelection = t.shape;
+    } else if (t.shape.isNotEmpty) {
+      _shapeSelection = 'Other';
+      _shapeOther.text = t.shape;
+    }
+    if (_cutOptions.contains(t.cutType)) {
+      _cutTypeSelection = t.cutType;
+    } else if (t.cutType.isNotEmpty) {
+      _cutTypeSelection = 'Other';
+      _cutTypeOther.text = t.cutType;
+    }
+    if (t.weightValue > 0) _weightValue.text = _fmt(t.weightValue);
+    _weightUnit = t.weightUnit.isEmpty ? 'ct' : t.weightUnit;
+    _costPrice.text = t.costPrice > 0 ? _fmt(t.costPrice) : '';
+    _sellingPrice.text = t.sellingPrice != null ? _fmt(t.sellingPrice) : '';
+    _barcode.text = t.barcode;
+    _notes.text = t.notes;
+    _description.text = t.description ?? '';
+    _certificationLab.text = t.certificationLab ?? '';
+    _treatment.text = t.treatment ?? '';
+    _lengthCtrl.text = _fmt(t.length);
+    _widthCtrl.text = _fmt(t.width);
+    _heightCtrl.text = _fmt(t.height);
+    _dimensionUnit = t.dimensionUnit.isEmpty ? 'mm' : t.dimensionUnit;
+    _clarity.text = t.clarity ?? '';
+    _species.text = t.species ?? '';
+    _locality.text = t.locality ?? '';
+    _matrix.text = t.matrix ?? '';
+    _weightGrams.text = _fmt(t.weightGrams);
+    _weightGramsUnit = t.weightGramsUnit;
+    _jewelryType.text = t.jewelryType ?? '';
+    _metal.text = t.metal ?? '';
+    _metalPurity.text = t.metalPurity ?? '';
+    _sizeOrLength.text = t.sizeOrLength ?? '';
+    _gemstonesUsed.text = t.gemstonesUsed ?? '';
+    _totalWeightGrams.text = _fmt(t.totalWeightGrams);
+    _totalWeightGramsUnit = t.totalWeightGramsUnit;
+    _supplierId = t.supplierId;
+    _locationId = t.locationId;
+    _makerId = t.makerId;
+    _applyShipping(t);
+    _title.text = t.title;
+    // Keep updating the title only if it was the automatic one.
+    _autoTitle = _suggestTitle() == t.title ? t.title : '';
+    _prefillNote = 'Copy of ${t.sku.isEmpty ? t.title : t.sku}. Change the weight, '
+        'price and anything else that differs (check treatment and certificate!), '
+        'and add this stone\'s own photos. Photos, video and certificate number '
+        'are not copied.';
+  }
+
+  /// Fills the "where / how" fields from the seller's last stone of this
+  /// type, so a batch of similar stones doesn't need them typed every time.
+  Future<void> _loadRememberedDefaults() async {
+    try {
+      final last = await _repository.getLastItemOfType(
+        UserProfileService.instance.effectiveSellerId, widget.productType);
+      if (last == null || !mounted) return;
+      setState(() {
+        if (_originCountry.text.trim().isEmpty) _originCountry.text = last.originCountry;
+        if (_originRegion.text.trim().isEmpty) _originRegion.text = last.originRegion;
+        // Treatment and certificate are NOT remembered: a wrong one would
+        // misdescribe the stone to the buyer.
+        _weightUnit = last.weightUnit.isEmpty ? _weightUnit : last.weightUnit;
+        _weightGramsUnit = last.weightGramsUnit;
+        _totalWeightGramsUnit = last.totalWeightGramsUnit;
+        _dimensionUnit = last.dimensionUnit.isEmpty ? _dimensionUnit : last.dimensionUnit;
+        _supplierId ??= last.supplierId;
+        _locationId ??= last.locationId;
+        _applyShipping(last);
+        _prefillVersion++;
+        _prefillNote = 'Origin, location, supplier and shipping are filled in from your '
+            'last ${widget.productType == 'jewelry' ? 'piece' : 'stone'} '
+            '(${last.sku}). Change them if this one is different.';
+      });
+      _refreshTitle();
+    } catch (_) {
+      // No defaults — the form simply starts empty.
+    }
   }
 
   @override
@@ -260,6 +448,8 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         imageUrls: const [],
         supplierId: _supplierId,
         supplierName: supplierName,
+        // A duplicate stays with the same seller (owner copying a brother's stone).
+        sellerId: widget.template?.sellerId,
         locationId: _locationId,
         isListed: false,
         sellingPrice: switch (parsePrice(_sellingPrice.text)) {
@@ -292,6 +482,11 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
         totalWeightGrams:
             isJewelry ? parseDecimalInput(_totalWeightGrams.text) : null,
         totalWeightGramsUnit: _totalWeightGramsUnit,
+        courier: _courier,
+        shippingCost: _shippingCost,
+        deliveryDaysMin: _deliveryDaysMin,
+        deliveryDaysMax: _deliveryDaysMax,
+        prepDays: _prepDays,
       );
 
       final created = await _repository.addItem(item);
@@ -384,7 +579,8 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
     return FormDropdownField<String?>(
       label: 'Supplier',
-      value: _supplierId,
+      // A remembered supplier that no longer exists shows as "No supplier".
+      value: _suppliers.any((s) => s.id == _supplierId) ? _supplierId : null,
       items: [null, ..._suppliers.where((s) => s.id != null).map((s) => s.id!)],
       itemLabel: (id) {
         if (id == null) return 'No supplier';
@@ -418,9 +614,9 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             value: _weightGramsUnit,
             items: const ['ct', 'g', 'kg'],
             itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
-            onChanged: (v) => setState(() => _weightGramsUnit = v!),
+            onChanged: (v) { setState(() => _weightGramsUnit = v!); _refreshTitle(); },
           ),
-          OriginCountryField(controller: _originCountry, label: 'Origin Country'),
+          OriginCountryField(key: ValueKey('origin$_prefillVersion'), controller: _originCountry, label: 'Origin Country'),
           const FormSection('Dimensions'),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +674,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             value: _shapeSelection,
             items: _shapeOptions,
             itemLabel: (v) => v.isEmpty ? '—' : v,
-            onChanged: (v) => setState(() => _shapeSelection = v ?? ''),
+            onChanged: (v) { setState(() => _shapeSelection = v ?? ''); _refreshTitle(); },
           ),
           if (_shapeSelection == 'Other')
             FormTextField('Shape (custom)', _shapeOther),
@@ -493,7 +689,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             FormTextField('Cut (custom)', _cutTypeOther),
           FormTextField('Clarity', _clarity),
           const FormSection('Origin'),
-          OriginCountryField(controller: _originCountry),
+          OriginCountryField(key: ValueKey('origin$_prefillVersion'), controller: _originCountry),
           FormTextField('Region', _originRegion),
           const FormSection('Weight'),
           FormTextField(
@@ -506,7 +702,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
             value: _weightUnit,
             items: const ['ct', 'g', 'kg'],
             itemLabel: (v) => v == 'ct' ? 'ct (carat)' : v == 'g' ? 'g (grams)' : 'kg',
-            onChanged: (v) => setState(() => _weightUnit = v!),
+            onChanged: (v) { setState(() => _weightUnit = v!); _refreshTitle(); },
           ),
           const FormSection('Dimensions'),
           Row(
@@ -560,6 +756,22 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
           ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              if (_prefillNote != null)
+                Card(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.auto_fix_high, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(_prefillNote!)),
+                      ],
+                    ),
+                  ),
+                ),
               _buildPhotoSelector(),
 
               const FormSection('Video'),
@@ -581,6 +793,16 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                 ),
               ),
               FormTextField('Title *', _title),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Text(
+                  'Fills in by itself from the gem, weight and shape below — '
+                  'type your own title to change it.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
 
               const FormSection('Price'),
               PriceField(
@@ -621,7 +843,9 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: CascadingLocationPicker(
+                  key: ValueKey('location$_prefillVersion'),
                   sellerId: svc.effectiveSellerId,
+                  initialLocationId: _locationId,
                   onChanged: (id) => _locationId = id,
                   enabled: !_saving,
                 ),

@@ -68,7 +68,9 @@ class ItemPhotoManager extends StatelessWidget {
       return;
     }
 
-    final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+    // Shrunk on the device before upload: 2000 px is still sharp for the
+    // store zoom, and uploads from a phone are fast (no 10 MB failures).
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
     if (picked.isEmpty || !context.mounted) return;
 
     final toAdd = picked.take(remaining).toList();
