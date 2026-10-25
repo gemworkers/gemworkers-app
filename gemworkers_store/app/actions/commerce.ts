@@ -105,6 +105,9 @@ export async function buyNow(
   try {
     const session = await createCheckoutSession({
       mode: 'payment',
+      // The buyer's account email, filled in on Stripe's page: receipts go there,
+      // and in test mode a +location_CH address simulates a buyer in that country.
+      ...(user?.email ? { customer_email: user.email } : {}),
       line_items: [
         {
           quantity: 1,
@@ -279,6 +282,9 @@ export async function payAcceptedOffer(
   try {
     session = await createCheckoutSession({
       mode: 'payment',
+      // The buyer's account email, filled in on Stripe's page: receipts go there,
+      // and in test mode a +location_CH address simulates a buyer in that country.
+      ...(user?.email ? { customer_email: user.email } : {}),
       line_items: [
         {
           quantity: 1,
@@ -551,6 +557,9 @@ export async function checkoutCart(): Promise<
   try {
     const session = await createCheckoutSession({
       mode: 'payment',
+      // The buyer's account email, filled in on Stripe's page: receipts go there,
+      // and in test mode a +location_CH address simulates a buyer in that country.
+      ...(user?.email ? { customer_email: user.email } : {}),
       line_items: lineItems,
       shipping_address_collection: {
         // Only the buyer's chosen ship-to country (checked by checkoutShipTo).

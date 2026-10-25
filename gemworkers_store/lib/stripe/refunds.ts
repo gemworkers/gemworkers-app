@@ -4,8 +4,10 @@
 // currency (sql/local_currency.sql), and Stripe refunds in the currency the
 // buyer paid. So a refund of €X becomes the same share of what they paid:
 //   paid_in_their_currency × (€X ÷ € total of that payment)
-// The € total is stored on the payment at checkout (metadata eur_total_cents;
-// older Adaptive Pricing payments: the session's currency_conversion).
+// The € total is stored on the payment at checkout (metadata eur_total_cents).
+// Stripe Adaptive Pricing payments (CHF, JPY…) stay EUR on our side — the
+// payment is in EUR, Stripe refunds the buyer at the original rate — so they
+// need no conversion here.
 // When that is (within one unit of) everything still refundable, the exact
 // remainder is refunded, so rounding never leaves a cent behind.
 
