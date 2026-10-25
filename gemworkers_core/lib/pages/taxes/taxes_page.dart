@@ -15,7 +15,9 @@ import 'tax_report_tab.dart';
 /// Starting values are unchecked estimates — tick "Checked" once confirmed.
 /// Nothing here charges buyers until the checkout step uses it.
 class TaxesPage extends StatefulWidget {
-  const TaxesPage({super.key});
+  /// Tab to open first (4 = Tax report, from the Dashboard).
+  final int initialTab;
+  const TaxesPage({super.key, this.initialTab = 0});
 
   @override
   State<TaxesPage> createState() => _TaxesPageState();
@@ -104,6 +106,7 @@ class _TaxesPageState extends State<TaxesPage> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 5,
+      initialIndex: widget.initialTab,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Taxes & duties'),

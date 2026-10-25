@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../orders/order_detail_page.dart';
 import '../orders/order_status.dart';
 import 'dashboard_intelligence.dart';
+import 'money_overview.dart';
 
 /// Where a dashboard link goes; MainLayout maps it to a sidebar page + tab.
 enum DashboardDestination {
@@ -22,6 +23,9 @@ enum DashboardDestination {
   ordersAll,
   offers,
   listingsDraft,
+  payouts,
+  returns,
+  taxes,
 }
 
 /// Order statuses that count as a sale in "This month".
@@ -48,6 +52,7 @@ class _DashboardPageState extends State<DashboardPage> {
   int _pendingOffers = 0;
   DashboardTimeRange _timeRange = DashboardTimeRange.thisMonth;
   bool _loading = true;
+  final _moneyKey = GlobalKey<MoneyOverviewState>();
 
   @override
   void initState() {
@@ -98,6 +103,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _loading = false;
     });
     await _loadPendingOffers();
+    _moneyKey.currentState?.reload();
   }
 
   Future<void> _loadPendingOffers() async {
@@ -191,6 +197,16 @@ class _DashboardPageState extends State<DashboardPage> {
                           const SizedBox(height: 28),
                           _buildAttention(),
                           const SizedBox(height: 36),
+                          if (UserProfileService.instance.isOwner) ...[
+                            MoneyOverview(
+                              key: _moneyKey,
+                              onPayouts: () => widget.onNavigate(DashboardDestination.payouts),
+                              onReturns: () => widget.onNavigate(DashboardDestination.returns),
+                              onTaxes: () => widget.onNavigate(DashboardDestination.taxes),
+                              onOrders: () => widget.onNavigate(DashboardDestination.ordersAll),
+                            ),
+                            const SizedBox(height: 36),
+                          ],
                           _buildThisMonth(),
                           const SizedBox(height: 36),
                           _buildRecentOrders(),

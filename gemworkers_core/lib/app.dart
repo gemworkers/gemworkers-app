@@ -110,6 +110,7 @@ class _MainLayoutState extends State<MainLayout> {
   // Tab to open when a dashboard link switches page; cleared on sidebar taps.
   String? _ordersStatus;
   String? _listingsTab;
+  int _taxesTab = 0; // Taxes & duties tab when opened from the Dashboard
   int _toShipCount = 0;
   int _pendingOffersCount = 0;
   int _unreadMessagesCount = 0;
@@ -195,6 +196,7 @@ class _MainLayoutState extends State<MainLayout> {
     setState(() {
       _ordersStatus = null;
       _listingsTab = null;
+      _taxesTab = 0;
       switch (d) {
         case DashboardDestination.ordersToShip:
           _ordersStatus = 'confirmed';
@@ -210,6 +212,13 @@ class _MainLayoutState extends State<MainLayout> {
         case DashboardDestination.listingsDraft:
           _listingsTab = 'draft';
           _selectedIndex = _listingsIndex;
+        case DashboardDestination.payouts:
+          _selectedIndex = _pages.indexWhere((p) => p is PayoutsPage);
+        case DashboardDestination.returns:
+          _selectedIndex = _pages.indexWhere((p) => p is ReturnsPage);
+        case DashboardDestination.taxes:
+          _taxesTab = 4;
+          _selectedIndex = _pages.indexWhere((p) => p is TaxesPage);
       }
     });
     _loadCounts();
@@ -231,7 +240,7 @@ class _MainLayoutState extends State<MainLayout> {
         if (_isOwner) const MakersPage(),
         if (_isOwner) ReviewsPage(onPendingChanged: _loadReviewsCount),
         if (_isOwner) ReturnsPage(onOpenChanged: _loadReturnsCount),
-        if (_isOwner) const TaxesPage(),
+        if (_isOwner) TaxesPage(key: ValueKey('taxes-$_taxesTab'), initialTab: _taxesTab),
       ];
 
   List<ShopNavItem> get _destinations => [
@@ -349,6 +358,7 @@ class _MainLayoutState extends State<MainLayout> {
                 _selectedIndex = i;
                 _ordersStatus = null;
                 _listingsTab = null;
+                _taxesTab = 0;
               });
               _loadCounts();
             },
