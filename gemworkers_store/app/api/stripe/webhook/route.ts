@@ -8,6 +8,7 @@ import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/
 import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
 import { paidTotal } from '@/lib/tax'
 import { refundAmountInChargeCurrency, sessionEurTotal } from '@/lib/stripe/refunds'
+import { recordFeeForPayment } from '@/lib/stripe/fees'
 import { sendDisputeAlertEmail } from '@/lib/email/sendDisputeAlertEmail'
 import {
   sendLatePaymentOwnerEmail,
@@ -402,31 +403,8 @@ async function recordStripeFee(admin: AdminClient, session: Stripe.Checkout.Sess
   try {
     const pi = paymentIntentId(session)
     if (!pi || orderIds.length === 0) return
-    const intent = await stripe.paymentIntents.retrieve(pi, { expand: ['latest_charge.balance_transaction'] })
-    const charge = intent.latest_charge
-    const bt = charge && typeof charge !== 'string' ? charge.balance_transaction : null
-    if (!bt || typeof bt === 'string' || bt.currency !== 'eur') {
-      console.error('[webhook] stripe fee not available for', pi)
-      return
-    }
-    const { data } = await admin.from('orders').select('id, order_total, tax_amount').in('id', orderIds)
-    const rows = ((data as { id: string; order_total: string | number; tax_amount: string | number | null }[] | null) ?? [])
-      .map(o => ({ id: o.id, cents: Math.round(paidTotal(o.order_total, o.tax_amount) * 100) }))
-    const totalCents = rows.reduce((s, r) => s + r.cents, 0)
-    if (totalCents <= 0) return
-    // eur_received: the euros Stripe credited (before its fee) — differs from
-    // the euro price when the buyer paid in USD/GBP/… (sql/local_currency.sql).
-    let left = bt.fee
-    let leftGross = bt.amount
-    for (const [i, r] of rows.entries()) {
-      const last = i === rows.length - 1
-      const share = last ? left : Math.round(bt.fee * r.cents / totalCents)
-      const gross = last ? leftGross : Math.round(bt.amount * r.cents / totalCents)
-      left -= share
-      leftGross -= gross
-      const { error } = await admin.from('orders').update({ stripe_fee: share / 100, eur_received: gross / 100 }).eq('id', r.id)
-      if (error) console.error('[webhook] stripe fee save failed for order', r.id, ':', error.message)
-    }
+    // Not ready yet (usual for USD/GBP/… payments): the daily catch-up fills it in.
+    if (!(await recordFeeForPayment(admin, pi, orderIds))) console.error('[webhook] stripe fee not available yet for', pi)
   } catch (e) {
     console.error('[webhook] stripe fee lookup threw:', e instanceof Error ? e.message : String(e))
   }
