@@ -52,7 +52,12 @@ export function stoneSeoDescription(s: SeoStone): string {
     s.certification_lab ? `certified by ${s.certification_lab}` : null,
   ].filter(Boolean).join(', ')
   const own = (s.description ?? '').replace(/\s+/g, ' ').trim()
-  const base = `Natural ${what.toLowerCase()}${facts ? `, ${facts}` : ''}. ${own}`.trim()
+  const gem = [s.variety, s.gem_type].filter(Boolean).join(' ')
+  const piece = s.jewelry_type ? s.jewelry_type.charAt(0).toUpperCase() + s.jewelry_type.slice(1).toLowerCase() : 'Jewellery'
+  const opening = s.product_type === 'jewelry'
+    ? `${piece}${gem ? ` with natural ${gem.toLowerCase()}` : ''}`
+    : `Natural ${what.toLowerCase()}`
+  const base = `${opening}${facts ? `, ${facts}` : ''}. ${own}`.trim()
   const tail = ' Tracked worldwide shipping and 30-day returns at GemWorkers.'
   const room = 155 - tail.length
   return (base.length > room ? base.slice(0, room - 1).replace(/\s+\S*$/, '') + '…' : base) + tail
