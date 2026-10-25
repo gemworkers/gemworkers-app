@@ -5,6 +5,7 @@ import { StoneGrid } from '@/app/components/StoneGrid'
 import type { StoneCardItem } from '@/app/components/StoneCard'
 import { priceContext } from '@/lib/display-price'
 import { favouriteIds } from '@/lib/favourites'
+import { fxContext } from '@/lib/fx'
 
 export const metadata = { title: 'Favourites · GemWorkers' }
 
@@ -48,7 +49,7 @@ export default async function FavouritesPage() {
           <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
         </div>
       ) : (
-        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} favouriteIds={ids} />
+        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} favouriteIds={ids} fx={await fxContext()} />
       )}
     </main>
   )

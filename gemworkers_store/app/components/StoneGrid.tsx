@@ -2,10 +2,11 @@
 
 import { useEffect, useRef } from 'react'
 import { StoneCard, type StoneCardItem } from './StoneCard'
-import type { PriceContext } from '@/lib/price-shown'
+import type { PriceContext, FxContext } from '@/lib/price-shown'
 
-export function StoneGrid({ items, className = 'stones-grid', priceCtx = null, favouriteIds }: {
+export function StoneGrid({ items, className = 'stones-grid', priceCtx = null, favouriteIds, fx = null }: {
   items: StoneCardItem[]; className?: string; priceCtx?: PriceContext | null; favouriteIds?: string[] | null
+  fx?: FxContext | null
 }) {
   const gridRef = useRef<HTMLDivElement>(null)
 
@@ -31,7 +32,7 @@ export function StoneGrid({ items, className = 'stones-grid', priceCtx = null, f
 
   return (
     <div ref={gridRef} className={className}>
-      {items.map((item, i) => <StoneCard key={item.id} item={item} index={i} priceCtx={priceCtx} favouriteIds={favouriteIds} />)}
+      {items.map((item, i) => <StoneCard key={item.id} item={item} index={i} priceCtx={priceCtx} favouriteIds={favouriteIds} fx={fx} />)}
     </div>
   )
 }

@@ -17,7 +17,8 @@ import { makerVerb, makerHref } from '@/lib/makers';
 import { currentShipToCode } from '@/lib/ship-to';
 import { taxQuote, taxNote, ratePercent } from '@/lib/tax';
 import { priceContext } from '@/lib/display-price';
-import { shownPrice } from '@/lib/price-shown';
+import { shownPrice, approxPrice } from '@/lib/price-shown';
+import { fxContext } from '@/lib/fx';
 import type { Metadata } from 'next';
 import { stoneSeoTitle, stoneSeoDescription, stoneJsonLd, type SeoStone } from '@/lib/seo';
 import { favouriteIds } from '@/lib/favourites';
@@ -359,6 +360,7 @@ export default async function StoneDetailPage({
   // EU consumers: prices incl. VAT when the stone ships from inside the EU.
   const pctx = shipToRow?.enabled ? await priceContext() : null;
   const favs = await favouriteIds();
+  const fx = await fxContext();
   const shownStone = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, pctx);
   const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx).amount;
 
@@ -432,10 +434,17 @@ export default async function StoneDetailPage({
             {item.sale_method === 'accept_offers' ? (
               <p className="pd-price">Make an offer</p>
             ) : item.selling_price != null ? (
-              <p className="pd-price">
-                {formatEur(shownStone!.amount)}
-                {shownStone!.inclVat && <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
-              </p>
+              <>
+                <p className="pd-price">
+                  {formatEur(shownStone!.amount)}
+                  {shownStone!.inclVat && <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
+                </p>
+                {approxPrice(shownStone!.amount, fx) && (
+                  <p className="pd-shipline" title="Approximate — you pay in euros; your bank or card converts the amount">
+                    {approxPrice(shownStone!.amount, fx)} · you pay in euros
+                  </p>
+                )}
+              </>
             ) : (
               <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}

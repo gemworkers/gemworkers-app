@@ -9,7 +9,8 @@ import { pillDark, pillOutline } from '@/lib/ui'
 import { formatEur } from '@/lib/money'
 import { currentShipToCode } from '@/lib/ship-to'
 import { priceContext } from '@/lib/display-price'
-import { shownPrice, type PriceContext } from '@/lib/price-shown'
+import { shownPrice, approxPrice, type PriceContext } from '@/lib/price-shown'
+import { fxContext } from '@/lib/fx'
 import { taxQuote, taxNote, paidTotal, ratePercent, type TaxQuote } from '@/lib/tax'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ export default async function CartPage() {
   quoteList.forEach((q, i) => { if (q) quoteMap.set(buyableIds[i], q) })
   const quotes = [...quoteMap.values()]
   const pctx = shipTo?.enabled ? await priceContext() : null
+  const fx = await fxContext()
   const vatTotal = quotes.reduce((sum, q) => paidTotal(sum, q.taxAmount), 0)
   const vatRates = [...new Set(quotes.filter(q => q.taxAmount > 0 && q.taxRate != null).map(q => ratePercent(q.taxRate!)))]
   const payTotal = paidTotal(grandTotal, vatTotal)
@@ -190,6 +192,11 @@ export default async function CartPage() {
                 <span>Total</span>
                 <span>{formatEur(payTotal)}</span>
               </div>
+              {approxPrice(payTotal, fx) && (
+                <p style={{ fontSize: 13, color: '#6B6052', margin: '-4px 0 12px', textAlign: 'right' }}>
+                  {approxPrice(payTotal, fx)} · you pay in euros
+                </p>
+              )}
               {shipTo?.enabled && (
                 <p style={{ fontSize: 13, marginBottom: 12 }}>
                   <Link href="/business" className="pd-link">Buying for a business? Add your VAT number</Link>

@@ -6,6 +6,7 @@ import type { StoneCardItem } from '@/app/components/StoneCard'
 import { shownPrice } from '@/lib/price-shown'
 import { countryName } from '@/lib/countries'
 import { favouriteIds } from '@/lib/favourites'
+import { fxContext } from '@/lib/fx'
 
 const TYPE_LABELS: Record<string, string> = {
   loose_stone: 'Loose Gemstones',
@@ -248,7 +249,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
           <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
         </div>
       ) : (
-        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={pctx} favouriteIds={favs} />
+        <StoneGrid items={items} className="home-arrivals-grid" priceCtx={pctx} favouriteIds={favs} fx={await fxContext()} />
       )}
     </main>
   )
