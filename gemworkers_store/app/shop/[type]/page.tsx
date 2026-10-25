@@ -51,6 +51,24 @@ function Breadcrumb({ label }: { label: string }) {
   )
 }
 
+const TYPE_SEO: Record<string, string> = {
+  loose_stone: 'Natural loose gemstones — tourmaline, sapphire, aquamarine and more, cut and certified on request.',
+  specimen:    'Natural mineral specimens and crystals, collected from the source.',
+  jewelry:     'Handmade jewellery with natural gemstones.',
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ type: string }> }) {
+  const { type } = await params
+  const label = TYPE_LABELS[type] ?? 'Shop'
+  const description = `${TYPE_SEO[type] ?? 'Natural gemstones, specimens and jewellery.'} Tracked worldwide shipping and 30-day returns.`
+  return {
+    title: `${label} · GemWorkers`,
+    description,
+    alternates: { canonical: `/shop/${type}` },
+    openGraph: { title: `${label} · GemWorkers`, description, url: `/shop/${type}` },
+  }
+}
+
 export default async function ShopCategoryPage({ params, searchParams }: PageProps) {
   const { type } = await params
   const { gem }  = await searchParams

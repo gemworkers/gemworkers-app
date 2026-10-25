@@ -23,8 +23,11 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'GemWorkers',
-  description: 'Curated gemstones, minerals and jewelry, direct from specialist sellers.',
+  metadataBase: new URL('https://www.gemworkers.com'),
+  title: 'GemWorkers — natural gemstones, mineral specimens & jewellery',
+  description: 'Natural gemstones, mineral specimens and jewellery, honestly described. Tracked worldwide shipping and 30-day returns.',
+  openGraph: { siteName: 'GemWorkers', type: 'website', locale: 'en_GB' },
+  twitter: { card: 'summary_large_image' },
 }
 
 const TRUST_POINTS = [

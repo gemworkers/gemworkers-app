@@ -18,6 +18,8 @@ import { currentShipToCode } from '@/lib/ship-to';
 import { taxQuote, taxNote, ratePercent } from '@/lib/tax';
 import { priceContext } from '@/lib/display-price';
 import { shownPrice } from '@/lib/price-shown';
+import type { Metadata } from 'next';
+import { stoneSeoTitle, stoneSeoDescription, stoneJsonLd, type SeoStone } from '@/lib/seo';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -135,6 +137,26 @@ function NotAvailable() {
       </Link>
     </main>
   );
+}
+
+// ── Search engines & link previews ────────────────────────────────────────────
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase.from('public_listing_details').select('*').eq('id', id).maybeSingle();
+  if (!data) return { title: 'Not available · GemWorkers', robots: { index: false } };
+  const s = data as SeoStone;
+  const title = `${stoneSeoTitle(s)} · GemWorkers`;
+  const description = stoneSeoDescription(s);
+  const image = s.image_urls?.[0];
+  return {
+    title,
+    description,
+    alternates: { canonical: `/stones/${s.id}` },
+    openGraph: { title, description, url: `/stones/${s.id}`, type: 'website', ...(image && { images: [{ url: image }] }) },
+    twitter: { card: 'summary_large_image', title, description, ...(image && { images: [image] }) },
+  };
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -344,6 +366,11 @@ export default async function StoneDetailPage({
 
   return (
     <main className="pd-wrap" style={{ paddingTop: 28, paddingBottom: 96 }}>
+      {/* Google Product data (lib/seo.ts) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(stoneJsonLd(item as unknown as SeoStone, item.seller_country)).replace(/</g, '\\u003c') }}
+      />
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="pd-crumbs">
         <Link href="/">Home</Link>
