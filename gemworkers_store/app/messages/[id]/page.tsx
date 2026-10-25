@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ThreadView } from './ThreadView'
 import type { StoneCardData, ThreadMessage } from '../shared'
+import { priceContext } from '@/lib/display-price'
+import { shownPrice } from '@/lib/price-shown'
 
 export const metadata = { title: 'Messages · GemWorkers' }
 
@@ -46,6 +48,18 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
   if (ids.length > 0) {
     const { data: cards } = await supabase.rpc('message_stone_cards', { p_ids: ids })
     for (const card of (cards ?? []) as StoneCardData[]) stones[card.id] = card
+
+    // EU consumers see prices incl. VAT (same rule as the stone page).
+    const pctx = await priceContext()
+    if (pctx) {
+      const { data: from } = await supabase.from('public_listings').select('id, seller_country').in('id', Object.keys(stones))
+      for (const f of (from ?? []) as { id: string; seller_country: string | null }[]) {
+        const card = stones[f.id]
+        if (card?.selling_price == null) continue
+        const shown = shownPrice(Number(card.selling_price), f.seller_country, pctx)
+        stones[f.id] = { ...card, selling_price: shown.amount, incl_vat: shown.inclVat }
+      }
+    }
   }
 
   return (

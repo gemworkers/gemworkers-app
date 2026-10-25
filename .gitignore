@@ -46,3 +46,7 @@ app.*.map.json
 
 # Claude Code local tooling config
 .claude/
+
+# Root tools (Supabase CLI via npx) and editor settings
+/node_modules/
+.vscode/

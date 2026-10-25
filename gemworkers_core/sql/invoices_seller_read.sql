@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Sellers can read the invoices of their own orders
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-25
 --
 -- A brother shipping from Thailand / Pakistan puts the GemWorkers invoice in
 -- the parcel (customs: CN23 needs a commercial invoice). The invoice already

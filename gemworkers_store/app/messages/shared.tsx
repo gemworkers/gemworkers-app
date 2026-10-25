@@ -15,6 +15,7 @@ export type StoneCardData = {
   selling_price: number | null
   product_type: string | null
   status: 'available' | 'reserved' | 'unavailable'
+  incl_vat?: boolean   // selling_price already includes VAT (EU consumer; set by the page)
 }
 
 // buyer_messages row
@@ -155,7 +156,9 @@ export function MessageStoneCard({
 
         <div className="msg-stone-meta">
           {stone.status === 'available' && stone.selling_price != null && (
-            <span className="msg-stone-price">{formatEur(Number(stone.selling_price))}</span>
+            <span className="msg-stone-price">
+              {formatEur(Number(stone.selling_price))}{stone.incl_vat ? ' incl. VAT' : ''}
+            </span>
           )}
           {stone.status === 'reserved' && (
             <span className="order-pill msg-stone-badge">Reserved</span>
