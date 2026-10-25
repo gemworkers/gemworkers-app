@@ -404,7 +404,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
         _row('Cost price', hasCost ? _eur(cost) : ''),
         if (payout != null) _row('You receive', _eur(payout)),
         if (payout != null && hasCost)
-          _row('Profit after commission', _eur(payout - cost)),
+          _row('Profit after service fee', _eur(payout - cost)),
       ];
     }
 

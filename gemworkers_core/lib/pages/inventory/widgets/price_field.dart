@@ -12,7 +12,7 @@ double? parsePrice(String text) {
   return v == null ? null : double.parse(v.toStringAsFixed(2));
 }
 
-/// "You'll receive €X after N% commission" line (+ default-rate note).
+/// "You'll receive €X" + what the GemWorkers service fee covers (+ default-rate note).
 class PayoutLine extends StatelessWidget {
   final double? price;
   final double rate;
@@ -35,10 +35,18 @@ class PayoutLine extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          "You'll receive €${receive.toStringAsFixed(2)} "
-          'after ${commissionLabel(rate)} commission',
+          "You'll receive €${receive.toStringAsFixed(2)}",
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
+        if (rate > 0) ...[
+          const SizedBox(height: 2),
+          Text(
+            'After the GemWorkers service fee of ${commissionLabel(rate)} (min. €3). It covers card, '
+            'PayPal and Klarna fees, currency exchange, VAT and customs paperwork, customer service, '
+            'returns and marketing — you pay nothing else.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        ],
         if (note != null) ...[
           const SizedBox(height: 4),
           Text(
@@ -102,6 +110,36 @@ class _PriceFieldState extends State<PriceField> {
     if (mounted) setState(() => _rate = r);
   }
 
+  /// "I want to receive €100" → sets the price (€114 at 12%).
+  Future<void> _fromPayout(double rate) async {
+    final c = TextEditingController();
+    final want = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('What do you want to receive?'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          decoration: InputDecoration(
+            prefixText: '€ ',
+            helperText: 'At full price, after the ${commissionLabel(rate)} service fee (min. €3)',
+            helperMaxLines: 2,
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, parsePrice(c.text)), child: const Text('Set price')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (want == null || want <= 0) return;
+    final p = priceForPayout(want, rate);
+    widget.controller.text = p.toStringAsFixed(p % 1 == 0 ? 0 : 2);
+  }
+
   @override
   Widget build(BuildContext context) {
     final rate = _rate;
@@ -130,12 +168,19 @@ class _PriceFieldState extends State<PriceField> {
               width: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          else
+          else ...[
             PayoutLine(
               price: parsePrice(widget.controller.text),
               rate: rate.rate,
               source: rate.source,
             ),
+            if (rate.rate > 0 && widget.enabled)
+              TextButton(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                onPressed: () => _fromPayout(rate.rate),
+                child: const Text('Work out the price from what I want to receive'),
+              ),
+          ],
         ],
       ),
     );

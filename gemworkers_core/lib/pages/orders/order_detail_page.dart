@@ -856,9 +856,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         return [
           const Divider(height: 16),
           if (order.commissionAmount > 0)
-            _moneyRow('Platform fee (${_pct(order.commissionRate)})', order.commissionAmount, prefix: '−'),
-          if (fee > 0) _moneyRow('Stripe fee', fee, prefix: '−'),
+            _moneyRow('GemWorkers service fee (${_pct(order.commissionRate)}, min. €3 — includes payment & exchange costs)', order.commissionAmount, prefix: '−'),
           _moneyRow('Seller payout', order.sellerPayout, bold: true),
+          // Paid by GemWorkers out of the commission — owner only.
+          if (fee > 0 && isOwner) _moneyRow('Stripe fee (paid by GemWorkers)', fee),
           _row('Payout', _payoutStatusLabel(order)),
         ];
       case 'own':
@@ -871,7 +872,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         return [
           if (order.commissionAmount > 0) ...[
             const Divider(height: 16),
-            _moneyRow('Platform fee (${_pct(order.commissionRate)})', order.commissionAmount, prefix: '−'),
+            _moneyRow('GemWorkers service fee (${_pct(order.commissionRate)})', order.commissionAmount, prefix: '−'),
             _moneyRow('Seller payout', order.sellerPayout, bold: true),
             _row('Payout', _payoutStatusLabel(order)),
           ],

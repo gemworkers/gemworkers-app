@@ -64,10 +64,29 @@ Future<CommissionRate> loadSellerCommissionRate(String? sellerId) async {
   }
 }
 
-/// Commission on a buyer price — mirrors deployed order math:
-/// ROUND(item_price × rate, 2).
-double commissionFee(double price, double rate) =>
-    double.parse((price * rate).toStringAsFixed(2));
+/// Minimum commission per sale when a seller has a commission rate
+/// (sql/commission_all_inclusive.sql).
+const kMinCommission = 3.0;
+
+/// Commission on a buyer price — mirrors the order math: ROUND(price × rate, 2),
+/// at least €3 when the rate is above 0, never more than the price. The
+/// commission includes all payment costs (Stripe is not deducted separately).
+double commissionFee(double price, double rate) {
+  final c = double.parse((price * rate).toStringAsFixed(2));
+  if (rate <= 0) return c;
+  return c < kMinCommission ? (price < kMinCommission ? price : kMinCommission) : c;
+}
+
+/// The price to ask so the seller receives [want] at full price
+/// (whole euros, rounded up).
+double priceForPayout(double want, double rate) {
+  if (want <= 0) return 0;
+  if (rate <= 0) return want.ceilToDouble();
+  var p = (want / (1 - rate)).ceilToDouble();
+  // The €3 minimum applies on small prices.
+  if (p - commissionFee(p, rate) < want) p = (want + kMinCommission).ceilToDouble();
+  return p;
+}
 
 /// What the seller receives for a buyer price.
 double payoutAfterCommission(double price, double rate) =>
