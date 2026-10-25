@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — EORI number on invoices (exports from NL)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-25
 --
 -- store_settings key 'company_eori' (set by the owner in admin → Taxes &
 -- duties → Company details). Couriers ask for it on exports from NL to
