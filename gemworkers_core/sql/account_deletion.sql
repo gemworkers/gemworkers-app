@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Buyers can delete their account (GDPR right to erasure)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-25
 --
 -- What we must KEEP (tax law, 7 / 10 years): orders, invoices, credit notes,
 -- returns, refunds — they hold the snapshot needed for the books. Everything
