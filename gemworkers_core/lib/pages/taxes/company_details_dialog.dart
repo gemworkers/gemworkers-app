@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// details it was issued with, so fill this in before the first real sale.
 Future<void> showCompanyDetailsDialog(BuildContext context) async {
   final supabase = Supabase.instance.client;
-  const keys = ['company_name', 'company_address', 'company_kvk', 'company_vat', 'company_email'];
+  const keys = ['company_name', 'company_address', 'company_kvk', 'company_vat', 'company_eori', 'company_email'];
 
   Map<String, String> current = {};
   try {
@@ -50,6 +50,15 @@ Future<void> showCompanyDetailsDialog(BuildContext context) async {
                 ),
               ),
               const SizedBox(height: 8),
+              TextField(
+                controller: c['company_eori'],
+                decoration: const InputDecoration(
+                  labelText: 'EORI number',
+                  hintText: 'NL…',
+                  helperText: 'For exports from NL to outside the EU (couriers ask for it).',
+                ),
+              ),
+              const SizedBox(height: 8),
               TextField(controller: c['company_email'], decoration: const InputDecoration(labelText: 'Email on invoices')),
               const SizedBox(height: 12),
               const Text(
@@ -74,7 +83,7 @@ Future<void> showCompanyDetailsDialog(BuildContext context) async {
         for (final k in keys)
           {
             'key': k,
-            'value': k == 'company_vat'
+            'value': k == 'company_vat' || k == 'company_eori'
                 ? c[k]!.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '')
                 : c[k]!.text.trim(),
             'updated_at': now,

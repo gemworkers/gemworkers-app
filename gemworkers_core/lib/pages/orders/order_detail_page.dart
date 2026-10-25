@@ -35,6 +35,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   List<Map<String, dynamic>> _customsItems = [];
   String? _shipFrom; // seller country code
   Map<String, dynamic>? _invoice; // {id, number}
+  String? _eori; // GemWorkers' EORI (exports from NL; owner only)
   bool _actionInProgress = false;
 
   @override
@@ -70,6 +71,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           if (order.sellerId != null) {
             final s = await sb.from('sellers').select('country').eq('id', order.sellerId!).maybeSingle();
             _shipFrom = s?['country']?.toString();
+          }
+          if (_shipFrom == 'NL' && UserProfileService.instance.isOwner) {
+            final e = await sb.from('store_settings').select('value').eq('key', 'company_eori').maybeSingle();
+            _eori = e?['value']?.toString();
           }
           _invoice = await sb.from('invoices').select('id, number')
               .eq('order_id', widget.orderId).eq('kind', 'invoice').maybeSingle();
@@ -557,6 +562,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       if ((order.shippingCost ?? 0) > 0) ('Shipping charged', '€${order.shippingCost!.toStringAsFixed(2)} EUR'),
       ('Invoice', _invoice == null ? 'Not issued yet' : '${_invoice!['number']} (print it and put it in the parcel)'),
       ('Sender name', 'GemWorkers'),
+      if (_shipFrom == 'NL') ('EORI (exporter)', (_eori ?? '').isEmpty ? 'Add it in Taxes & duties → Company details' : _eori!),
+      if (_shipFrom == 'NL' && goods > 1000) ('Export declaration', 'Over €1,000: the courier makes it with your EORI — keep their export document as proof'),
       ('Import taxes', 'Paid by the buyer on delivery (DAP / DDU)'),
     ];
     final text = lines.map((l) => '${l.$1}: ${l.$2}').join('\n');

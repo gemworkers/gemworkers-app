@@ -14,7 +14,7 @@ export const metadata = { title: 'Invoice · GemWorkers' }
 
 type Line = { description: string; detail?: string | null; quantity: number; amount: number | string }
 type InvoiceData = {
-  company: { name: string; address: string | null; kvk: string | null; vat: string | null; email: string }
+  company: { name: string; address: string | null; kvk: string | null; vat: string | null; eori?: string | null; email: string }
   order_number: string
   supply_date: string | null
   credits_invoice?: string
@@ -89,6 +89,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <p style={{ ...muted, margin: '6px 0 0' }}>
               {d.company.vat ? `VAT ${d.company.vat}` : 'VAT number: —'}
               {d.company.kvk ? ` · KvK ${d.company.kvk}` : ''}
+              {d.company.eori ? ` · EORI ${d.company.eori}` : ''}
               <br />{d.company.email}
             </p>
           </div>
