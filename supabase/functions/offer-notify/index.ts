@@ -42,6 +42,10 @@ interface OfferRecord {
   counter_price?:      number | string | null
   counter_expires_at?: string | null
   countered_by_role?:  string | null
+  // Offers in the buyer's own currency (sql/offers_local_currency.sql)
+  offer_currency?:     string | null
+  local_offered?:      number | string | null
+  local_counter?:      number | string | null
 }
 
 interface WebhookPayload {
@@ -56,6 +60,22 @@ interface OrderRow {
   order_total:    number | string | null
   shipping_cost:  number | string | null
   payment_due_at: string | null
+  charge_currency?: string | null
+  charge_amount?:   number | string | null
+  charge_shipping?: number | string | null
+}
+
+const ORDER_PAY_COLS = "order_total, shipping_cost, payment_due_at, charge_currency, charge_amount, charge_shipping"
+
+// What the buyer pays for an order: in their own currency when it was agreed
+// in it (US/GB/AU/CA), else euros. Shipping null = none.
+function orderPay(o: OrderRow): { total: string; shipping: string | null } {
+  if (o.charge_currency && o.charge_currency !== "EUR" && o.charge_amount != null) {
+    const ship = Number(o.charge_shipping ?? 0)
+    return { total: money(Number(o.charge_amount), o.charge_currency), shipping: ship > 0 ? money(ship, o.charge_currency) : null }
+  }
+  const ship = Number(o.shipping_cost ?? 0)
+  return { total: eur(Number(o.order_total)), shipping: ship > 0 ? eur(ship) : null }
 }
 
 interface ReminderPayload {
@@ -108,6 +128,16 @@ const eurCents = new Intl.NumberFormat("en-IE", { style: "currency", currency: "
 
 function eur(n: number): string {
   return Number.isInteger(n) ? eurWhole.format(n) : eurCents.format(n)
+}
+
+// $300, £49.50, A$120, C$75 — same whole / 2-decimal rule.
+const LOCALE: Record<string, string> = { USD: "en-US", GBP: "en-GB", AUD: "en-AU", CAD: "en-CA" }
+function money(n: number, currency: string): string {
+  if (currency === "EUR") return eur(n)
+  const digits = Number.isInteger(n) ? 0 : 2
+  return new Intl.NumberFormat(LOCALE[currency] ?? "en-GB", {
+    style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(n)
 }
 
 const utcDate = new Intl.DateTimeFormat("en-GB", {
@@ -299,8 +329,8 @@ function buyerCounterEmail(stoneTitle: string, offered: string, counter: string,
   }
 }
 
-function buyerCounterAcceptedEmail(stoneTitle: string, counter: string, total: string, shipping: number, dueAt: string): Email {
-  const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
+function buyerCounterAcceptedEmail(stoneTitle: string, counter: string, total: string, shipping: string | null, dueAt: string): Email {
+  const totalLine = shipping ? `${total} (including ${shipping} shipping)` : total
   const subject   = "Your stone is reserved"
   return {
     subject,
@@ -340,8 +370,8 @@ function buyerCounterExpiredEmail(stoneTitle: string, counter: string, itemId: s
   }
 }
 
-function buyerAcceptedEmail(stoneTitle: string, amount: string, total: string, shipping: number, dueAt: string): Email {
-  const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
+function buyerAcceptedEmail(stoneTitle: string, amount: string, total: string, shipping: string | null, dueAt: string): Email {
+  const totalLine = shipping ? `${total} (including ${shipping} shipping)` : total
   const subject   = "Your offer was accepted"
   return {
     subject,
@@ -363,8 +393,8 @@ function buyerAcceptedEmail(stoneTitle: string, amount: string, total: string, s
   }
 }
 
-function buyerPaymentReminderEmail(stoneTitle: string, total: string, shipping: number, dueAt: string): Email {
-  const totalLine = shipping > 0 ? `${total} (including ${eur(shipping)} shipping)` : total
+function buyerPaymentReminderEmail(stoneTitle: string, total: string, shipping: string | null, dueAt: string): Email {
+  const totalLine = shipping ? `${total} (including ${shipping} shipping)` : total
   const subject   = `Reminder: complete your payment for ${stoneTitle}`
   return {
     subject,
@@ -546,7 +576,7 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
 
   const { data: orderData, error: orderErr } = await supabase
     .from("orders")
-    .select("id, status, buyer_id, offer_id, order_total, shipping_cost, payment_due_at")
+    .select("id, status, buyer_id, offer_id, order_total, shipping_cost, payment_due_at, charge_currency, charge_amount, charge_shipping")
     .eq("id", orderId)
     .maybeSingle()
   const order = orderData as ReminderOrderRow | null
@@ -595,10 +625,11 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
     return json({ ok: true, emailsSent: 0, reason: "no buyer email" })
   }
 
+  const pay = orderPay(order)
   const email = buyerPaymentReminderEmail(
     stoneTitle,
-    eur(Number(order.order_total)),
-    Number(order.shipping_cost ?? 0),
+    pay.total,
+    pay.shipping,
     utcDate.format(new Date(order.payment_due_at)),
   )
   const sent = await sendEmail(resendApiKey, buyerAddr, email, `order ${orderId} payment_reminder (buyer)`)
@@ -1127,10 +1158,17 @@ Deno.serve(async (req: Request) => {
   const invRow     = inv as { sku: string | null; title: string | null } | null
   const sku        = invRow?.sku?.trim()   || "a stone"
   const stoneTitle = invRow?.title?.trim() || "your stone"
-  const amount     = eur(Number(offer.offered_price))
+  const amountEur  = eur(Number(offer.offered_price))
   // Set once the offer was countered; an accepted offer with a counter price
   // was accepted at that price.
-  const counterAmount = offer.counter_price != null ? eur(Number(offer.counter_price)) : null
+  const counterEur = offer.counter_price != null ? eur(Number(offer.counter_price)) : null
+  // Buyer's currency (US/GB/AU/CA offers): buyers see only that; staff see
+  // both, e.g. "$300 (€262.61)".
+  const cur = offer.offer_currency && offer.offer_currency !== "EUR" ? offer.offer_currency : null
+  const buyerAmount = cur && offer.local_offered != null ? money(Number(offer.local_offered), cur) : amountEur
+  const buyerCounter = cur && offer.local_counter != null ? money(Number(offer.local_counter), cur) : counterEur
+  const amount = buyerAmount !== amountEur ? `${buyerAmount} (${amountEur})` : amountEur
+  const counterAmount = counterEur && buyerCounter !== counterEur ? `${buyerCounter} (${counterEur})` : counterEur
 
   if (event.startsWith("counter") && !counterAmount) {
     console.error("[offer-notify] offer", offer.id, "event", event, "has no counter_price — no email")
@@ -1192,7 +1230,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: orderData, error: orderErr } = await supabase
         .from("orders")
-        .select("order_total, shipping_cost, payment_due_at")
+        .select(ORDER_PAY_COLS)
         .eq("offer_id", offer.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -1207,9 +1245,9 @@ Deno.serve(async (req: Request) => {
           who: "buyer",
           email: buyerAcceptedEmail(
             stoneTitle,
-            amount,
-            eur(Number(order.order_total)),
-            Number(order.shipping_cost ?? 0),
+            buyerAmount,
+            orderPay(order).total,
+            orderPay(order).shipping,
             utcDate.format(new Date(order.payment_due_at)),
           ),
         })
@@ -1240,7 +1278,7 @@ Deno.serve(async (req: Request) => {
         outbox.push({
           to:    buyerAddr,
           who:   "buyer",
-          email: buyerDeclinedEmail(stoneTitle, amount, offer.inventory_item_id, offer.responded_by_role === "system"),
+          email: buyerDeclinedEmail(stoneTitle, buyerAmount, offer.inventory_item_id, offer.responded_by_role === "system"),
         })
       }
       break
@@ -1265,8 +1303,8 @@ Deno.serve(async (req: Request) => {
           who: "buyer",
           email: buyerCounterEmail(
             stoneTitle,
-            amount,
-            counterAmount!,
+            buyerAmount,
+            buyerCounter!,
             utcDate.format(new Date(offer.counter_expires_at)),
             offer.inventory_item_id,
           ),
@@ -1295,7 +1333,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: orderData, error: orderErr } = await supabase
         .from("orders")
-        .select("order_total, shipping_cost, payment_due_at")
+        .select(ORDER_PAY_COLS)
         .eq("offer_id", offer.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -1310,9 +1348,9 @@ Deno.serve(async (req: Request) => {
           who: "buyer",
           email: buyerCounterAcceptedEmail(
             stoneTitle,
-            counterAmount!,
-            eur(Number(order.order_total)),
-            Number(order.shipping_cost ?? 0),
+            buyerCounter!,
+            orderPay(order).total,
+            orderPay(order).shipping,
             utcDate.format(new Date(order.payment_due_at)),
           ),
         })
@@ -1330,7 +1368,7 @@ Deno.serve(async (req: Request) => {
           outbox.push({
             to:    buyerAddr,
             who:   "buyer",
-            email: buyerDeclinedEmail(stoneTitle, amount, offer.inventory_item_id, true),
+            email: buyerDeclinedEmail(stoneTitle, buyerAmount, offer.inventory_item_id, true),
           })
         }
       } else {
@@ -1345,7 +1383,7 @@ Deno.serve(async (req: Request) => {
         outbox.push({
           to:    buyerAddr,
           who:   "buyer",
-          email: buyerCounterExpiredEmail(stoneTitle, counterAmount!, offer.inventory_item_id),
+          email: buyerCounterExpiredEmail(stoneTitle, buyerCounter!, offer.inventory_item_id),
         })
       }
       queueStaff(await loadSellerEmail(), staffCounterExpiredEmail(sku, counterAmount!))

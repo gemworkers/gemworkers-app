@@ -8,6 +8,7 @@
 import { cache } from 'react'
 import { currentShipToCode } from '@/lib/ship-to'
 import type { FxContext } from '@/lib/price-shown'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const ECB_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml'
 
@@ -58,6 +59,22 @@ export const fxContext = cache(async (): Promise<FxContext | null> => {
   const rate = USD_PEG[code] ? rates.USD * USD_PEG[code] : rates[code]
   return rate ? { code, rate, exact: EXACT[country] === code } : null
 })
+
+/** Offers: the buyer's currency for the current "Ship to" (US/GB/AU/CA), or
+ *  null = offer in EUR. Saves today's rate to fx_rates first — the database
+ *  converts the offer with that rate (sql/offers_local_currency.sql). */
+export async function offerCurrencyNow(): Promise<{ code: string; rate: number } | null> {
+  const cc = await chargeCurrencyFor(await currentShipToCode())
+  if (!cc) return null
+  const { error } = await createAdminClient()
+    .from('fx_rates')
+    .upsert({ currency: cc.code, rate: cc.rate, updated_at: new Date().toISOString() })
+  if (error) {
+    console.error('[fx] rate not saved for offers:', error.message)
+    return null
+  }
+  return cc
+}
 
 /** Checkout: the currency and rate to charge an order shipped to [country]
  *  in (same rates as the prices shown), or null = charge in EUR. */

@@ -415,9 +415,16 @@ class _OfferCard extends StatelessWidget {
             if (_percentOfPrice != null) _PercentChip(_percentOfPrice!),
           ],
         ),
+        // Offer made in the buyer's currency: what they typed / will see.
+        if (StorefrontOffer.localLabel(offer.offerCurrency, offer.localOffered) != null)
+          Text(
+            'Buyer offered ${StorefrontOffer.localLabel(offer.offerCurrency, offer.localOffered)} · you decide in euros',
+            style: AppTheme.numeric(textTheme.bodyMedium, color: AppColors.muted),
+          ),
         if (offer.counterPrice != null)
           Text(
-            'Counter-offer ${_money(offer.counterPrice!)}',
+            'Counter-offer ${_money(offer.counterPrice!)}'
+            '${StorefrontOffer.localLabel(offer.offerCurrency, offer.localCounter) != null ? ' (buyer sees ${StorefrontOffer.localLabel(offer.offerCurrency, offer.localCounter)})' : ''}',
             style: AppTheme.numeric(textTheme.bodyMedium,
                 color: AppColors.accent),
           ),

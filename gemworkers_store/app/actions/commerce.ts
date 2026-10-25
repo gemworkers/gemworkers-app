@@ -9,28 +9,34 @@ import { checkoutShipTo } from '@/lib/ship-to'
 import { applyOrderTax, vatLineItem, reverseChargeText } from '@/lib/tax'
 import { createCheckoutSession } from '@/lib/stripe/checkout'
 import { refreshBusinessCheck } from '@/lib/business'
-import { chargeCurrencyFor } from '@/lib/fx'
+import { chargeCurrencyFor, offerCurrencyNow } from '@/lib/fx'
 
 // US / UK / AU / CA buyers pay in their own currency (sql/local_currency.sql):
 // locks today's rate on the pending orders and returns what to charge per
 // order. All orders of one payment share one currency — if they don't all
 // qualify, every order stays in EUR. Empty map = charge in EUR.
 async function lockLocalCurrency(orderIds: string[], country: string): Promise<{ currency: string; amounts: Map<string, number> } | null> {
-  const cc = await chargeCurrencyFor(country)
-  if (!cc || orderIds.length === 0) return null
+  if (orderIds.length === 0) return null
   const admin = createAdminClient()
+  // Back to EUR (an accepted offer carries its agreed local amount; it can't be
+  // used when the buyer now ships elsewhere or the payment is in EUR).
+  const toEur = async () => {
+    const { error } = await admin.from('orders')
+      .update({ charge_currency: 'EUR', charge_rate: null, charge_markup: null, charge_shipping: null, charge_amount: null })
+      .in('id', orderIds).neq('charge_currency', 'EUR')
+    if (error) console.error('[checkout] reset to EUR failed:', error.message)
+  }
+  const cc = await chargeCurrencyFor(country)
+  if (!cc) { await toEur(); return null }
   const { data, error } = await admin.rpc('set_order_currency', { p_order_ids: orderIds, p_currency: cc.code, p_rate: cc.rate })
   if (error) {
     console.error('[checkout] local currency not set, charging EUR:', error.message)
+    await toEur()
     return null
   }
   const rows = (data as { order_id: string; charge_currency: string; charge_amount: string | number | null }[] | null) ?? []
   if (rows.length !== orderIds.length || rows.some(r => r.charge_currency !== cc.code || !(Number(r.charge_amount) > 0))) {
-    if (rows.some(r => r.charge_currency !== 'EUR')) {
-      await admin.from('orders')
-        .update({ charge_currency: 'EUR', charge_rate: null, charge_markup: null, charge_shipping: null, charge_amount: null })
-        .in('id', orderIds)
-    }
+    await toEur()
     return null
   }
   return { currency: cc.code, amounts: new Map(rows.map(r => [r.order_id, Number(r.charge_amount)])) }
@@ -213,7 +219,11 @@ export async function payAcceptedOffer(
   if (taxErr || !taxRow) return { error: SETUP_FAILED }
   const vatLine = vatLineItem(taxRow, shipTo.name)
 
-  const amountCents = Math.round(Number(order.order_total) * 100)
+  // Offer agreed in the buyer's currency: pay exactly that (if still shipping there).
+  const eurCents = Math.round((Number(order.order_total) + Number(taxRow.tax_amount ?? 0)) * 100)
+  const local = await lockLocalCurrency([order.id], shipTo.code)
+  const currency = local ? local.currency.toLowerCase() : 'eur'
+  const amountCents = Math.round((local ? local.amounts.get(order.id)! : Number(order.order_total)) * 100)
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     return { error: 'Invalid order amount' }
   }
@@ -289,14 +299,14 @@ export async function payAcceptedOffer(
         {
           quantity: 1,
           price_data: {
-            currency: 'eur',
+            currency,
             unit_amount: amountCents,
             product_data: {
               name: `GemWorkers order ${order.id.substring(0, 8).toUpperCase()}`,
             },
           },
         },
-        ...(vatLine ? [vatLine] : []),
+        ...(vatLine && !local ? [vatLine] : []),
       ],
       shipping_address_collection: {
         // Only the buyer's chosen ship-to country (checked by checkoutShipTo).
@@ -308,11 +318,11 @@ export async function payAcceptedOffer(
       success_url: `${base}/orders?paid=1&order=${order.id}`,
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${order.id}`,
       // CRITICAL: the webhook uses this to advance the order to 'confirmed'.
-      metadata: { order_id: order.id },
+      metadata: { order_id: order.id, eur_total_cents: String(eurCents) },
       // Shown on the PaymentIntent in the Stripe dashboard.
       payment_intent_data: {
         description: order.order_number ? `GemWorkers ${order.order_number}` : 'GemWorkers order',
-        metadata: { order_id: order.id, ...(order.order_number && { order_number: order.order_number }) },
+        metadata: { order_id: order.id, eur_total_cents: String(eurCents), ...(order.order_number && { order_number: order.order_number }) },
       },
     })
   } catch (err) {
@@ -660,16 +670,20 @@ export async function submitOffer(
   if (!user) return { error: 'You must be logged in to make an offer.' }
 
   if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    return { error: 'Please enter an offer greater than €0.' }
+    return { error: 'Please enter an offer greater than 0.' }
   }
   // Strip float noise (e.g. 49.800000000001) so the RPC's 2-decimal guard
   // only rejects genuinely over-precise amounts.
   const exactPrice = Math.round(offeredPrice * 100) / 100
 
+  // US / UK / AU / CA: the amount is in the buyer's currency; the database
+  // stores its euro value at today's rate (sql/offers_local_currency.sql).
+  const oc = await offerCurrencyNow()
   const { data, error } = await supabase.rpc('submit_storefront_offer', {
     p_inventory_item_id: itemId,
-    p_offered_price: exactPrice,
+    p_offered_price: oc ? null : exactPrice,
     p_buyer_note: note ?? '',
+    ...(oc ? { p_currency: oc.code, p_local_amount: exactPrice } : {}),
   })
 
   if (error) return { error: error.message }

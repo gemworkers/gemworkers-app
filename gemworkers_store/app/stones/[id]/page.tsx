@@ -209,7 +209,7 @@ export default async function StoneDetailPage({
   if (user) {
     const { data: offer } = await supabase
       .from('buyer_offers')
-      .select('id, offered_price, status, counter_price, counter_expires_at')
+      .select('id, offered_price, status, counter_price, counter_expires_at, offer_currency, local_offered, local_counter')
       .eq('inventory_item_id', id)
       .in('status', ['pending', 'countered', 'accepted', 'declined', 'expired'])
       .order('created_at', { ascending: false })
@@ -220,7 +220,7 @@ export default async function StoneDetailPage({
     if (offerRow?.status === 'accepted') {
       const { data: offerOrder } = await supabase
         .from('orders')
-        .select('id, order_total, payment_due_at')
+        .select('id, order_total, payment_due_at, charge_currency, charge_amount')
         .eq('offer_id', offerRow.id)
         .eq('buyer_id', user.id)
         .eq('status', 'pending_payment')
@@ -228,7 +228,10 @@ export default async function StoneDetailPage({
         .maybeSingle();
       if (offerOrder?.payment_due_at) {
         payable = {
-          orderTotal: Number(offerOrder.order_total),
+          // Agreed in the buyer's currency: that amount (incl. shipping).
+          ...(offerOrder.charge_currency !== 'EUR' && offerOrder.charge_amount != null
+            ? { orderTotal: Number(offerOrder.charge_amount), currency: offerOrder.charge_currency }
+            : { orderTotal: Number(offerOrder.order_total) }),
           dueAt: offerOrder.payment_due_at,
           canPay: canStartOfferPayment(offerOrder.payment_due_at),
         };
@@ -479,6 +482,7 @@ export default async function StoneDetailPage({
               isLoggedIn={!!user}
               initialOffer={offerRow}
               payable={payable}
+              fx={fx}
             />
           ) : isReserved ? (
             <div style={{
@@ -522,6 +526,7 @@ export default async function StoneDetailPage({
                   initialOffer={offerRow}
                   payable={payable}
                   isAvailable
+                  fx={fx}
                 />
               )}
             </div>

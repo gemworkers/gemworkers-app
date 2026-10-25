@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { formatEur } from '@/lib/money'
+import { formatMoney } from '@/lib/money'
 
 // Shared types + pieces for the buyer message portal (/messages).
 
@@ -16,6 +16,7 @@ export type StoneCardData = {
   product_type: string | null
   status: 'available' | 'reserved' | 'unavailable'
   incl_vat?: boolean   // selling_price already includes VAT (EU consumer; set by the page)
+  currency?: string    // selling_price is in the buyer's currency (US/GB/AU/CA; set by the page)
 }
 
 // buyer_messages row
@@ -30,6 +31,9 @@ export type ThreadMessage = {
   kind: string
   offer_id: string | null
   offer_amount: number | string | null
+  // Set by the thread page for offers made in USD/GBP/AUD/CAD: offer_amount
+  // is then in that currency.
+  offer_currency?: string
 }
 
 // ── Local time ────────────────────────────────────────────────────────────────
@@ -94,7 +98,7 @@ const OFFER_CARD_TEXT: Record<string, {
 
 export function OfferCard({ message, stoneId }: { message: ThreadMessage; stoneId?: string | null }) {
   const text = OFFER_CARD_TEXT[message.kind]
-  const amount = message.offer_amount != null ? formatEur(message.offer_amount) : null
+  const amount = message.offer_amount != null ? formatMoney(message.offer_amount, message.offer_currency ?? 'EUR') : null
 
   return (
     <div className={`msg-offer msg-offer-${message.kind}`}>
@@ -157,7 +161,7 @@ export function MessageStoneCard({
         <div className="msg-stone-meta">
           {stone.status === 'available' && stone.selling_price != null && (
             <span className="msg-stone-price">
-              {formatEur(Number(stone.selling_price))}{stone.incl_vat ? ' incl. VAT' : ''}
+              {formatMoney(Number(stone.selling_price), stone.currency ?? 'EUR')}{stone.incl_vat ? ' incl. VAT' : ''}
             </span>
           )}
           {stone.status === 'reserved' && (

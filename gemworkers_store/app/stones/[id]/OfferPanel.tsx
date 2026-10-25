@@ -10,7 +10,8 @@ import {
 } from '@/lib/ui'
 import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
 import { PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
-import { formatEur, formatEurExact } from '@/lib/money'
+import { formatEur, formatMoney, formatMoneyExact } from '@/lib/money'
+import { currencySymbol, type FxContext } from '@/lib/price-shown'
 
 export type BuyerOffer = {
   id: string
@@ -19,6 +20,19 @@ export type BuyerOffer = {
   // Our counter-offer (one per offer); null if never countered.
   counter_price?: number | string | null
   counter_expires_at?: string | null
+  // US / UK / AU / CA buyers: the offer in their own currency
+  // (sql/offers_local_currency.sql); EUR otherwise.
+  offer_currency?: string | null
+  local_offered?: number | string | null
+  local_counter?: number | string | null
+}
+
+// The buyer's own offer / our counter-offer, in the currency they offered in.
+function offerAmount(o: BuyerOffer, which: 'offer' | 'counter'): string {
+  const cur = o.offer_currency && o.offer_currency !== 'EUR' ? o.offer_currency : null
+  const local = which === 'counter' ? o.local_counter : o.local_offered
+  if (cur && local != null) return formatMoney(local, cur)
+  return formatEur((which === 'counter' ? o.counter_price : o.offered_price) ?? 0)
 }
 
 // Same format as the counter-offer email ("24 Oct 2026, 10:00 UTC"); fixed
@@ -32,6 +46,7 @@ const utcDate = new Intl.DateTimeFormat('en-GB', {
 // still inside its payment window. Loaded server-side under the buyer's RLS.
 export type PayableOrder = {
   orderTotal: number
+  currency?: string   // what orderTotal is in (default EUR)
   dueAt: string
   // false when < 35 min remain (computed server-side) — Pay button hidden
   canPay: boolean
@@ -72,7 +87,7 @@ function parseOfferPrice(raw: string): { price: number } | { error: string } | n
   }
   const price = Number(s.replace(',', '.'))
   if (!Number.isFinite(price) || price <= 0) {
-    return { error: 'Your offer must be more than €0.' }
+    return { error: 'Your offer must be more than 0.' }
   }
   return { price }
 }
@@ -87,6 +102,7 @@ export function OfferPanel({
   initialOffer,
   payable = null,
   isAvailable = false,
+  fx = null,
 }: {
   itemId: string
   isLoggedIn: boolean
@@ -95,7 +111,10 @@ export function OfferPanel({
   // Stone is available for offers — lets the buyer re-offer after an
   // expired/declined offer (SQL only blocks while an offer is 'pending').
   isAvailable?: boolean
+  // US / UK / AU / CA buyers offer in their own currency.
+  fx?: FxContext | null
 }) {
+  const typeCurrency = fx?.exact ? fx.code : 'EUR'
   const router = useRouter()
   const [state, setState] = useState<State>(initState(initialOffer))
   const [offer, setOffer] = useState<BuyerOffer | null>(initialOffer)
@@ -151,7 +170,10 @@ export function OfferPanel({
         setErrorMsg(res.error)
         setState('form')
       } else {
-        setOffer({ id: res.offerId, offered_price: parsed, status: 'pending' })
+        setOffer({
+          id: res.offerId, offered_price: parsed, status: 'pending',
+          offer_currency: typeCurrency, local_offered: typeCurrency === 'EUR' ? null : parsed,
+        })
         setState('pending')
       }
     }
@@ -163,7 +185,7 @@ export function OfferPanel({
         </p>
 
         <div>
-          <label style={labelStyle} htmlFor="offer-price">Your price (€)</label>
+          <label style={labelStyle} htmlFor="offer-price">Your price ({currencySymbol(fx)})</label>
           <input
             id="offer-price"
             type="text" inputMode="decimal" autoComplete="off"
@@ -210,7 +232,7 @@ export function OfferPanel({
               cursor: busy || !validPrice ? 'default' : 'pointer',
             }}
           >
-            {busy ? 'Sending…' : parsed !== null ? `Send offer of ${formatEurExact(parsed)}` : 'Send offer'}
+            {busy ? 'Sending…' : parsed !== null ? `Send offer of ${formatMoneyExact(parsed, typeCurrency)}` : 'Send offer'}
           </button>
           <button
             onClick={() => setState(initState(offer))}
@@ -246,7 +268,7 @@ export function OfferPanel({
       <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ fontSize: 15, color: '#1F1B16' }}>
-            Your offer: <strong>{offer ? formatEur(offer.offered_price) : '—'}</strong>
+            Your offer: <strong>{offer ? offerAmount(offer, 'offer') : '—'}</strong>
           </span>
           <span style={{
             ...chipBase, color: '#7A5A22',
@@ -272,7 +294,7 @@ export function OfferPanel({
   // ── Countered → buyer accepts or declines ─────────────────────────────────
   if ((state === 'countered' || state === 'answering') && offer && offer.counter_price != null) {
     const busy = state === 'answering'
-    const counter = formatEur(offer.counter_price)
+    const counter = offerAmount(offer, 'counter')
     const expiresAt = offer.counter_expires_at ? new Date(offer.counter_expires_at) : null
     const expired = expiresAt !== null && expiresAt.getTime() <= Date.now()
 
@@ -300,7 +322,7 @@ export function OfferPanel({
       <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ fontSize: 15, color: '#1F1B16' }}>
-            Your offer: <strong>{formatEur(offer.offered_price)}</strong>
+            Your offer: <strong>{offerAmount(offer, 'offer')}</strong>
           </span>
           <span style={{
             ...chipBase, color: '#7A5A22',
@@ -357,14 +379,14 @@ export function OfferPanel({
       <div style={{ ...panel, border: '1px solid rgba(43,122,61,0.3)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <p style={{ fontSize: 15, color: '#1F1B16', lineHeight: 1.5, margin: 0 }}>
           {offer.counter_price != null ? (
-            <>You accepted our counter-offer of <strong>{formatEur(offer.counter_price)}</strong>.</>
+            <>You accepted our counter-offer of <strong>{offerAmount(offer, 'counter')}</strong>.</>
           ) : (
-            <>Your offer of <strong>{formatEur(offer.offered_price)}</strong> was accepted.</>
+            <>Your offer of <strong>{offerAmount(offer, 'offer')}</strong> was accepted.</>
           )}
         </p>
         {payable.canPay ? (
           <>
-            <PayOfferButton offerId={offer.id} label={`Pay ${formatEur(payable.orderTotal)}`} />
+            <PayOfferButton offerId={offer.id} label={`Pay ${formatMoney(payable.orderTotal, payable.currency ?? 'EUR')}`} />
             <PaymentDeadline dueAt={payable.dueAt} style={{ margin: 0, textAlign: 'center' }} />
           </>
         ) : (
@@ -401,9 +423,9 @@ export function OfferPanel({
     }}>
       <span style={{ fontSize: 15, color: '#1F1B16' }}>
         {accepted && offer?.counter_price != null ? (
-          <>Counter-offer: <strong>{formatEur(offer.counter_price)}</strong></>
+          <>Counter-offer: <strong>{offerAmount(offer, 'counter')}</strong></>
         ) : (
-          <>Your offer: <strong>{offer ? formatEur(offer.offered_price) : '—'}</strong></>
+          <>Your offer: <strong>{offer ? offerAmount(offer, 'offer') : '—'}</strong></>
         )}
       </span>
       <span style={{
