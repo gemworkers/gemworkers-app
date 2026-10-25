@@ -24,14 +24,17 @@ export default function PaymentPage() {
         <li>Apple Pay and Google Pay</li>
         <li>PayPal</li>
         <li>iDEAL (Netherlands) and Bancontact (Belgium)</li>
-        <li>Klarna</li>
+        <li>Klarna (pay later or in instalments, where available)</li>
       </ul>
       <p>
-        The payment page shows the methods available for your country and device.
+        The payment page shows the methods most used in your country and on your device.
       </p>
       <p>
-        All prices are in euros (€). If your card is in another currency, your bank converts
-        the amount and may charge a small fee for this.
+        Our prices are in euros (€); in many countries we also show an approximate price in
+        your currency. On the payment page you can usually pay in your own currency — the
+        amount is shown before you pay, and the conversion is done by our payment provider.
+        If you pay in euros with a card in another currency, your bank converts it and may
+        charge a small fee.
       </p>
 
       <h2>Safe and secure</h2>

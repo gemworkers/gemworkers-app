@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
 import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
 import { paidTotal } from '@/lib/tax'
+import { refundAmountInChargeCurrency, sessionEurTotal } from '@/lib/stripe/refunds'
 import { sendDisputeAlertEmail } from '@/lib/email/sendDisputeAlertEmail'
 import {
   sendLatePaymentOwnerEmail,
@@ -353,7 +354,7 @@ function paymentIntentId(session: Stripe.Checkout.Session): string | null {
 async function refundLateOrder(
   paymentIntent: string,
   orderId: string,
-  amountCents?: number,   // omitted = full refund
+  amountCents?: number,   // in EUR; omitted = full refund (converted if the buyer paid in another currency)
 ): Promise<boolean> {
   const existing = await stripe.refunds.list({ payment_intent: paymentIntent, limit: 100 })
   if (existing.data.some(r => r.metadata?.order_id === orderId && r.metadata?.reason === 'late_payment')) {
@@ -362,7 +363,7 @@ async function refundLateOrder(
   await stripe.refunds.create(
     {
       payment_intent: paymentIntent,
-      ...(amountCents !== undefined ? { amount: amountCents } : {}),
+      ...(amountCents !== undefined ? { amount: await refundAmountInChargeCurrency(paymentIntent, amountCents) } : {}),
       metadata: { order_id: orderId, reason: 'late_payment' },
     },
     { idempotencyKey: `refund-late-${orderId}` },
@@ -795,7 +796,7 @@ export async function POST(req: NextRequest) {
           console.error('[webhook] late payment for order', orderId, `(status '${status}') —`, created ? 'refunded in full' : 'already refunded (dup delivery)')
           if (created) {
             try {
-              await notifyLatePayment(supabase, [orderId], (session.amount_total ?? 0) / 100, custEmail, session.id, pi)
+              await notifyLatePayment(supabase, [orderId], sessionEurTotal(session), custEmail, session.id, pi)
             } catch (e) {
               console.error('[webhook] late-payment emails threw for order', orderId, ':', e instanceof Error ? e.message : String(e))
             }

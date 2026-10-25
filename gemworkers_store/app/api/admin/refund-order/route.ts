@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { stripe } from '@/lib/stripe/server'
 import { findPaymentIntent, preflight, reply, requireOwner, type OrderPaymentRef } from '@/lib/admin-api'
+import { refundAmountInChargeCurrency } from '@/lib/stripe/refunds'
 
 // Refund an order WITHOUT a return (lost parcel, buyer keeps the stone,
 // partial compensation) — sql/refund_owner_costs.sql. Owner only:
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     const refund = await stripe.refunds.create(
       {
         payment_intent: pi,
-        amount: cents,
+        amount: await refundAmountInChargeCurrency(pi, cents),   // EUR → the buyer's currency
         metadata: { order_id: order.id, order_number: order.order_number, reason: 'order_refund' },
       },
       { idempotencyKey: `order-refund-${order.id}-${count ?? 0}-${cents}` },

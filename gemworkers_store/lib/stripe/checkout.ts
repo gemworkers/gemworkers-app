@@ -1,35 +1,21 @@
 // SERVER ONLY — never import from a client component.
 
-import Stripe from 'stripe'
+import type Stripe from 'stripe'
 import { stripe } from './server'
 
-// Payment methods on the Stripe page. Instant methods only: each one is paid
-// the moment Checkout completes, which is when the webhook confirms the order
-// (delayed methods such as SEPA debit are deliberately left out).
-// Apple Pay and Google Pay come with 'card'. Each method must also be switched
-// on in Stripe Dashboard → Settings → Payment methods.
-export const PAYMENT_METHODS: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
-  'card',
-  'paypal',
-  'ideal',
-  'bancontact',
-  'klarna',
-]
-
-// Creates the Checkout Session with PAYMENT_METHODS. If Stripe refuses one of
-// them (not switched on in the dashboard yet), retries with card only so
-// checkout never breaks.
+// Payment methods: Stripe's dynamic payment methods — no list in code. Stripe
+// shows each buyer the methods common in their country (cards, Apple Pay,
+// Google Pay, PayPal, Klarna, iDEAL, Bancontact…) from those switched on in
+// Dashboard → Settings → Payment methods.
+// Keep delayed methods OFF there (SEPA debit, ACH, bank transfer, vouchers):
+// the stone is held for 30 minutes and the webhook confirms only payments
+// that are 'paid' (charge.dispute / async_payment_succeeded handle the rest).
+//
+// Local currency: Stripe Adaptive Pricing (Dashboard → Settings → Adaptive
+// Pricing) lets buyers see and pay in their own currency; we always create the
+// session in EUR and receive EUR. Refunds convert back: lib/stripe/refunds.ts.
 export async function createCheckoutSession(
   params: Omit<Stripe.Checkout.SessionCreateParams, 'payment_method_types'>,
 ): Promise<Stripe.Checkout.Session> {
-  try {
-    return await stripe.checkout.sessions.create({ ...params, payment_method_types: PAYMENT_METHODS })
-  } catch (err) {
-    const methodRefused =
-      err instanceof Stripe.errors.StripeInvalidRequestError &&
-      ((err.param ?? '').startsWith('payment_method_types') || /payment method type/i.test(err.message))
-    if (!methodRefused) throw err
-    console.error('[checkout] a payment method is not switched on in Stripe — card only:', (err as Error).message)
-    return stripe.checkout.sessions.create({ ...params, payment_method_types: ['card'] })
-  }
+  return stripe.checkout.sessions.create(params)
 }

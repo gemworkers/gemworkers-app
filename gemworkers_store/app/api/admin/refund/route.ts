@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { refundAmountInChargeCurrency } from '@/lib/stripe/refunds'
 
 // Refund a returned stone (sql/returns_setup.sql). Called by the admin app
 // (sell.gemworkers.com) with the owner's Supabase access token:
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
       const refund = await stripe.refunds.create(
         {
           payment_intent: pi,
-          amount: cents,
+          amount: await refundAmountInChargeCurrency(pi, cents),   // EUR → the buyer's currency
           metadata: { order_id: order.id, order_number: order.order_number, return_id: returnId, reason: 'return' },
         },
         { idempotencyKey: `return-${returnId}-${cents}` },
