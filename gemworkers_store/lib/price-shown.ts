@@ -50,7 +50,7 @@ export function currencySymbol(fx: FxContext | null | undefined): string {
   return symbols[fx?.exact ? fx.code : ''] ?? '€'
 }
 
-/** "≈ US$395" — rounded, display only (buyers pay in EUR). Null when not needed. */
+/** "≈ CHF 380" — rounded, display only (Stripe shows the exact amount at payment). Null when not needed. */
 export function approxPrice(eur: number, fx: FxContext | null | undefined): string | null {
   if (!fx || fx.exact || !(eur > 0)) return null
   const v = eur * fx.rate

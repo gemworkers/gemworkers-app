@@ -438,8 +438,8 @@ export default async function StoneDetailPage({
                   {shownStone!.inclVat && <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
                 </p>
                 {approxPrice(shownStone!.amount, fx) && (
-                  <p className="pd-shipline" title="Approximate — you pay in euros; your bank or card converts the amount">
-                    {approxPrice(shownStone!.amount, fx)} · you pay in euros
+                  <p className="pd-shipline" title="Approximate — the payment page shows the exact amount in your currency (or pay in euros)">
+                    {approxPrice(shownStone!.amount, fx)} · exact amount in your currency when you pay
                   </p>
                 )}
               </>

@@ -2,7 +2,8 @@
 // Bank's daily reference rates, refreshed every 12 hours.
 // • US, UK, Australia, Canada: buyers SEE AND PAY local prices (Etsy style,
 //   sql/local_currency.sql locks the currency per order at checkout).
-// • Other non-euro countries: an "≈" hint only, they pay in EUR.
+// • Other non-euro countries: an "≈" hint; Stripe Adaptive Pricing (ON) lets
+//   them pay in their own currency at checkout (Stripe converts our euro price).
 
 import { cache } from 'react'
 import { currentShipToCode } from '@/lib/ship-to'

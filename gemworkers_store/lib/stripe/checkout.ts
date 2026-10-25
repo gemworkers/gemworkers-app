@@ -13,8 +13,10 @@ import { stripe } from './server'
 //
 // Local currency: US / UK / AU / CA buyers are charged in their own currency
 // at OUR price (app/actions/commerce.ts lockLocalCurrency, sql/local_currency.sql).
-// Keep Stripe Adaptive Pricing OFF — it would convert a second time. Refunds
-// convert back per order: lib/stripe/refunds.ts.
+// Stripe Adaptive Pricing is ON (Zakaria 2026-10-25). Sessions already in the
+// buyer's currency (US/GB/AU/CA) need no conversion; buyers elsewhere (CH, JP, SE…) may pay in their own currency,
+// converted by Stripe, buyer pays its fee, we receive the euro amount. Refunds
+// convert back per order: lib/stripe/refunds.ts (metadata eur_total_cents).
 export async function createCheckoutSession(
   params: Omit<Stripe.Checkout.SessionCreateParams, 'payment_method_types'>,
 ): Promise<Stripe.Checkout.Session> {

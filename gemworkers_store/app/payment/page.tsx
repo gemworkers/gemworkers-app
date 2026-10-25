@@ -39,9 +39,10 @@ export default function PaymentPage() {
       </p>
       <p>
         Everywhere else our prices are in euros (€); in many countries we also show an
-        approximate price in your currency. If you pay in euros with a card in another
-        currency, your bank converts it and may charge a small fee. Offers are always made
-        and paid in euros.
+        approximate price in your currency. On the payment page you can usually choose to pay
+        in your own currency: the exact amount, converted by our payment provider (Stripe), is
+        shown before you pay. Or pay in euros and let your bank convert it (your bank may
+        charge a small fee). Offers are made in euros.
       </p>
 
       <h2>Safe and secure</h2>

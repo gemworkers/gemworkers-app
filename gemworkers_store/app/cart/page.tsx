@@ -202,7 +202,7 @@ export default async function CartPage() {
               </div>
               {approxPrice(payTotal, fx) && (
                 <p style={{ fontSize: 13, color: '#6B6052', margin: '-4px 0 12px', textAlign: 'right' }}>
-                  {approxPrice(payTotal, fx)} · you pay in euros
+                  {approxPrice(payTotal, fx)} · exact amount in your currency when you pay
                 </p>
               )}
               {shipTo?.enabled && (
