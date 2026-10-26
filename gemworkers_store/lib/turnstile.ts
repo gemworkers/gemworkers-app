@@ -13,7 +13,9 @@ export async function verifyTurnstile(token: string | null | undefined): Promise
       method: 'POST',
       body: new URLSearchParams({ secret, response: token }),
     })
-    const data = (await res.json()) as { success?: boolean }
+    const data = (await res.json()) as { success?: boolean; 'error-codes'?: string[]; hostname?: string }
+    // Cloudflare's reason codes only (never the secret), e.g. invalid-input-secret.
+    if (data.success !== true) console.error('[turnstile] refused:', (data['error-codes'] ?? []).join(',') || 'no reason', 'host:', data.hostname ?? '-')
     return data.success === true
   } catch (e) {
     console.error('[turnstile] verify failed:', e instanceof Error ? e.message : String(e))
