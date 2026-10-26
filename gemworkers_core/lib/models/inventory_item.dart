@@ -67,6 +67,12 @@ class InventoryItem {
   final DateTime? listingRequestedAt;
   // Owner's reason when a listing was rejected; read only, not in toMap().
   final String? listingReviewNote;
+  // Protected materials answers (sql/protected_materials.sql); read only, not
+  // in toMap() — changed only through setItemCompliance.
+  final String? citesDeclaration;
+  final String? citesPermitNo;
+  final String? diamondDeclaration;
+  final String? kimberleyCertNo;
   // 'buy_now' | 'accept_offers' | 'both' — mirrors CHECK constraint on inventory_items.
   final String saleMethod;
 
@@ -152,6 +158,10 @@ class InventoryItem {
     this.listedAt,
     this.listingRequestedAt,
     this.listingReviewNote,
+    this.citesDeclaration,
+    this.citesPermitNo,
+    this.diamondDeclaration,
+    this.kimberleyCertNo,
     this.saleMethod = 'buy_now',
     this.isUnsortedLot = false,
     this.lotRemainingCount,
@@ -238,6 +248,10 @@ class InventoryItem {
           ? DateTime.parse(map['listed_at'].toString())
           : null,
       listingReviewNote: map['listing_review_note']?.toString(),
+      citesDeclaration: map['cites_declaration']?.toString(),
+      citesPermitNo: map['cites_permit_no']?.toString(),
+      diamondDeclaration: map['diamond_declaration']?.toString(),
+      kimberleyCertNo: map['kimberley_cert_no']?.toString(),
       listingRequestedAt: map['listing_requested_at'] != null
           ? DateTime.parse(map['listing_requested_at'].toString())
           : null,
@@ -442,6 +456,10 @@ class InventoryItem {
       consignorPrice: consignorPrice,
       profitShare: profitShare,
       listingReviewNote: listingReviewNote,
+      citesDeclaration: citesDeclaration,
+      citesPermitNo: citesPermitNo,
+      diamondDeclaration: diamondDeclaration,
+      kimberleyCertNo: kimberleyCertNo,
       supplierId:
           identical(supplierId, _omitted) ? this.supplierId : supplierId as String?,
       supplierName: supplierName ?? this.supplierName,

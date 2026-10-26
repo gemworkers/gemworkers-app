@@ -79,6 +79,9 @@ type ListingDetail = {
   maker_id: string | null;
   maker_name: string | null;
   maker_place: string | null;
+  // Protected materials (sql/protected_materials.sql) — yes/no only.
+  export_permit?: boolean | null;
+  conflict_free_diamond?: boolean | null;
 
   // shipping
   seller_country: string | null;
@@ -312,6 +315,12 @@ export default async function StoneDetailPage({
       <Link href="/guarantee" className="pd-link">Our Guarantee</Link>)
     </>
   );
+  // Export papers for protected materials / conflict-free diamonds (trust line).
+  const documentsValue = [
+    item.export_permit ? 'CITES export permit included' : null,
+    item.conflict_free_diamond ? 'Conflict-free diamond (Kimberley Process), not of Russian origin' : null,
+  ].filter(Boolean).join(' · ') || null;
+
   const certificateValue = item.certification_lab?.trim() ? certificationLine : (
     <Link href="/contact?topic=Certificate%20request" className="pd-link">Available on request</Link>
   );
@@ -605,6 +614,7 @@ export default async function StoneDetailPage({
               <DetailRow label="Treatment"   value={treatmentValue} />
               <DetailRow label="Dimensions"  value={dimensions} />
               <DetailRow label="Certificate" value={certificateValue} />
+              <DetailRow label="Documents"   value={documentsValue} />
             </DetailSection>
           )}
 
@@ -618,6 +628,7 @@ export default async function StoneDetailPage({
               <DetailRow label="Treatment"   value={treatmentValue} />
               <DetailRow label="Dimensions"  value={dimensions} />
               <DetailRow label="Certificate" value={certificateValue} />
+              <DetailRow label="Documents"   value={documentsValue} />
             </DetailSection>
           )}
 
@@ -630,6 +641,7 @@ export default async function StoneDetailPage({
               <DetailRow label="Total weight"  value={jewelryWeight} />
               <DetailRow label="Treatment"     value={treatmentValue} />
               <DetailRow label="Certificate"   value={certificateValue} />
+              <DetailRow label="Documents"     value={documentsValue} />
             </DetailSection>
           )}
 

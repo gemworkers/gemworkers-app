@@ -157,6 +157,19 @@ class InventoryRepository {
 
   /// Patches only the cost_price field of an item.
   /// Owner only (DB trigger refuses anyone else). null = unknown / none.
+  /// Protected materials answers (sql/protected_materials.sql). Nulls clear them.
+  Future<void> setItemCompliance(String id, {
+    String? cites, String? permitNo, String? diamond, String? kimberleyNo,
+  }) async {
+    await supabase.rpc('set_item_compliance', params: {
+      'p_item_id': id,
+      'p_cites': cites,
+      'p_permit': permitNo,
+      'p_diamond': diamond,
+      'p_kimberley': kimberleyNo,
+    });
+  }
+
   Future<void> setItemMaker(String id, String? makerId) async {
     await supabase
         .from('inventory_items')

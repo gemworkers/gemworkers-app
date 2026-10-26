@@ -18,6 +18,8 @@ import '../../repositories/consignor_repository.dart';
 import '../../core/services/seller_service.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
+import 'widgets/protected_materials_section.dart';
+import '../../core/utils/protected_materials.dart';
 
 class EditInventoryPage extends StatefulWidget {
   final InventoryItem item;
@@ -65,6 +67,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
   late String _shapeSelection;
   late final TextEditingController _shapeOther;
+  // Protected materials answers (sql/protected_materials.sql).
+  String? _cites;
+  String? _diamond;
+  late final TextEditingController _permitNo;
+  late final TextEditingController _kimberleyNo;
   late String _cutTypeSelection;
   late final TextEditingController _cutTypeOther;
 
@@ -139,6 +146,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   void initState() {
     super.initState();
     final i = widget.item;
+    _cites = i.citesDeclaration;
+    _diamond = i.diamondDeclaration;
+    _permitNo = TextEditingController(text: i.citesPermitNo ?? '');
+    _kimberleyNo = TextEditingController(text: i.kimberleyCertNo ?? '');
     _title = TextEditingController(text: i.title);
     _gemType = TextEditingController(text: i.gemType);
     _variety = TextEditingController(text: i.variety);
@@ -207,6 +218,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
   @override
   void dispose() {
     for (final c in [
+      _permitNo, _kimberleyNo,
       _title, _gemType, _variety, _originCountry, _originRegion,
       _weightValue, _quantity, _costPrice, _sellingPrice,
       _barcode, _notes,
@@ -444,6 +456,16 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         }
       }
 
+      // Protected materials answers: saved separately (never in toMap).
+      final permit = _permitNo.text.trim();
+      final kimberley = _kimberleyNo.text.trim();
+      if (_cites != widget.item.citesDeclaration || _diamond != widget.item.diamondDeclaration ||
+          permit != (widget.item.citesPermitNo ?? '') || kimberley != (widget.item.kimberleyCertNo ?? '')) {
+        await _repository.setItemCompliance(widget.item.id!,
+            cites: _cites, permitNo: _cites == 'permit' ? permit : null,
+            diamond: _diamond, kimberleyNo: _diamond == 'kimberley' ? kimberley : null);
+      }
+
       if (_makerId != widget.item.makerId && UserProfileService.instance.isOwner) {
         await _repository.setItemMaker(widget.item.id!, _makerId);
       }
@@ -457,7 +479,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         );
       }
 
-      if (mounted) Navigator.pop(context, updated);
+      // Fresh copy from the database (includes read-only fields such as the
+      // protected materials answers, which aren't part of `updated`).
+      final fresh = await _repository.getItem(widget.item.id!).catchError((_) => updated);
+      if (mounted) Navigator.pop(context, fresh);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -747,6 +772,30 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           ),
 
           ..._buildTypeSpecificFields(),
+
+          // Re-checked while typing: coral, ivory, shells, fossils, diamonds…
+          AnimatedBuilder(
+            animation: Listenable.merge([
+              _title, _gemType, _variety, _species, _gemstonesUsed, _description,
+              _jewelryType, _matrix, _shapeOther, _cutTypeOther,
+            ]),
+            builder: (context, _) => ProtectedMaterialsSection(
+              flags: protectedFlags(
+                text: [_title.text, _gemType.text, _variety.text, _species.text, _gemstonesUsed.text,
+                       _description.text, _jewelryType.text, _matrix.text],
+                shape: [_shapeSelection == 'Other' ? _shapeOther.text : _shapeSelection,
+                        _cutTypeSelection == 'Other' ? _cutTypeOther.text : _cutTypeSelection],
+                gemType: _gemType.text,
+              ),
+              cites: _cites,
+              permitNo: _permitNo,
+              diamond: _diamond,
+              kimberleyNo: _kimberleyNo,
+              onCites: (v) => setState(() => _cites = v),
+              onDiamond: (v) => setState(() => _diamond = v),
+              enabled: !_saving,
+            ),
+          ),
 
           const FormSection('Description & Certification'),
           FormTextField('Description', _description, maxLines: 3),

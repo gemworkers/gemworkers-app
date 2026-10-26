@@ -638,6 +638,23 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
             const SizedBox(height: 4),
           ],
 
+          if (_item.citesDeclaration != null || _item.diamondDeclaration != null) ...[
+            // Protected materials answers (sql/protected_materials.sql).
+            _sectionLabel('Protected materials'),
+            if (_item.citesDeclaration != null)
+              _row('Material', switch (_item.citesDeclaration) {
+                'permit' => 'Protected — export permit ${_item.citesPermitNo ?? ''}',
+                'not_protected' => 'Not a protected species (seller declared)',
+                _ => 'Word only describes colour / shape',
+              }),
+            if (_item.diamondDeclaration != null)
+              _row('Diamond', switch (_item.diamondDeclaration) {
+                'conflict_free' => 'Conflict-free, not of Russian origin (declared)',
+                'kimberley' => 'Rough — Kimberley certificate ${_item.kimberleyCertNo ?? ''}',
+                _ => 'Word only describes the cut / look',
+              }),
+          ],
+
           _sectionLabel('Supplier'),
           _row(
             'Supplier',

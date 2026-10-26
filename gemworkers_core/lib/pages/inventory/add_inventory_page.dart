@@ -14,6 +14,8 @@ import 'widgets/item_video_picker.dart';
 import 'widgets/maker_picker.dart';
 import 'widgets/origin_country_field.dart';
 import 'widgets/price_field.dart';
+import 'widgets/protected_materials_section.dart';
+import '../../core/utils/protected_materials.dart';
 import 'listing_sheet.dart';
 
 class AddInventoryPage extends StatefulWidget {
@@ -70,6 +72,13 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   final _shapeOther = TextEditingController();
   String _cutTypeSelection = '';
   final _cutTypeOther = TextEditingController();
+
+  // Protected materials answers (sql/protected_materials.sql) — never copied
+  // from a duplicated stone: a permit belongs to one stone.
+  String? _cites;
+  String? _diamond;
+  final _permitNo = TextEditingController();
+  final _kimberleyNo = TextEditingController();
 
   // ── Shared product-detail controllers ───────────────────────────────────
 
@@ -325,6 +334,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
   @override
   void dispose() {
     for (final c in [
+      _permitNo, _kimberleyNo,
       _title, _gemType, _variety, _originCountry, _originRegion,
       _weightValue, _quantity, _costPrice, _sellingPrice,
       _barcode, _notes,
@@ -495,6 +505,13 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
           created.id != null &&
           UserProfileService.instance.isOwner) {
         await _repository.setItemMaker(created.id!, _makerId);
+      }
+
+      // Protected materials answers (before any listing; never in toMap).
+      if ((_cites != null || _diamond != null) && created.id != null) {
+        await _repository.setItemCompliance(created.id!,
+            cites: _cites, permitNo: _cites == 'permit' ? _permitNo.text.trim() : null,
+            diamond: _diamond, kimberleyNo: _diamond == 'kimberley' ? _kimberleyNo.text.trim() : null);
       }
 
       if (mounted) {
@@ -811,6 +828,30 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
               ),
 
               ..._buildTypeSpecificFields(),
+
+              // Re-checked while typing: coral, ivory, shells, fossils, diamonds…
+              AnimatedBuilder(
+                animation: Listenable.merge([
+                  _title, _gemType, _variety, _species, _gemstonesUsed, _description,
+                  _jewelryType, _matrix, _shapeOther, _cutTypeOther,
+                ]),
+                builder: (context, _) => ProtectedMaterialsSection(
+                  flags: protectedFlags(
+                    text: [_title.text, _gemType.text, _variety.text, _species.text, _gemstonesUsed.text,
+                           _description.text, _jewelryType.text, _matrix.text],
+                    shape: [_shapeSelection == 'Other' ? _shapeOther.text : _shapeSelection,
+                            _cutTypeSelection == 'Other' ? _cutTypeOther.text : _cutTypeSelection],
+                    gemType: _gemType.text,
+                  ),
+                  cites: _cites,
+                  permitNo: _permitNo,
+                  diamond: _diamond,
+                  kimberleyNo: _kimberleyNo,
+                  onCites: (v) => setState(() => _cites = v),
+                  onDiamond: (v) => setState(() => _diamond = v),
+                  enabled: !_saving,
+                ),
+              ),
 
               const FormSection('Description & Certification'),
               FormTextField('Description', _description, maxLines: 3),
