@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -30,7 +30,11 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image' },
   // Google Search Console ownership (public token, URL-prefix property https://www.gemworkers.com)
   verification: { google: '3Ae1n6rrisU5F5FXaPMEJCkHQUHpszaM5Lez8hcAIt0' },
+  // Installed on a phone (app/manifest.ts): name under the icon on iPhone.
+  appleWebApp: { capable: true, title: 'GemWorkers', statusBarStyle: 'default' },
 }
+
+export const viewport: Viewport = { themeColor: '#1F1B16' }
 
 const TRUST_POINTS = [
   '100% natural gemstones',

@@ -202,6 +202,23 @@ class _LoginPageState extends State<LoginPage> {
                           : const Text('Sign In',
                               style: TextStyle(fontSize: 16)),
                     ),
+
+                    // Installing the admin as an app (web/manifest.json).
+                    const SizedBox(height: 20),
+                    const ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      leading: Icon(Icons.install_mobile_outlined),
+                      title: Text('Use GemWorkers as an app on your phone'),
+                      childrenPadding: EdgeInsets.only(bottom: 12),
+                      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Android (Chrome): open this page → menu ⋮ → "Install app" (or "Add to Home screen").'),
+                        SizedBox(height: 8),
+                        Text('iPhone (Safari): open this page → Share button (square with arrow) → "Add to Home Screen".'),
+                        SizedBox(height: 8),
+                        Text('A GemWorkers icon appears on your home screen and opens full screen, like any app.'),
+                      ],
+                    ),
                   ],
                 ),
               ),
