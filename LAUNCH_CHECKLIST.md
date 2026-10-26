@@ -13,7 +13,7 @@ Everything left before real customers can pay. Tick items off as they're done.
       business buyers get an official consultation number).
 - [ ] **Z** Company details complete in Admin → Taxes & duties → Company details
       (address / virtual office, KvK, BTW, EORI, return address).
-- [ ] **Z+C** Short written agreement with each brother: 12% service fee, payout after the
+- [x] **Z+C** Short written agreement with each brother (seller terms, "I agree" at login — done 2026-10-26; accountant/lawyer to check the text): 12% service fee, payout after the
       30-day return period, returns and chargebacks charged to the stone's owner.
       (Claude can draft it.)
 - [ ] **Z** Admin → Sellers: set the service fee to **12%** for each brother.
@@ -22,8 +22,8 @@ Everything left before real customers can pay. Tick items off as they're done.
 ## 2. Real stock
 - [ ] **Z** Load 30–50 real stones: good photos (same background and light every time) +
       video, correct weight, treatment, certificate, shipping price per stone.
-- [ ] **C** Listing-form rule for protected materials (coral, ivory, shells, fossils) and
-      the Kimberley statement for diamonds.
+- [x] **C** Listing-form rule for protected materials (coral, ivory, shells, fossils) and
+      the Kimberley statement for diamonds. (done 2026-10-26)
 - [ ] **Z** Unlist or remove the test stones.
 
 ## 3. Stripe live mode (test settings do NOT carry over)
@@ -41,7 +41,7 @@ Everything left before real customers can pay. Tick items off as they're done.
 
 ## 4. Clean-up & safety
 - [ ] **C** Test-data wipe (keep the one real buyer): test orders, invoices (counter back to
-      GW-YYYY-00001), payouts (PO-YYYY-0001), refunds, owner charges, test offers, messages.
+      GW-YYYY-00001), payouts (PO-YYYY-0001), refunds, owner charges, test offers, messages, test newsletter subscribers.
 - [ ] **Z** Admin → Reviews: hide the test review.
 - [ ] **Z** Deactivate the test seller account.
 - [ ] **Z+C** New webhook passwords for the offer, message and order-shipped emails.
