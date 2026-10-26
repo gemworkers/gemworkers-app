@@ -47,7 +47,28 @@ class GemWorkersApp extends StatelessWidget {
       title: 'GemWorkers',
       theme: AppTheme.light,
       // "New version available" bar above every screen (deploy_admin.sh).
-      builder: (context, child) => UpdateNotice(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) {
+        Widget app = UpdateNotice(child: child ?? const SizedBox.shrink());
+        // Phones: denser, like the Etsy Seller app — text ~10% smaller (on top
+        // of the phone's own text-size setting), compact buttons and lists.
+        final mq = MediaQuery.of(context);
+        if (mq.size.width < 600) {
+          final theme = Theme.of(context);
+          app = MediaQuery(
+            data: mq.copyWith(textScaler: TextScaler.linear(mq.textScaler.scale(1) * 0.9)),
+            child: Theme(
+              data: theme.copyWith(
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                listTileTheme: theme.listTileTheme.copyWith(dense: true, minVerticalPadding: 6),
+                appBarTheme: theme.appBarTheme.copyWith(toolbarHeight: 52),
+              ),
+              child: app,
+            ),
+          );
+        }
+        return app;
+      },
       home: StreamBuilder<AuthState>(
         stream: AuthService.authStateChanges,
         builder: (context, _) {
@@ -409,7 +430,7 @@ class _MainLayoutState extends State<MainLayout> {
           child: SafeArea(
             top: false,
             child: SizedBox(
-              height: 64,
+              height: 58,
               child: Row(
                 children: [
                   for (var t = 0; t < tabs.length; t++)

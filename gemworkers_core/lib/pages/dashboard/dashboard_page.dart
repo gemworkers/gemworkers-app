@@ -248,7 +248,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Text(
                 greeting,
                 style: t.headlineLarge
-                    ?.copyWith(fontSize: wide ? 36 : 30, height: 1.15),
+                    ?.copyWith(fontSize: wide ? 36 : 24, height: 1.15),
               ),
               const SizedBox(height: 4),
               Text(
@@ -507,26 +507,22 @@ class _ResponsiveGrid extends StatelessWidget {
   final List<Widget> children;
   const _ResponsiveGrid({required this.children});
 
-  static const _gap = 16.0;
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final w = constraints.maxWidth;
-      final cols = w >= 860
-          ? 4
-          : w >= 480
-              ? 2
-              : 1;
+      // Phones: 2 small cards per row (Etsy-like density).
+      final cols = w >= 860 ? 4 : 2;
+      final gap = w < 480 ? 10.0 : 16.0;
       final rows = <Widget>[];
       for (var i = 0; i < children.length; i += cols) {
-        if (rows.isNotEmpty) rows.add(const SizedBox(height: _gap));
+        if (rows.isNotEmpty) rows.add(SizedBox(height: gap));
         rows.add(IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var j = 0; j < cols; j++) ...[
-                if (j > 0) const SizedBox(width: _gap),
+                if (j > 0) SizedBox(width: gap),
                 Expanded(
                   child: i + j < children.length
                       ? children[i + j]
@@ -544,16 +540,18 @@ class _ResponsiveGrid extends StatelessWidget {
 
 class _WhiteCard extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? padding;   // default: 20, phones 14
   final VoidCallback? onTap;
   const _WhiteCard({
     required this.child,
-    this.padding = const EdgeInsets.all(20),
+    this.padding,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final padding = this.padding ??
+        EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 14 : 20);
     return Material(
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
@@ -601,6 +599,8 @@ class _AttentionCard extends StatelessWidget {
             ? AppColors.muted
             : AppColors.ink;
     final subline = calm ? 'All caught up' : hint;
+    // Phones: compact tile — smaller number, whole card is the link.
+    final phone = MediaQuery.sizeOf(context).width < 600;
 
     return _WhiteCard(
       onTap: onTap,
@@ -610,11 +610,11 @@ class _AttentionCard extends StatelessWidget {
           Text(
             '$count',
             style: AppTheme.numeric(t.displaySmall,
-                fontSize: 40, height: 1, color: countColor),
+                fontSize: phone ? 26 : 40, height: 1, color: countColor),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: phone ? 6 : 10),
           Text(label,
-              style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+              style: (phone ? t.bodyMedium : t.bodyLarge)?.copyWith(fontWeight: FontWeight.w600)),
           if (subline != null) ...[
             const SizedBox(height: 2),
             Text(
@@ -626,6 +626,7 @@ class _AttentionCard extends StatelessWidget {
             ),
           ],
           const Spacer(),
+          if (!phone) ...[
           const SizedBox(height: 16),
           Text(
             '$link →',
@@ -634,6 +635,7 @@ class _AttentionCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          ],
         ],
       ),
     );
