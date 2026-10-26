@@ -31,6 +31,7 @@ import 'repositories/offers_repository.dart';
 import 'repositories/order_repository.dart';
 import 'repositories/review_repository.dart';
 import 'theme/app_theme.dart';
+import 'widgets/update_notice.dart';
 import 'widgets/shop_sidebar.dart';
 
 class GemWorkersApp extends StatelessWidget {
@@ -42,6 +43,8 @@ class GemWorkersApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'GemWorkers',
       theme: AppTheme.light,
+      // "New version available" bar above every screen (deploy_admin.sh).
+      builder: (context, child) => UpdateNotice(child: child ?? const SizedBox.shrink()),
       home: StreamBuilder<AuthState>(
         stream: AuthService.authStateChanges,
         builder: (context, _) {

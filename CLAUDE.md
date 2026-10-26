@@ -19,7 +19,7 @@ Owner: Zakaria (non-technical founder). Explain in plain English, one small step
 - Supabase project ref: cvqzidqnwthzfodhzepz.
 
 ## How we work
-- Admin updates can be cached by the browser (Flutter web): after a deploy tell Zakaria to close the sell.gemworkers.com tabs and reload with Ctrl+Shift+R.
+- Admin updates: open tabs show a "new version — Reload" bar within 5 minutes (deploy_admin.sh). Tabs from before 2026-10-26 12:04 UTC still need one Ctrl+Shift+R.
 - Inspect before building. One verified change per commit. Report what changed and what is untested.
 - SQL-first: write SQL file → Zakaria runs it in the Supabase SQL Editor → verify the live change (prosrc / information_schema) → then app code. Mark the file header "Applied to live DB <date>".
 - Money / payment SQL (respond_to_offer, submit_storefront_offer, sweeps, checkout): copy the LIVE definition exactly and change only what's needed; show a diff. (Example trap: respond_to_offer_owner_override.sql is NOT live — commission_default_zero.sql + offer_notify.sql stamps are.)
