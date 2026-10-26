@@ -7,6 +7,7 @@ import 'core/services/auth_service.dart';
 import 'core/services/user_profile_service.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/no_profile_page.dart';
+import 'pages/auth/seller_terms_page.dart';
 import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
@@ -90,7 +91,8 @@ class _ProfileGateState extends State<_ProfileGate> {
         AppAuthState.loading || AppAuthState.initial =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
         AppAuthState.noProfile => const NoProfilePage(),
-        AppAuthState.ready => const MainLayout(),
+        // Sellers agree to the seller terms first (sql/seller_terms.sql).
+        AppAuthState.ready => const SellerTermsGate(child: MainLayout()),
       },
     );
   }
@@ -453,6 +455,17 @@ class _UserMenu extends StatelessWidget {
           ),
         ),
         const PopupMenuDivider(),
+        if (!svc.isOwner)
+          const PopupMenuItem(
+            value: 'terms',
+            child: Row(
+              children: [
+                Icon(Icons.description_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('Seller terms'),
+              ],
+            ),
+          ),
         const PopupMenuItem(
           value: 'signout',
           child: Row(
@@ -465,6 +478,12 @@ class _UserMenu extends StatelessWidget {
         ),
       ],
       onSelected: (value) async {
+        if (value == 'terms') {
+          final terms = await loadSellerTerms();
+          if (terms != null && context.mounted) {
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => SellerTermsPage(terms: terms)));
+          }
+        }
         if (value == 'signout') {
           UserProfileService.instance.clear();
           await AuthService.signOut();

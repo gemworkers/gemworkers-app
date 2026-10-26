@@ -401,6 +401,8 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
                     const SizedBox(height: 12),
                     _buildFeeSettings(seller),
                     const SizedBox(height: 12),
+                    _buildTermsStatus(seller),
+                    const SizedBox(height: 12),
                     _buildLocations(),
                     if (seller.notes.isNotEmpty) ...[
                       const SizedBox(height: 12),
@@ -618,6 +620,44 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
           ),
         ),
       );
+
+  // Seller terms (sql/seller_terms.sql): which versions this seller agreed to.
+  Widget _buildTermsStatus(Seller seller) {
+    final db = Supabase.instance.client;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<List<dynamic>>(
+          future: Future.wait([
+            db.from('seller_terms').select('version').eq('is_current', true).maybeSingle(),
+            db.from('seller_terms_acceptances').select('version, accepted_at, fee_rate')
+                .eq('seller_id', seller.id!).order('accepted_at', ascending: false),
+          ]),
+          builder: (context, snap) {
+            if (!snap.hasData) return const LinearProgressIndicator();
+            final current = (snap.data![0] as Map<String, dynamic>?)?['version'];
+            final rows = (snap.data![1] as List).cast<Map<String, dynamic>>();
+            final ok = rows.where((r) => r['version'] == current).firstOrNull;
+            final when = ok == null ? null : DateTime.parse(ok['accepted_at'].toString()).toLocal();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Seller terms', style: Theme.of(context).textTheme.titleMedium),
+                const Divider(height: 20),
+                _row('Current version', current?.toString() ?? '—'),
+                _row('Agreed',
+                    when == null
+                        ? 'Not yet — they see the terms at their next login'
+                        : '${when.day.toString().padLeft(2, '0')}/${when.month.toString().padLeft(2, '0')}/${when.year} '
+                          '${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}'
+                          '${ok?['fee_rate'] != null ? ' (fee shown: ${(double.parse(ok!['fee_rate'].toString()) * 100).toStringAsFixed(0)}%)' : ''}'),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   Widget _row(String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
