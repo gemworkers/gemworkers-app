@@ -17,6 +17,9 @@ function sourceOf(referrer: string, utm: string): string {
   let host = ''
   try { host = new URL(referrer).hostname.toLowerCase() } catch { return 'direct' }
   if (!host || host.endsWith('gemworkers.com')) return 'direct'
+  // Back from paying (Stripe, PayPal, Klarna, the bank's 3-D Secure page…) is
+  // not where a buyer came from.
+  if (/(stripe.com|stripe.network|paypal.com|klarna.com|ideal.nl|bancontact|payconiq|3dsecure|securecode|acs.)/.test(host)) return 'direct'
   const known: [RegExp, string][] = [
     [/(^|\.)google\./, 'google'], [/(^|\.)bing\.com$/, 'bing'], [/duckduckgo\.com$/, 'duckduckgo'],
     [/instagram\.com$/, 'instagram'], [/(facebook\.com|fb\.com|fb\.me)$/, 'facebook'],
