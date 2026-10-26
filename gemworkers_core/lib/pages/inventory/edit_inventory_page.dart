@@ -763,16 +763,6 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           const FormSection('Identification'),
           ReadOnlyFormField('SKU', widget.item.sku),
           FormTextField('Title *', _title),
-
-          const FormSection('Price'),
-          PriceField(
-            controller: _sellingPrice,
-            sellerId: widget.item.sellerId ?? svc.effectiveSellerId,
-            enabled: !_saving,
-          ),
-
-          ..._buildTypeSpecificFields(),
-
           // Re-checked while typing: coral, ivory, shells, fossils, diamonds…
           AnimatedBuilder(
             animation: Listenable.merge([
@@ -796,6 +786,15 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
               enabled: !_saving,
             ),
           ),
+
+          const FormSection('Price'),
+          PriceField(
+            controller: _sellingPrice,
+            sellerId: widget.item.sellerId ?? svc.effectiveSellerId,
+            enabled: !_saving,
+          ),
+
+          ..._buildTypeSpecificFields(),
 
           const FormSection('Description & Certification'),
           FormTextField('Description', _description, maxLines: 3),

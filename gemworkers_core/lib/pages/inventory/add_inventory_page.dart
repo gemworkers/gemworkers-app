@@ -820,15 +820,6 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                       ),
                 ),
               ),
-
-              const FormSection('Price'),
-              PriceField(
-                controller: _sellingPrice,
-                sellerId: svc.effectiveSellerId,
-              ),
-
-              ..._buildTypeSpecificFields(),
-
               // Re-checked while typing: coral, ivory, shells, fossils, diamonds…
               AnimatedBuilder(
                 animation: Listenable.merge([
@@ -852,6 +843,14 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
                   enabled: !_saving,
                 ),
               ),
+
+              const FormSection('Price'),
+              PriceField(
+                controller: _sellingPrice,
+                sellerId: svc.effectiveSellerId,
+              ),
+
+              ..._buildTypeSpecificFields(),
 
               const FormSection('Description & Certification'),
               FormTextField('Description', _description, maxLines: 3),
