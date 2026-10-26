@@ -424,13 +424,22 @@ class _MainLayoutState extends State<MainLayout> {
                 },
               )
             : pages[safeIndex],
-        bottomNavigationBar: Material(
-          color: AppColors.surface,
-          elevation: 8,
-          child: SafeArea(
-            top: false,
+        // Like Etsy: same warm colour as the page, a thin line on top, and
+        // room under the icons for the phone's swipe bar (iPhones don't
+        // report it to installed web apps, so at least 22 px).
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            border: Border(top: BorderSide(color: AppColors.border)),
+          ),
+          padding: EdgeInsets.only(
+            top: 6,
+            bottom: MediaQuery.viewPaddingOf(context).bottom > 22 ? MediaQuery.viewPaddingOf(context).bottom : 22,
+          ),
+          child: Material(
+            type: MaterialType.transparency,
             child: SizedBox(
-              height: 58,
+              height: 56,
               child: Row(
                 children: [
                   for (var t = 0; t < tabs.length; t++)
