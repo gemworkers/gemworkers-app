@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Vacation mode for sellers (like Etsy's)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-26
 --
 -- Zakaria 2026-10-26. A seller (or the owner for any seller) switches vacation
 -- mode on, optionally with a return date:
