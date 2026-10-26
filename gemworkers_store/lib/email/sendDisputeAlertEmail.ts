@@ -2,7 +2,7 @@
 // Owner alert for a Stripe chargeback (dispute). Stripe gives only a few days
 // to send evidence, so this goes out the moment the dispute is opened.
 import { Resend } from 'resend'
-import { formatEur } from '@/lib/money'
+import { formatMoney } from '@/lib/money'
 
 const FROM = 'GemWorkers <orders@gemworkers.com>'
 
@@ -13,7 +13,8 @@ function esc(s: string): string {
 export async function sendDisputeAlertEmail(opts: {
   to: string
   disputeId: string
-  amount: number            // disputed amount, euros
+  amount: number            // disputed amount, in [currency]
+  currency?: string         // what the buyer paid in (default EUR)
   reason: string            // Stripe reason code, e.g. "fraudulent"
   respondBy: Date | null    // evidence due by
   orders: { orderNumber: string; title: string; owner: string }[]
@@ -31,7 +32,7 @@ export async function sendDisputeAlertEmail(opts: {
 <body style="margin:0;padding:40px 24px;background:#fafaf9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111">
   <div style="max-width:520px;margin:0 auto">
     <p style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#b42318;margin:0 0 10px">Chargeback — action needed</p>
-    <h1 style="font-size:20px;margin:0 0 14px">A buyer disputed a payment of ${esc(formatEur(opts.amount))}</h1>
+    <h1 style="font-size:20px;margin:0 0 14px">A buyer disputed a payment of ${esc(formatMoney(opts.amount, opts.currency ?? 'EUR'))}</h1>
     <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px">
       Reason given by the bank: <strong>${esc(reason)}</strong><br>
       <strong>Send your evidence before: ${esc(due)}</strong> — if you don't respond, the buyer wins automatically.
@@ -47,7 +48,7 @@ export async function sendDisputeAlertEmail(opts: {
 </body></html>`
 
   const text =
-    `A buyer disputed a payment of ${formatEur(opts.amount)} (reason: ${reason}).\n` +
+    `A buyer disputed a payment of ${formatMoney(opts.amount, opts.currency ?? 'EUR')} (reason: ${reason}).\n` +
     `Send your evidence before: ${due}. If you don't respond, the buyer wins automatically.\n\n` +
     opts.orders.map(o => `- ${o.orderNumber} — ${o.title} (${o.owner})`).join('\n') +
     `\n\nOpen the dispute in Stripe: ${link}\n`
@@ -55,7 +56,7 @@ export async function sendDisputeAlertEmail(opts: {
   await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: FROM,
     to: [opts.to],
-    subject: `Chargeback: ${formatEur(opts.amount)} — respond by ${opts.respondBy ? opts.respondBy.toLocaleDateString('en-GB', { timeZone: 'Europe/Amsterdam' }) : 'soon'}`,
+    subject: `Chargeback: ${formatMoney(opts.amount, opts.currency ?? 'EUR')} — respond by ${opts.respondBy ? opts.respondBy.toLocaleDateString('en-GB', { timeZone: 'Europe/Amsterdam' }) : 'soon'}`,
     html,
     text,
   })

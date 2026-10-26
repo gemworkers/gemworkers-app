@@ -20,8 +20,26 @@ import { stripe } from './server'
 // CAD sessions (not a settlement currency). Test it with a buyer account email
 // like name+location_CH@… (passed as customer_email). Refunds of our own
 // local-currency orders: lib/stripe/refunds.ts.
+//
+// Fraud: from THREE_DS_FROM_EUR (the order's euro value, metadata
+// eur_total_cents) every card payment asks for the bank's own check
+// (3-D Secure: code or approval in the banking app) where the card supports
+// it. A stolen-card chargeback on a 3-D Secure payment is then the bank's
+// loss, not ours. Below it Stripe asks only when the bank requires it.
+export const THREE_DS_FROM_EUR = 300
+
 export async function createCheckoutSession(
   params: Omit<Stripe.Checkout.SessionCreateParams, 'payment_method_types'>,
 ): Promise<Stripe.Checkout.Session> {
+  const eurCents = Number(params.metadata?.eur_total_cents ?? 0)
+  if (eurCents >= THREE_DS_FROM_EUR * 100) {
+    params = {
+      ...params,
+      payment_method_options: {
+        ...params.payment_method_options,
+        card: { ...params.payment_method_options?.card, request_three_d_secure: 'any' },
+      },
+    }
+  }
   return stripe.checkout.sessions.create(params)
 }

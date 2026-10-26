@@ -10,6 +10,7 @@ import { paidTotal } from '@/lib/tax'
 import { refundAmountInChargeCurrency, sessionEurTotal } from '@/lib/stripe/refunds'
 import { recordFeeForPayment } from '@/lib/stripe/fees'
 import { sendDisputeAlertEmail } from '@/lib/email/sendDisputeAlertEmail'
+import { sendFraudWarningEmail } from '@/lib/email/sendFraudWarningEmail'
 import {
   sendLatePaymentOwnerEmail,
   sendLatePaymentBuyerEmail,
@@ -415,7 +416,11 @@ async function recordStripeFee(admin: AdminClient, session: Stripe.Checkout.Sess
 // or through the payment's metadata for older orders.
 async function disputeOrders(admin: AdminClient, dispute: Stripe.Dispute): Promise<{ order_id: string; share: number }[]> {
   const pi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent?.id
-  if (!pi) return []
+  return pi ? paymentOrders(admin, pi) : []
+}
+
+// The orders paid by payment [pi], each with its share of it (a cart is one payment).
+async function paymentOrders(admin: AdminClient, pi: string): Promise<{ order_id: string; share: number }[]> {
   type Row = { id: string; order_total: string | number; tax_amount: string | number | null }
   let { data } = await admin.from('orders').select('id, order_total, tax_amount').eq('stripe_payment_intent', pi)
   if (!data || data.length === 0) {
@@ -429,6 +434,34 @@ async function disputeOrders(admin: AdminClient, dispute: Stripe.Dispute): Promi
   const total = rows.reduce((s, r) => s + r.cents, 0)
   if (total <= 0) return []
   return rows.map(r => ({ order_id: r.id, share: r.cents / total }))
+}
+
+// Early fraud warning (the card's bank: probably a stolen card): tell the
+// owner at once, before the stone ships. Nothing is booked — a chargeback, if
+// it comes, is handled by charge.dispute.created.
+async function alertOwnerOfFraudWarning(admin: AdminClient, efw: Stripe.Radar.EarlyFraudWarning): Promise<void> {
+  const to = process.env.OWNER_EMAIL?.trim()
+  if (!to) return
+  const chargeId = typeof efw.charge === 'string' ? efw.charge : efw.charge.id
+  const charge = await stripe.charges.retrieve(chargeId)
+  const pi = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
+  const orders = pi ? await paymentOrders(admin, pi) : []
+  const { data } = orders.length
+    ? await admin.from('orders').select('order_number, status, order_items(inventory_items(title))').in('id', orders.map(o => o.order_id))
+    : { data: [] }
+  type Row = { order_number: string; status: string; order_items: { inventory_items: { title: string } | null }[] }
+  await sendFraudWarningEmail({
+    to,
+    chargeId,
+    amount: charge.amount / 100,
+    currency: charge.currency.toUpperCase(),
+    fraudType: efw.fraud_type ?? 'fraud',
+    orders: ((data as unknown as Row[] | null) ?? []).map(r => ({
+      orderNumber: r.order_number,
+      title: r.order_items?.[0]?.inventory_items?.title ?? 'Stone',
+      status: r.status === 'confirmed' ? 'paid, not shipped' : r.status,
+    })),
+  })
 }
 
 async function alertOwnerOfDispute(admin: AdminClient, dispute: Stripe.Dispute, orderIds: string[]): Promise<void> {
@@ -449,6 +482,7 @@ async function alertOwnerOfDispute(admin: AdminClient, dispute: Stripe.Dispute, 
     to,
     disputeId: dispute.id,
     amount: dispute.amount / 100,
+    currency: dispute.currency.toUpperCase(),
     reason: dispute.reason ?? 'unknown',
     respondBy: due,
     orders: rows.map(r => ({
@@ -898,6 +932,13 @@ export async function POST(req: NextRequest) {
         console.error('[webhook] record_dispute_closed failed for', dispute.id, ':', error.message)
         return NextResponse.json({ error: 'Dispute save failed' }, { status: 500 })
       }
+    }
+  } else if (event.type === 'radar.early_fraud_warning.created') {
+    const efw = event.data.object as Stripe.Radar.EarlyFraudWarning
+    try {
+      await alertOwnerOfFraudWarning(supabase, efw)
+    } catch (e) {
+      console.error('[webhook] fraud warning email failed for', efw.id, ':', e instanceof Error ? e.message : String(e))
     }
   }
   // All other event types are silently ignored.
