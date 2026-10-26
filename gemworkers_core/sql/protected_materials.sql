@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Protected materials check (CITES, Kimberley Process, Russia ban)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-26
 --
 -- Zakaria 2026-10-26. When a stone is listed (or a seller asks for listing), the
 -- text of the stone (title, gem type, variety, species, gemstones used,
