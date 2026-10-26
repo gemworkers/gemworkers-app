@@ -1,12 +1,12 @@
 -- =============================================================================
 -- GemWorkers — Social media links (edited by the owner in the admin)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-26
 --
 -- Zakaria 2026-10-26: GemWorkers' own accounts (one per platform, never seller
 -- accounts) shown as icons in the store footer and the admin. Stored in
--- store_settings (social_<platform>), edited in Admin → Taxes & duties →
--- Company details → Social media. public_social_links shows only https links
+-- store_settings (social_<platform>), edited in the admin account menu →
+-- Social media (lib/pages/settings/social_links_dialog.dart). public_social_links shows only https links
 -- on that platform's own domain, so a typo can never put a strange link on the shop.
 -- Starting values = the links Zakaria sent (Facebook: the page's permanent address).
 -- =============================================================================
