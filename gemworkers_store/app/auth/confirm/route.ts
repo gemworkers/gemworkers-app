@@ -3,6 +3,7 @@ import type { EmailOtpType } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { safeNext } from '@/lib/safe-next'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Email links that work on any device: the Supabase email templates point
 // here — Reset password: ?token_hash=…&type=recovery&next=/auth/reset-password,
@@ -40,6 +41,15 @@ export async function GET(request: NextRequest) {
       if (type === 'recovery') {
         const { error: outErr } = await supabase.auth.signOut({ scope: 'others' })
         if (outErr) console.error('[auth/confirm] sign out others failed:', outErr.message)
+        // Guest-checkout account: the email is now proven theirs — a normal
+        // account from here on (no more "choose my password" links).
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.user_metadata?.guest === true) {
+          const { error: metaErr } = await createAdminClient().auth.admin.updateUserById(user.id, {
+            user_metadata: { ...user.user_metadata, guest: false },
+          })
+          if (metaErr) console.error('[auth/confirm] guest flag not cleared:', metaErr.message)
+        }
       }
       return NextResponse.redirect(`${origin}${next}`)
     }
