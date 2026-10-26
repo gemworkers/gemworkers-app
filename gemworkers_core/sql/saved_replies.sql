@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Saved replies in Messages (like Etsy's saved replies)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-26
 --
 -- Zakaria 2026-10-26: staff (owner and sellers) save answers they send often
 -- and insert them into a reply with one tap. Each person sees only their own.
