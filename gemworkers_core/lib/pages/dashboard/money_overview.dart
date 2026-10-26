@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/commission.dart';
 import '../../core/utils/money.dart';
 import '../../theme/app_theme.dart';
+import 'earnings_page.dart';
 
 /// Owner-only "Money" section on the Dashboard: what you owe sellers and
 /// owners (sql/payouts_setup.sql), VAT for this quarter and its deadline
@@ -38,6 +39,8 @@ class MoneyOverviewState extends State<MoneyOverview> {
   String _quarter = '';
   int _returnsOpen = 0, _returnsToRefund = 0;
   int _disputes = 0;
+  double? _earned;
+  int _earnedOrders = 0;
 
   @override
   void initState() {
@@ -56,7 +59,10 @@ class MoneyOverviewState extends State<MoneyOverview> {
         _sb.rpc('tax_report', params: {'p_year': now.year, 'p_quarter': q}),
         _sb.from('returns').select('status').inFilter('status', ['requested', 'approved', 'received']),
         _sb.from('orders').select('id').eq('dispute_status', 'open'),
+        loadEarnings(EarningsRange.quarter).then<Map<String, dynamic>?>((v) => v).catchError((_) => null),
       ]);
+      final earnings = r[5] as Map<String, dynamic>?;
+      final earnedTotals = (earnings?['totals'] as Map?) ?? const {};
       final lines = List<Map<String, dynamic>>.from(r[0] as List);
       final charges = List<Map<String, dynamic>>.from(r[1] as List);
       final report = Map<String, dynamic>.from(r[2] as Map);
@@ -81,6 +87,8 @@ class MoneyOverviewState extends State<MoneyOverview> {
         _returnsOpen = returns.where((x) => x['status'] != 'received').length;
         _returnsToRefund = returns.where((x) => x['status'] == 'received').length;
         _disputes = disputes.length;
+        _earned = earnings == null ? null : parseNumeric(earnedTotals['earned']) ?? 0;
+        _earnedOrders = (earnedTotals['orders'] as num?)?.toInt() ?? 0;
         _loading = false;
       });
     } catch (e) {
@@ -110,6 +118,16 @@ class MoneyOverviewState extends State<MoneyOverview> {
             final w = (c.maxWidth - (cols - 1) * 16) / cols;
             return Wrap(spacing: 16, runSpacing: 16, children: [
               for (final card in [
+                if (_earned != null)
+                  _MoneyCard(
+                    value: formatEur(_earned!),
+                    label: 'GemWorkers earned · $_quarter',
+                    hint: '$_earnedOrders paid orders · after sellers, Stripe and refunds, without VAT',
+                    alert: _earned! < 0,
+                    link: 'See totals and per order',
+                    onTap: () => Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (_) => const EarningsPage())),
+                  ),
                 _MoneyCard(
                   value: formatEur(_owed - _charges),
                   label: 'Owed to sellers & owners',
