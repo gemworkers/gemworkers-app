@@ -34,17 +34,21 @@ class ShopSidebar extends StatelessWidget {
   /// Account block at the bottom; receives whether the rail is compact.
   final Widget Function(bool compact) accountBuilder;
 
+  /// Phone menu (drawer): always the full menu with names.
+  final bool? forceCompact;
+
   const ShopSidebar({
     super.key,
     required this.items,
     required this.selectedIndex,
     required this.onSelected,
     required this.accountBuilder,
+    this.forceCompact,
   });
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < compactBreakpoint;
+    final compact = forceCompact ?? MediaQuery.sizeOf(context).width < compactBreakpoint;
 
     return Container(
       width: compact ? compactWidth : expandedWidth,

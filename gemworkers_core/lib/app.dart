@@ -352,21 +352,78 @@ class _MainLayoutState extends State<MainLayout> {
     // Guard against stale index when role changes (e.g. after profile load).
     final safeIndex = _selectedIndex.clamp(0, pages.length - 1);
 
+    void select(int i) {
+      setState(() {
+        _selectedIndex = i;
+        _ordersStatus = null;
+        _listingsTab = null;
+        _taxesTab = 0;
+      });
+      _loadCounts();
+    }
+
+    // Phones: the menu slides in from a "Menu" bar at the bottom (thumb
+    // reach); pages keep their own title bar at the top.
+    if (MediaQuery.sizeOf(context).width < 600) {
+      final waiting = destinations.any((d) => d.badgeCount > 0);
+      return Scaffold(
+        drawer: Drawer(
+          width: ShopSidebar.expandedWidth,
+          child: Builder(
+            builder: (drawerContext) => ShopSidebar(
+              items: destinations,
+              selectedIndex: safeIndex,
+              forceCompact: false,
+              onSelected: (i) {
+                Navigator.of(drawerContext).pop();
+                select(i);
+              },
+              accountBuilder: (_) => const _UserMenu(compact: false),
+            ),
+          ),
+        ),
+        body: pages[safeIndex],
+        bottomNavigationBar: Builder(
+          builder: (barContext) => Material(
+            color: AppColors.surface,
+            elevation: 8,
+            child: SafeArea(
+              top: false,
+              child: InkWell(
+                onTap: () => Scaffold.of(barContext).openDrawer(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Badge(isLabelVisible: waiting, smallSize: 9, child: const Icon(Icons.menu)),
+                      const SizedBox(width: 12),
+                      const Text('Menu', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          destinations[safeIndex].label,
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: AppColors.muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Row(
         children: [
           ShopSidebar(
             items: destinations,
             selectedIndex: safeIndex,
-            onSelected: (i) {
-              setState(() {
-                _selectedIndex = i;
-                _ordersStatus = null;
-                _listingsTab = null;
-                _taxesTab = 0;
-              });
-              _loadCounts();
-            },
+            onSelected: select,
             accountBuilder: (compact) => _UserMenu(compact: compact),
           ),
           Expanded(
