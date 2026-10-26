@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/utils/open_url/open_url.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
@@ -58,6 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _load();
+    _loadRating();
   }
 
   bool get _isSeller => UserProfileService.instance.isSeller;
@@ -169,10 +174,264 @@ class _DashboardPageState extends State<DashboardPage> {
     return (sales: sales, count: count, received: received);
   }
 
+
+  // ── Phone Home (Etsy Seller-style) ────────────────────────────────────────
+  // Shop header (sales + ★) · Orders to ship soon · Needs your attention ·
+  // Your shop stats (Today / Yesterday / 7 / 30 days) · Money (owner).
+
+  String _statsRange = 'today';
+  double? _rating;
+  int _ratingCount = 0;
+
+  Future<void> _loadRating() async {
+    try {
+      final rows = await Supabase.instance.client.from('public_reviews').select('rating');
+      final list = (rows as List).map((r) => (r['rating'] as num).toDouble()).toList();
+      if (!mounted) return;
+      setState(() {
+        _ratingCount = list.length;
+        _rating = list.isEmpty ? null : list.reduce((a, b) => a + b) / list.length;
+      });
+    } catch (_) {}
+  }
+
+  String get _shopName {
+    if (_isSeller) {
+      final sid = UserProfileService.instance.sellerId;
+      return _sellers.where((s) => s.id == sid).map((s) => s.name).firstOrNull ?? 'My shop';
+    }
+    return _selectedSeller?.name ?? 'GemWorkers';
+  }
+
+  /// Sales and money in the chosen period (paid orders).
+  ({int orders, double revenue, double payout}) _rangeStats() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final (from, to) = switch (_statsRange) {
+      'yesterday' => (today.subtract(const Duration(days: 1)), today),
+      '7d' => (today.subtract(const Duration(days: 6)), today.add(const Duration(days: 1))),
+      '30d' => (today.subtract(const Duration(days: 29)), today.add(const Duration(days: 1))),
+      _ => (today, today.add(const Duration(days: 1))),
+    };
+    var orders = 0;
+    var revenue = 0.0;
+    var payout = 0.0;
+    for (final o in _scopedOrders) {
+      if (!_kSaleStatuses.contains(o.status)) continue;
+      final d = (o.paidAt ?? o.orderDate).toLocal();
+      if (d.isBefore(from) || !d.isBefore(to)) continue;
+      orders++;
+      revenue += o.items.isNotEmpty ? o.total : o.orderTotal;
+      payout += o.sellerPayout;
+    }
+    return (orders: orders, revenue: revenue, payout: payout);
+  }
+
+  String _euro(double v) => v == v.roundToDouble() ? '€${v.toStringAsFixed(0)}' : '€${v.toStringAsFixed(2)}';
+
+  Widget _buildPhone() {
+    final t = Theme.of(context).textTheme;
+    final sales = _scopedOrders.where((o) => _kSaleStatuses.contains(o.status)).length;
+    final toShip = _scopedOrders.where((o) => o.status == 'confirmed').toList()
+      ..sort((a, b) => orderShipBy(a).compareTo(orderShipBy(b)));
+    final shopPhoto = _scopedItems
+        .where((i) => i.isListed && i.imageUrls.isNotEmpty)
+        .map((i) => i.imageUrls.first)
+        .firstOrNull;
+    final stats = _rangeStats();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    String shipLabel(Order o) {
+      final by = orderShipBy(o);
+      final d = DateTime(by.year, by.month, by.day);
+      if (d.isBefore(today)) return 'Overdue — ship now';
+      if (d == today) return 'Ship today';
+      if (d == today.add(const Duration(days: 1))) return 'Ship tomorrow';
+      return 'Ship by ${DateFormat('EEE d MMM').format(by)}';
+    }
+
+    Widget section(String title) => Padding(
+          padding: const EdgeInsets.fromLTRB(0, 22, 0, 10),
+          child: Text(title, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        );
+
+    Widget statRow(String label, String value, {String? note}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(value, style: AppTheme.numeric(t.headlineSmall, fontSize: 26, height: 1.1)),
+                ]),
+              ),
+              if (note != null) Text(note, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+            ],
+          ),
+        );
+
+    Widget photo(String? url) => url != null
+        ? Image.network(url, fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Container(color: AppColors.raised, child: const Icon(Icons.diamond_outlined)))
+        : Container(color: AppColors.raised, child: const Icon(Icons.diamond_outlined));
+
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _load();
+          await _loadRating();
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          children: [
+            // Shop header: photo, name, "N sales | 4.9 ★", copy link + open shop.
+            SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(width: 64, height: 64, child: photo(shopPhoto)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(_shopName, style: t.headlineSmall, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$sales ${sales == 1 ? 'sale' : 'sales'}'
+                        '${_rating != null ? ' | ${_rating!.toStringAsFixed(1)} ★ ($_ratingCount)' : ''}',
+                        style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ]),
+                  ),
+                  IconButton.filledTonal(
+                    tooltip: 'Copy shop link',
+                    icon: const Icon(Icons.link, size: 20),
+                    onPressed: () async {
+                      await Clipboard.setData(const ClipboardData(text: 'https://www.gemworkers.com'));
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop link copied')));
+                      }
+                    },
+                  ),
+                  IconButton.filledTonal(
+                    tooltip: 'Open shop',
+                    icon: const Icon(Icons.open_in_new, size: 20),
+                    onPressed: () => openUrl('https://www.gemworkers.com'),
+                  ),
+                ],
+              ),
+            ),
+            _buildSellerFilter(),
+
+            // Orders to ship soon.
+            section('Orders to ship soon'),
+            if (toShip.isEmpty)
+              Text('Nothing to ship right now.', style: t.bodyMedium?.copyWith(color: AppColors.muted))
+            else
+              SizedBox(
+                height: 92,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: toShip.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (_, i) {
+                    final o = toShip[i];
+                    final it = o.items.isNotEmpty ? o.items.first : null;
+                    final label = shipLabel(o);
+                    return _WhiteCard(
+                      onTap: () => _openOrder(o),
+                      padding: const EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 230,
+                        child: Row(children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(width: 64, height: 64, child: photo(it?.itemImageUrl)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(it?.itemTitle ?? o.orderNumber,
+                                    maxLines: 2, overflow: TextOverflow.ellipsis, style: t.bodyMedium),
+                                const SizedBox(height: 4),
+                                Text(label,
+                                    style: t.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: label.startsWith('Overdue') ? AppColors.error : AppColors.ink,
+                                    )),
+                              ],
+                            ),
+                          ),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+            const SizedBox(height: 8),
+            _buildAttention(),
+
+            // Your shop stats.
+            section('Your shop stats'),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final r in const [('today', 'Today'), ('yesterday', 'Yesterday'), ('7d', 'Last 7 days'), ('30d', 'Last 30 days')])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(r.$2),
+                      selected: _statsRange == r.$1,
+                      onSelected: (_) => setState(() => _statsRange = r.$1),
+                    ),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 10),
+            _WhiteCard(
+              child: Column(children: [
+                statRow('Orders', '${stats.orders}'),
+                const Divider(height: 1),
+                statRow(_isSeller ? 'You receive' : 'Revenue', _euro(_isSeller ? stats.payout : stats.revenue)),
+                const Divider(height: 1),
+                statRow('Views', '—', note: 'coming soon'),
+              ]),
+            ),
+
+            if (UserProfileService.instance.isOwner) ...[
+              const SizedBox(height: 24),
+              MoneyOverview(
+                key: _moneyKey,
+                onPayouts: () => widget.onNavigate(DashboardDestination.payouts),
+                onReturns: () => widget.onNavigate(DashboardDestination.returns),
+                onTaxes: () => widget.onNavigate(DashboardDestination.taxes),
+                onOrders: () => widget.onNavigate(DashboardDestination.ordersAll),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    // Phones: the Etsy Seller-style Home.
+    if (MediaQuery.sizeOf(context).width < 600 && !(_loading && _orders.isEmpty && _items.isEmpty)) {
+      return _buildPhone();
+    }
     final wide = MediaQuery.sizeOf(context).width >= 900;
     final gutter = wide ? 32.0 : 16.0;
 
