@@ -41,7 +41,7 @@ Everything left before real customers can pay. Tick items off as they're done.
 
 ## 4. Clean-up & safety
 - [ ] **C** Test-data wipe (keep the one real buyer): test orders, invoices (counter back to
-      GW-YYYY-00001), payouts (PO-YYYY-0001), refunds, owner charges, test offers, messages, test newsletter subscribers.
+      GW-YYYY-00001), payouts (PO-YYYY-0001), refunds, owner charges, test offers, messages, test newsletter subscribers, test page views.
 - [ ] **Z** Admin → Reviews: hide the test review.
 - [ ] **Z** Deactivate the test seller account.
 - [ ] **Z+C** New webhook passwords for the offer, message and order-shipped emails.
