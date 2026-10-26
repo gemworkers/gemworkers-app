@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StoreHeader } from '@/app/components/StoreHeader'
 import { ShipToSelect } from '@/app/components/ShipToSelect'
 import { NewsletterSignup } from '@/app/components/NewsletterSignup'
+import { ViewCounter } from '@/app/components/ViewCounter'
 import { socialLinks } from '@/lib/social'
 import { SOCIAL_ICONS } from '@/lib/social-icons'
 import { loadShipCountries, currentShipToCode } from '@/lib/ship-to'
@@ -192,6 +193,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
           <Footer />
         </div>
+        {/* Anonymous views & visits (sql/page_views.sql) */}
+        <ViewCounter />
       </body>
     </html>
   )

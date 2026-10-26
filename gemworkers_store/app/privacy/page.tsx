@@ -30,6 +30,12 @@ export default async function PrivacyPage() {
         </li>
         <li>Messages: anything you send us by email or through Messages on our website.</li>
         <li>
+          Visitor statistics: which pages are opened, where visitors came from (e.g. Google or
+          Instagram) and their country. We use no cookies for this and store nothing on your
+          device; your IP address is not stored, and visitors can&apos;t be recognised from one
+          day to the next. These counts are kept for 13 months.
+        </li>
+        <li>
           Newsletter: if you sign up for emails about new stones, your email address and the date
           you confirmed (proof of your consent). You can unsubscribe at any time with the link in
           every email.

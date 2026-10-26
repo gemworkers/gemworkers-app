@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../core/utils/money.dart';
@@ -133,7 +134,22 @@ class _InventoryPageState extends State<InventoryPage>
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
+  /// Stone page views in the last 30 days (sql/page_views.sql), by stone id.
+  Map<String, int> _views30 = {};
+
+  Future<void> _loadViews() async {
+    try {
+      final rows = await Supabase.instance.client.rpc('stone_view_counts');
+      final map = <String, int>{
+        for (final r in (rows as List).cast<Map>())
+          r['inventory_item_id'].toString(): (r['views_30d'] as num).toInt(),
+      };
+      if (mounted) setState(() => _views30 = map);
+    } catch (_) {}
+  }
+
   Future<void> _loadItems() async {
+    _loadViews();
     setState(() => _loading = true);
     try {
       final svc = UserProfileService.instance;
@@ -1029,6 +1045,7 @@ class _InventoryPageState extends State<InventoryPage>
           final item = display[i];
           return _PhoneListingCard(
             item,
+            views30: item.id == null ? null : _views30[item.id],
             selectionMode: _selectionMode,
             isSelected: item.id != null && _selectedIds.contains(item.id),
             onToggleSelect: item.id != null ? () => _toggleItem(item.id!) : null,
@@ -1504,9 +1521,11 @@ class _PhoneListingCard extends StatelessWidget {
   final VoidCallback? onToggleSelect;
   final Future<void> Function(InventoryItem) onTap;
   final void Function(_RowAction, InventoryItem) onAction;
+  final int? views30;
 
   const _PhoneListingCard(
     this.item, {
+    this.views30,
     required this.selectionMode,
     required this.isSelected,
     required this.onToggleSelect,
@@ -1546,6 +1565,14 @@ class _PhoneListingCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   _StatusChip(status),
                 ]),
+                if (item.isListed) ...[
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Icon(Icons.visibility_outlined, size: 14, color: AppColors.muted),
+                    const SizedBox(width: 4),
+                    Text('${views30 ?? 0} views · 30 days', style: t.bodySmall?.copyWith(color: AppColors.muted)),
+                  ]),
+                ],
               ]),
             ),
             if (!selectionMode)

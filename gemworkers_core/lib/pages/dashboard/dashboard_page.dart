@@ -180,6 +180,40 @@ class _DashboardPageState extends State<DashboardPage> {
   // Your shop stats (Today / Yesterday / 7 / 30 days) · Money (owner).
 
   String _statsRange = 'today';
+  // Views / visits for the chosen period (sql/page_views.sql), reloaded when
+  // the period or the seller changes.
+  Future<Map<String, dynamic>?>? _viewsFuture;
+  String _viewsKey = '';
+
+  ({DateTime from, DateTime to}) _rangeDates() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    return switch (_statsRange) {
+      'yesterday' => (from: today.subtract(const Duration(days: 1)), to: today),
+      '7d' => (from: today.subtract(const Duration(days: 6)), to: tomorrow),
+      '30d' => (from: today.subtract(const Duration(days: 29)), to: tomorrow),
+      _ => (from: today, to: tomorrow),
+    };
+  }
+
+  Future<Map<String, dynamic>?> _views() {
+    final key = '$_statsRange|${_isSeller ? '' : _selectedSeller?.id ?? ''}';
+    if (_viewsFuture == null || key != _viewsKey) {
+      _viewsKey = key;
+      final r = _rangeDates();
+      String d(DateTime x) => DateFormat('yyyy-MM-dd').format(x);
+      _viewsFuture = Supabase.instance.client
+          .rpc('page_view_stats', params: {
+            'p_from': d(r.from),
+            'p_to': d(r.to),
+            'p_seller': _isSeller ? null : _selectedSeller?.id,
+          })
+          .then<Map<String, dynamic>?>((v) => (v as Map).cast<String, dynamic>())
+          .catchError((_) => null);
+    }
+    return _viewsFuture!;
+  }
   double? _rating;
   int _ratingCount = 0;
 
@@ -226,6 +260,19 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     return (orders: orders, revenue: revenue, payout: payout);
   }
+
+  static String _sourceName(String s) => switch (s) {
+        'direct' => 'Direct / WhatsApp / typed in',
+        'google' => 'Google',
+        'instagram' => 'Instagram',
+        'facebook' => 'Facebook',
+        'tiktok' => 'TikTok',
+        'pinterest' => 'Pinterest',
+        'youtube' => 'YouTube',
+        'x' => 'X (Twitter)',
+        'etsy' => 'Etsy',
+        _ => s,
+      };
 
   String _euro(double v) => v == v.roundToDouble() ? '€${v.toStringAsFixed(0)}' : '€${v.toStringAsFixed(2)}';
 
@@ -404,9 +451,55 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 1),
                 statRow(_isSeller ? 'You receive' : 'Revenue', _euro(_isSeller ? stats.payout : stats.revenue)),
                 const Divider(height: 1),
-                statRow('Views', '—', note: 'coming soon'),
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _views(),
+                  builder: (context, snap) {
+                    final v = snap.data;
+                    final busy = snap.connectionState != ConnectionState.done;
+                    return Column(children: [
+                      statRow('Views', busy ? '…' : '${v?['views'] ?? '—'}', note: 'stone pages opened'),
+                      const Divider(height: 1),
+                      statRow('Visits', busy ? '…' : '${v?['visits'] ?? '—'}', note: 'different people'),
+                    ]);
+                  },
+                ),
               ]),
             ),
+
+            // Where visitors come from + countries (owner).
+            if (UserProfileService.instance.isOwner)
+              FutureBuilder<Map<String, dynamic>?>(
+                future: _views(),
+                builder: (context, snap) {
+                  final sources = ((snap.data?['sources'] as List?) ?? const []).cast<Map>();
+                  final countries = ((snap.data?['countries'] as List?) ?? const []).cast<Map>();
+                  if (sources.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _WhiteCard(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Where visitors come from', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        for (final r in sources.take(6))
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(children: [
+                              Expanded(child: Text(_sourceName(r['source'].toString()))),
+                              Text('${r['visits']}', style: AppTheme.numeric(t.bodyMedium)),
+                            ]),
+                          ),
+                        if (countries.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text('Countries', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 6),
+                          Text(countries.map((c) => '${c['country']} ${c['visits']}').join(' · '),
+                              style: t.bodyMedium),
+                        ],
+                      ]),
+                    ),
+                  );
+                },
+              ),
 
             if (UserProfileService.instance.isOwner) ...[
               const SizedBox(height: 24),
