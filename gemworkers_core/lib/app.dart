@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/services/auth_service.dart';
 import 'core/services/user_profile_service.dart';
+import 'core/utils/open_url/open_url.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/no_profile_page.dart';
 import 'pages/auth/seller_terms_page.dart';
@@ -114,6 +115,8 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
+  // Phones: the More tab (grouped list of the other pages) is showing.
+  bool _phoneMore = false;
   // Tab to open when a dashboard link switches page; cleared on sidebar taps.
   String? _ordersStatus;
   String? _listingsTab;
@@ -371,54 +374,78 @@ class _MainLayoutState extends State<MainLayout> {
       _loadCounts();
     }
 
-    // Phones: the menu slides in from a "Menu" bar at the bottom (thumb
-    // reach); pages keep their own title bar at the top.
+    // Phones: Etsy Seller-style bottom bar — Home · Messages · Orders ·
+    // Listings · More (everything else, grouped). Pages keep their own top bar.
     if (MediaQuery.sizeOf(context).width < 600) {
-      final waiting = destinations.any((d) => d.badgeCount > 0);
+      // Page index of each main tab in _pages / _destinations.
+      const tabPages = [0, 4, 2, 1];
+      final inMain = tabPages.contains(safeIndex);
+      final activeTab = _phoneMore || !inMain ? 4 : tabPages.indexOf(safeIndex);
+      final otherBadges = [
+        for (var i = 0; i < destinations.length; i++)
+          if (!tabPages.contains(i)) destinations[i].badgeCount,
+      ].fold<int>(0, (a, b) => a + b);
+      final tabs = [
+        (Icons.home_outlined, Icons.home, 'Home', 0),
+        (Icons.chat_bubble_outline, Icons.chat_bubble, 'Messages', destinations[4].badgeCount),
+        (Icons.receipt_long_outlined, Icons.receipt_long, 'Orders', destinations[2].badgeCount),
+        (Icons.category_outlined, Icons.category, 'Listings', destinations[1].badgeCount),
+        (Icons.menu, Icons.menu, 'More', otherBadges),
+      ];
       return Scaffold(
-        drawer: Drawer(
-          width: ShopSidebar.expandedWidth,
-          child: Builder(
-            builder: (drawerContext) => ShopSidebar(
-              items: destinations,
-              selectedIndex: safeIndex,
-              forceCompact: false,
-              onSelected: (i) {
-                Navigator.of(drawerContext).pop();
-                select(i);
-              },
-              accountBuilder: (_) => const _UserMenu(compact: false),
-            ),
-          ),
-        ),
-        body: pages[safeIndex],
-        bottomNavigationBar: Builder(
-          builder: (barContext) => Material(
-            color: AppColors.surface,
-            elevation: 8,
-            child: SafeArea(
-              top: false,
-              child: InkWell(
-                onTap: () => Scaffold.of(barContext).openDrawer(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Badge(isLabelVisible: waiting, smallSize: 9, child: const Icon(Icons.menu)),
-                      const SizedBox(width: 12),
-                      const Text('Menu', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          destinations[safeIndex].label,
-                          textAlign: TextAlign.right,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppColors.muted),
+        body: _phoneMore
+            ? _MoreMenu(
+                destinations: destinations,
+                hidden: tabPages,
+                onSelected: (i) {
+                  setState(() => _phoneMore = false);
+                  select(i);
+                },
+              )
+            : pages[safeIndex],
+        bottomNavigationBar: Material(
+          color: AppColors.surface,
+          elevation: 8,
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                children: [
+                  for (var t = 0; t < tabs.length; t++)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          if (t == 4) {
+                            setState(() => _phoneMore = true);
+                          } else {
+                            setState(() => _phoneMore = false);
+                            select(tabPages[t]);
+                          }
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Badge(
+                              isLabelVisible: tabs[t].$4 > 0,
+                              label: Text('${tabs[t].$4}'),
+                              child: Icon(
+                                activeTab == t ? tabs[t].$2 : tabs[t].$1,
+                                color: activeTab == t ? AppColors.ink : AppColors.muted,
+                              ),
+                            ),
+                            // Like Etsy: only the selected tab shows its name.
+                            if (activeTab == t)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Text(tabs[t].$3,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                              ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -571,6 +598,124 @@ class _UserMenu extends StatelessWidget {
           await AuthService.signOut();
         }
       },
+    );
+  }
+}
+
+// ── Phone "More" tab (Etsy Seller-style grouped list) ─────────────────────────
+
+class _MoreMenu extends StatelessWidget {
+  final List<ShopNavItem> destinations;
+  final List<int> hidden;               // pages already in the bottom bar
+  final ValueChanged<int> onSelected;
+  const _MoreMenu({required this.destinations, required this.hidden, required this.onSelected});
+
+  static const _groups = <(String, List<String>)>[
+    ('Selling', ['Offers', 'Payouts', 'Returns', 'Reviews']),
+    ('Stock', ['Purchases', 'Suppliers', 'Locations', 'Makers']),
+    ('People', ['Customers', 'Sellers', 'Owners', 'Subscribers']),
+    ('Business', ['Taxes & duties']),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final svc = UserProfileService.instance;
+    final email = AuthService.currentUserEmail ?? '';
+    final name = svc.profile?.displayName;
+    final textTheme = Theme.of(context).textTheme;
+    final byLabel = {
+      for (var i = 0; i < destinations.length; i++)
+        if (!hidden.contains(i)) destinations[i].label: i,
+    };
+    final grouped = {for (final g in _groups) ...g.$2};
+    final others = byLabel.keys.where((l) => !grouped.contains(l)).toList();
+
+    Widget tile(IconData icon, String label, VoidCallback onTap, {int badge = 0}) => ListTile(
+          leading: CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.raised,
+            child: Icon(icon, size: 20, color: AppColors.ink),
+          ),
+          title: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          trailing: badge > 0 ? Badge(label: Text('$badge')) : null,
+          onTap: onTap,
+        );
+
+    Widget section(String title, List<Widget> children) => children.isEmpty
+        ? const SizedBox.shrink()
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
+                child: Text(title, style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              ...children,
+            ],
+          );
+
+    List<Widget> pageTiles(List<String> labels) => [
+          for (final l in labels)
+            if (byLabel[l] != null)
+              tile(destinations[byLabel[l]!].icon, l, () => onSelected(byLabel[l]!),
+                  badge: destinations[byLabel[l]!].badgeCount),
+        ];
+
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            // Account (like Etsy's shop header / Switch Account).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.raised,
+                    child: Text(
+                      (name?.isNotEmpty == true ? name! : (email.isNotEmpty ? email : '?'))[0].toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.accent, fontSize: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name?.isNotEmpty == true ? name! : email,
+                            style: textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                        Text(svc.isOwner ? 'Owner' : 'Seller',
+                            style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            section('Shop', [
+              tile(Icons.open_in_new, 'View shop on GemWorkers', () => openUrl('https://www.gemworkers.com')),
+              tile(Icons.share_outlined, 'GemWorkers on social media', () => showSocialLinksDialog(context)),
+            ]),
+            for (final g in _groups) section(g.$1, pageTiles(g.$2)),
+            if (others.isNotEmpty) section('Other', pageTiles(others)),
+            section('Settings', [
+              if (!svc.isOwner)
+                tile(Icons.description_outlined, 'Seller terms', () async {
+                  final terms = await loadSellerTerms();
+                  if (terms != null && context.mounted) {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => SellerTermsPage(terms: terms)));
+                  }
+                }),
+              tile(Icons.logout, 'Sign out', () async {
+                UserProfileService.instance.clear();
+                await AuthService.signOut();
+              }),
+            ]),
+          ],
+        ),
+      ),
     );
   }
 }
