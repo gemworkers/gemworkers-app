@@ -6,6 +6,7 @@ import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
 import { createClient } from '@/lib/supabase/server'
 import { StoreHeader } from '@/app/components/StoreHeader'
 import { ShipToSelect } from '@/app/components/ShipToSelect'
+import { NewsletterSignup } from '@/app/components/NewsletterSignup'
 import { loadShipCountries, currentShipToCode } from '@/lib/ship-to'
 
 const cormorant = Cormorant_Garamond({
@@ -82,6 +83,9 @@ function Footer() {
             <Image src="/logo-white.png" alt="GemWorkers" height={90} width={124} style={{ display: 'block' }} />
           </Link>
         </div>
+
+        {/* Email sign-up (sql/newsletter.sql) */}
+        <NewsletterSignup />
 
         {/* Links */}
         <div style={{ display: 'flex', gap: 60, flexWrap: 'wrap' }}>

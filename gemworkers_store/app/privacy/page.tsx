@@ -30,6 +30,11 @@ export default async function PrivacyPage() {
         </li>
         <li>Messages: anything you send us by email or through Messages on our website.</li>
         <li>
+          Newsletter: if you sign up for emails about new stones, your email address and the date
+          you confirmed (proof of your consent). You can unsubscribe at any time with the link in
+          every email.
+        </li>
+        <li>
           Business buyers: company name and VAT number, and the result of the check in the
           EU VAT register (VIES), which we must keep as proof for 0% VAT.
         </li>

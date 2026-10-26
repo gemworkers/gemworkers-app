@@ -8,6 +8,7 @@ import 'core/services/user_profile_service.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/no_profile_page.dart';
 import 'pages/auth/seller_terms_page.dart';
+import 'pages/subscribers/subscribers_page.dart';
 import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
@@ -244,6 +245,7 @@ class _MainLayoutState extends State<MainLayout> {
         if (_isOwner) const LocationsPage(),
         if (_isOwner) const MakersPage(),
         if (_isOwner) ReviewsPage(onPendingChanged: _loadReviewsCount),
+        if (_isOwner) const SubscribersPage(),
         if (_isOwner) ReturnsPage(onOpenChanged: _loadReturnsCount),
         if (_isOwner) TaxesPage(key: ValueKey('taxes-$_taxesTab'), initialTab: _taxesTab),
       ];
@@ -329,6 +331,12 @@ class _MainLayoutState extends State<MainLayout> {
             selectedIcon: Icons.star,
             label: 'Reviews',
             badgeCount: _pendingReviewsCount,
+          ),
+        if (_isOwner)
+          const ShopNavItem(
+            icon: Icons.mark_email_read_outlined,
+            selectedIcon: Icons.mark_email_read,
+            label: 'Subscribers',
           ),
         if (_isOwner)
           ShopNavItem(
