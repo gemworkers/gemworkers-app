@@ -277,6 +277,20 @@ class InventoryRepository {
   }
 
   /// Marks a batch of items as sold and removes them from the marketplace.
+  /// "Sold elsewhere" (Etsy, Instagram, in person): off GemWorkers, status
+  /// sold — NOT a GemWorkers sale (no order, invoice or fee). Only while the
+  /// stone is available (never while a GemWorkers buyer is paying for it).
+  /// Returns false when the stone was not available.
+  Future<bool> markSoldElsewhere(String id, String notes) async {
+    final rows = await supabase
+        .from('inventory_items')
+        .update({'status': 'sold', 'is_listed': false, 'notes': notes})
+        .eq('id', id)
+        .eq('status', 'available')
+        .select('id');
+    return (rows as List).isNotEmpty;
+  }
+
   Future<void> markSold(List<String> ids) async {
     if (ids.isEmpty) return;
     await supabase

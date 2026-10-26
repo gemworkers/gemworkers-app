@@ -1,6 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
+import '../../core/utils/share/share.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../models/inventory_item.dart';
@@ -97,6 +100,56 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
       }
     } catch (_) {
       if (mounted) setState(() => _movementsLoading = false);
+    }
+  }
+
+  // ── Share / sold elsewhere ─────────────────────────────────────────────────
+
+  /// The stone's shop link: phone share menu, or copied on a computer.
+  Future<void> _share() async {
+    final url = 'https://www.gemworkers.com/stones/${_item.id}';
+    final shared = await shareLink(url, _item.title);
+    if (shared || !mounted) return;
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Link copied — paste it in Instagram, WhatsApp, Facebook…'),
+    ));
+  }
+
+  /// Sold on Etsy, Instagram or in person: off GemWorkers at once, so it can't
+  /// be sold twice. Not a GemWorkers sale (no order, invoice or fee).
+  Future<void> _soldElsewhere() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sold somewhere else?'),
+        content: const Text(
+          'Sold on Etsy, Instagram, at a fair or in person? The stone is taken off GemWorkers '
+          'right away and marked as sold.\n\nThis is not a GemWorkers sale: no order, invoice or fee is made.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, sold elsewhere')),
+        ],
+      ),
+    );
+    if (ok != true || _item.id == null) return;
+    final stamp = 'Sold elsewhere ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}';
+    final notes = _item.notes.trim().isEmpty ? stamp : '${_item.notes.trim()}\n$stamp';
+    try {
+      final done = await _repository.markSoldElsewhere(_item.id!, notes);
+      if (!mounted) return;
+      if (done) {
+        setState(() => _item = _item.copyWith(status: 'sold', isListed: false, notes: notes));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Taken off GemWorkers and marked sold.')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Not changed: a GemWorkers buyer has reserved or bought this stone. Check Orders first.'),
+        ));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
     }
   }
 
@@ -740,6 +793,28 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           if (_item.notes.isNotEmpty) ...[
             _sectionLabel('Notes'),
             Text(_item.notes),
+          ],
+
+          if (_item.isListed || _item.status == 'available') ...[
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (_item.isListed)
+                  OutlinedButton.icon(
+                    onPressed: _share,
+                    icon: const Icon(Icons.share_outlined, size: 18),
+                    label: const Text('Share'),
+                  ),
+                if (_item.status == 'available')
+                  OutlinedButton.icon(
+                    onPressed: _soldElsewhere,
+                    icon: const Icon(Icons.storefront_outlined, size: 18),
+                    label: const Text('Sold elsewhere'),
+                  ),
+              ],
+            ),
           ],
 
           if (_item.status != 'sold') ...[

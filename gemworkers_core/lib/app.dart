@@ -9,6 +9,7 @@ import 'pages/auth/login_page.dart';
 import 'pages/auth/no_profile_page.dart';
 import 'pages/auth/seller_terms_page.dart';
 import 'pages/subscribers/subscribers_page.dart';
+import 'pages/settings/social_links_dialog.dart';
 import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
@@ -523,6 +524,16 @@ class _UserMenu extends StatelessWidget {
           ),
         ),
         const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'social',
+          child: Row(
+            children: [
+              Icon(Icons.share_outlined, size: 18),
+              SizedBox(width: 10),
+              Text('Social media'),
+            ],
+          ),
+        ),
         if (!svc.isOwner)
           const PopupMenuItem(
             value: 'terms',
@@ -546,6 +557,9 @@ class _UserMenu extends StatelessWidget {
         ),
       ],
       onSelected: (value) async {
+        if (value == 'social' && context.mounted) {
+          await showSocialLinksDialog(context);
+        }
         if (value == 'terms') {
           final terms = await loadSellerTerms();
           if (terms != null && context.mounted) {

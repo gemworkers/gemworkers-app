@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 import { StoreHeader } from '@/app/components/StoreHeader'
 import { ShipToSelect } from '@/app/components/ShipToSelect'
 import { NewsletterSignup } from '@/app/components/NewsletterSignup'
+import { socialLinks } from '@/lib/social'
+import { SOCIAL_ICONS } from '@/lib/social-icons'
 import { loadShipCountries, currentShipToCode } from '@/lib/ship-to'
 
 const cormorant = Cormorant_Garamond({
@@ -66,7 +68,16 @@ const CUSTOMER_CARE_LINKS = [
   { label: 'Privacy Policy',     href: '/privacy' },
 ]
 
-function Footer() {
+async function Footer() {
+  const social = await socialLinks()
+  const accounts = (['instagram', 'tiktok', 'pinterest', 'youtube', 'facebook', 'x'] as const)
+    .filter(k => social[k] && SOCIAL_ICONS[k])
+  // Google: these are GemWorkers' official accounts (Organization sameAs).
+  const orgJsonLd = {
+    '@context': 'https://schema.org', '@type': 'Organization', name: 'GemWorkers',
+    url: 'https://www.gemworkers.com', logo: 'https://www.gemworkers.com/icon-512.png',
+    sameAs: accounts.map(k => social[k]),
+  }
   return (
     <footer style={{ background: '#FFFFFF', marginTop: 80, borderTop: '1px solid #ECE5D8' }}>
       <div className="gold-rule" />
@@ -84,8 +95,23 @@ function Footer() {
           </Link>
         </div>
 
-        {/* Email sign-up (sql/newsletter.sql) */}
-        <NewsletterSignup />
+        {/* Email sign-up (sql/newsletter.sql) + GemWorkers' social accounts */}
+        <div>
+          <NewsletterSignup />
+          {accounts.length > 0 && (
+            <div style={{ display: 'flex', gap: 14, marginTop: 22, flexWrap: 'wrap' }} aria-label="GemWorkers on social media">
+              {accounts.map(k => (
+                <a key={k} href={social[k]} target="_blank" rel="noopener noreferrer"
+                   aria-label={`GemWorkers on ${SOCIAL_ICONS[k].title}`} title={SOCIAL_ICONS[k].title}
+                   style={{ color: '#5A5045', lineHeight: 0 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d={SOCIAL_ICONS[k].path} />
+                  </svg>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Links */}
         <div style={{ display: 'flex', gap: 60, flexWrap: 'wrap' }}>
@@ -123,6 +149,9 @@ function Footer() {
       }}>
         © {new Date().getFullYear()} GemWorkers. All rights reserved.
       </div>
+      {accounts.length > 0 && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd).replace(/</g, '\\u003c') }} />
+      )}
     </footer>
   )
 }

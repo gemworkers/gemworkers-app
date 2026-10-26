@@ -23,6 +23,7 @@ import type { Metadata } from 'next';
 import { stoneSeoTitle, stoneSeoDescription, stoneJsonLd, type SeoStone } from '@/lib/seo';
 import { favouriteIds } from '@/lib/favourites';
 import { FavouriteButton } from '@/app/components/FavouriteButton';
+import { ShareButton } from '@/app/components/ShareButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -479,7 +480,10 @@ export default async function StoneDetailPage({
             )}
             <ReviewSummary style={{ marginTop: 10 }} />
             <div style={{ marginTop: 12 }}>
-              <FavouriteButton variant="page" itemId={item.id} initial={!!favs?.includes(item.id)} loggedIn={favs !== null} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+                <FavouriteButton variant="page" itemId={item.id} initial={!!favs?.includes(item.id)} loggedIn={favs !== null} />
+                <ShareButton url={`https://www.gemworkers.com/stones/${item.id}`} title={item.title} image={photos[0] ?? null} />
+              </div>
             </div>
           </div>
 
