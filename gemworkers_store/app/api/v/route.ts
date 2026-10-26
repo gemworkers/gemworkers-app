@@ -1,7 +1,7 @@
-import { createHmac } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { visitorCodeFrom } from '@/lib/visitor'
 
 // Anonymous views & visits (sql/page_views.sql). Called by ViewCounter in the
 // browser for every page opened. No cookies, nothing stored on the device;
@@ -47,11 +47,9 @@ export async function POST(req: NextRequest) {
       if (role === 'owner' || role === 'seller') return new NextResponse(null, { status: 204 })
     }
 
-    const secret = process.env.CRON_SECRET
-    if (!secret) return new NextResponse(null, { status: 204 })
-    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
     const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
-    const visitor = createHmac('sha256', secret).update(`${day}|${ip}|${ua}`).digest('hex').slice(0, 16)
+    const visitor = visitorCodeFrom(ip, ua)
+    if (!visitor) return new NextResponse(null, { status: 204 })
     const country = (req.headers.get('x-vercel-ip-country') ?? '').toUpperCase()
     const stone = STONE.exec(path)?.[1] ?? null
 

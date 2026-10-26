@@ -11,6 +11,7 @@ import { createCheckoutSession } from '@/lib/stripe/checkout'
 import { refreshBusinessCheck } from '@/lib/business'
 import { chargeCurrencyFor, offerCurrencyNow } from '@/lib/fx'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { noteSource } from '@/lib/visitor'
 
 // US / UK / AU / CA buyers pay in their own currency (sql/local_currency.sql):
 // locks today's rate on the pending orders and returns what to charge per
@@ -132,6 +133,7 @@ async function startBuyNow(
   }
 
   const orderId = data as string
+  await noteSource('orders', [orderId])   // sales per channel (sql/sales_by_source.sql)
 
   // VAT for the ship-to country (or a refusal, e.g. under the UK minimum).
   await refreshBusinessCheck(user.id)   // business buyer: keep the VIES check fresh
@@ -569,6 +571,8 @@ export async function checkoutCart(): Promise<
     return { error: 'Payment setup failed — please try again.' }
   }
 
+  await noteSource('orders', createdOrderIds)   // sales per channel
+
   // ── 4b. VAT for the ship-to country (or a refusal, e.g. UK minimum) ───────
   await refreshBusinessCheck(user.id)   // business buyer: keep the VIES check fresh
   const tax = await applyOrderTax(supabase, createdOrderIds, shipTo.code)
@@ -748,6 +752,7 @@ export async function submitOffer(
   if (error) return { error: error.message }
   if (!data) return { error: 'No offer ID returned — please try again.' }
 
+  await noteSource('storefront_offers', [data as string])   // its order takes this source
   return { offerId: data as string }
 }
 

@@ -197,6 +197,28 @@ class _DashboardPageState extends State<DashboardPage> {
     };
   }
 
+  Future<List<Map<String, dynamic>>>? _salesFuture;
+  String _salesKey = '';
+
+  /// Paid orders + revenue per source in the chosen period (sql/sales_by_source.sql).
+  Future<List<Map<String, dynamic>>> _salesBySource() {
+    final key = '$_statsRange|${_isSeller ? '' : _selectedSeller?.id ?? ''}';
+    if (_salesFuture == null || key != _salesKey) {
+      _salesKey = key;
+      final r = _rangeDates();
+      String d(DateTime x) => DateFormat('yyyy-MM-dd').format(x);
+      _salesFuture = Supabase.instance.client
+          .rpc('sales_by_source', params: {
+            'p_from': d(r.from),
+            'p_to': d(r.to),
+            'p_seller': _isSeller ? null : _selectedSeller?.id,
+          })
+          .then<List<Map<String, dynamic>>>((v) => (v as List).cast<Map>().map((m) => m.cast<String, dynamic>()).toList())
+          .catchError((_) => <Map<String, dynamic>>[]);
+    }
+    return _salesFuture!;
+  }
+
   Future<Map<String, dynamic>?> _views() {
     final key = '$_statsRange|${_isSeller ? '' : _selectedSeller?.id ?? ''}';
     if (_viewsFuture == null || key != _viewsKey) {
@@ -468,24 +490,43 @@ class _DashboardPageState extends State<DashboardPage> {
 
             // Where visitors come from + countries (owner).
             if (UserProfileService.instance.isOwner)
-              FutureBuilder<Map<String, dynamic>?>(
-                future: _views(),
+              FutureBuilder<List<dynamic>>(
+                future: Future.wait([_views(), _salesBySource()]),
                 builder: (context, snap) {
-                  final sources = ((snap.data?['sources'] as List?) ?? const []).cast<Map>();
-                  final countries = ((snap.data?['countries'] as List?) ?? const []).cast<Map>();
-                  if (sources.isEmpty) return const SizedBox.shrink();
+                  final viewData = snap.data?[0] as Map<String, dynamic>?;
+                  final sales = (snap.data?[1] as List<Map<String, dynamic>>?) ?? const [];
+                  final countries = ((viewData?['countries'] as List?) ?? const []).cast<Map>();
+                  // One row per source: visits (page views) + paid orders + revenue.
+                  final rows = <String, ({int visits, int orders, double revenue})>{};
+                  for (final r in ((viewData?['sources'] as List?) ?? const []).cast<Map>()) {
+                    rows[r['source'].toString()] = (visits: (r['visits'] as num).toInt(), orders: 0, revenue: 0);
+                  }
+                  for (final r in sales) {
+                    final k = r['source'].toString();
+                    final cur = rows[k] ?? (visits: 0, orders: 0, revenue: 0.0);
+                    rows[k] = (visits: cur.visits, orders: (r['orders'] as num).toInt(),
+                        revenue: double.tryParse('${r['revenue']}') ?? 0);
+                  }
+                  if (rows.isEmpty) return const SizedBox.shrink();
+                  final sorted = rows.entries.toList()
+                    ..sort((a, b) => b.value.revenue != a.value.revenue
+                        ? b.value.revenue.compareTo(a.value.revenue)
+                        : b.value.visits.compareTo(a.value.visits));
                   return Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: _WhiteCard(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Where visitors come from', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 8),
-                        for (final r in sources.take(6))
+                        Text('Visitors and sales by source', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text('Visits · orders · revenue', style: t.bodySmall?.copyWith(color: AppColors.muted)),
+                        const SizedBox(height: 6),
+                        for (final e in sorted.take(8))
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 3),
                             child: Row(children: [
-                              Expanded(child: Text(_sourceName(r['source'].toString()))),
-                              Text('${r['visits']}', style: AppTheme.numeric(t.bodyMedium)),
+                              Expanded(child: Text(e.key == 'unknown' ? 'Unknown (before tracking)' : _sourceName(e.key))),
+                              Text('${e.value.visits} · ${e.value.orders} · ${_euro(e.value.revenue)}',
+                                  style: AppTheme.numeric(t.bodyMedium)),
                             ]),
                           ),
                         if (countries.isNotEmpty) ...[

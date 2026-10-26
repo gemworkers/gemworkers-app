@@ -69,7 +69,7 @@ Everything left before real customers can pay. Tick items off as they're done.
 - [ ] Answer every buyer message within a day — early reviews matter most.
 
 ## Sales tools (Claude, optional before launch)
-- [ ] **C** Sales per channel: save where each buyer came from with the order
+- [x] **C** Sales per channel (done 2026-10-26): save where each buyer came from with the order
       ("Instagram: 40 visits, 2 sales, €580").
 - [ ] **C** Welcome discount for newsletter sign-ups (e.g. 10% on the first order).
 - [ ] **C** Free "Social kit" per stone: photos + video to the phone + captions/hashtags per
