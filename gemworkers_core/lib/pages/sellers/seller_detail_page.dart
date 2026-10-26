@@ -9,6 +9,7 @@ import '../../models/seller.dart';
 import '../../repositories/location_repository.dart';
 import '../../repositories/seller_repository.dart';
 import 'add_edit_seller_page.dart';
+import '../settings/vacation_dialog.dart';
 
 class SellerDetailPage extends StatefulWidget {
   final String sellerId;
@@ -402,6 +403,16 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
                     _buildFeeSettings(seller),
                     const SizedBox(height: 12),
                     _buildTermsStatus(seller),
+                    const SizedBox(height: 12),
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.beach_access_outlined),
+                        title: const Text('Vacation mode'),
+                        subtitle: const Text("Hide this seller's stones from the shop for a while"),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => showVacationDialog(context, sellerId: seller.id),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     _buildLocations(),
                     if (seller.notes.isNotEmpty) ...[

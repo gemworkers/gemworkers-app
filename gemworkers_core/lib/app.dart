@@ -11,6 +11,7 @@ import 'pages/auth/no_profile_page.dart';
 import 'pages/auth/seller_terms_page.dart';
 import 'pages/subscribers/subscribers_page.dart';
 import 'pages/settings/social_links_dialog.dart';
+import 'pages/settings/vacation_dialog.dart';
 import 'pages/sellers/sellers_page.dart';
 import 'pages/customers/customers_page.dart';
 import 'pages/dashboard/dashboard_page.dart';
@@ -582,6 +583,16 @@ class _UserMenu extends StatelessWidget {
         ),
         const PopupMenuDivider(),
         const PopupMenuItem(
+          value: 'vacation',
+          child: Row(
+            children: [
+              Icon(Icons.beach_access_outlined, size: 18),
+              SizedBox(width: 10),
+              Text('Vacation mode'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
           value: 'social',
           child: Row(
             children: [
@@ -614,6 +625,9 @@ class _UserMenu extends StatelessWidget {
         ),
       ],
       onSelected: (value) async {
+        if (value == 'vacation' && context.mounted) {
+          await showVacationDialog(context);
+        }
         if (value == 'social' && context.mounted) {
           await showSocialLinksDialog(context);
         }
@@ -731,6 +745,7 @@ class _MoreMenu extends StatelessWidget {
             for (final g in _groups) section(g.$1, pageTiles(g.$2)),
             if (others.isNotEmpty) section('Other', pageTiles(others)),
             section('Settings', [
+              tile(Icons.beach_access_outlined, 'Vacation mode', () => showVacationDialog(context)),
               if (!svc.isOwner)
                 tile(Icons.description_outlined, 'Seller terms', () async {
                   final terms = await loadSellerTerms();
