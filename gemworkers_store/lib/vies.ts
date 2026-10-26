@@ -1,8 +1,12 @@
 // SERVER ONLY — EU VAT number check (VIES, European Commission).
 //
-// Sends GEMWORKERS_VAT_NUMBER as the requester when it is set, so VIES returns
-// a consultation number — the official proof that the buyer's number was
-// checked (kept on buyer_business / orders, sql/order_tax_b2b.sql).
+// Sends GemWorkers' own BTW-id as the requester, so VIES returns a
+// consultation number — the official proof that the buyer's number was
+// checked (kept on buyer_business / orders, sql/order_tax_b2b.sql). The BTW-id
+// comes from admin → Taxes & duties → Company details (public_company_info);
+// GEMWORKERS_VAT_NUMBER in Vercel overrides it if ever needed.
+
+import { createClient } from '@supabase/supabase-js'
 
 // VAT prefixes of EU member states (Greece uses EL; XI = Northern Ireland goods).
 const EU_PREFIXES = new Set([
@@ -34,8 +38,28 @@ function clean(v: unknown): string | null {
   return s && s !== '---' ? s : null
 }
 
+// GemWorkers' BTW-id, cached for 10 minutes (read without the buyer's login).
+let requesterCache: { vat: string; at: number } | null = null
+async function requesterVat(): Promise<string> {
+  const fromEnv = normalizeVatNumber(process.env.GEMWORKERS_VAT_NUMBER ?? '')
+  if (fromEnv) return fromEnv
+  if (requesterCache && Date.now() - requesterCache.at < 600_000) return requesterCache.vat
+  let vat = ''
+  try {
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const { data } = await db.from('public_company_info').select('vat').maybeSingle()
+    vat = normalizeVatNumber((data as { vat: string | null } | null)?.vat ?? '')
+  } catch {
+    // No requester: VIES still checks the number, just without a consultation number.
+  }
+  // Only a real EU VAT number (e.g. NL123456789B01) can be the requester.
+  if (!euVatCountry(vat) || vat.length < 8) vat = ''
+  requesterCache = { vat, at: Date.now() }
+  return vat
+}
+
 export async function checkVies(vat: string): Promise<ViesResult> {
-  const requester = normalizeVatNumber(process.env.GEMWORKERS_VAT_NUMBER ?? '')
+  const requester = await requesterVat()
   try {
     const res = await fetch(VIES_URL, {
       method: 'POST',

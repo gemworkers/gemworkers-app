@@ -9,8 +9,8 @@ Everything left before real customers can pay. Tick items off as they're done.
       turnover for foreign-currency orders (euro price or euros received). Also the
       "ACCOUNTANT REVIEW" wording on the Payment page.
 - [ ] **Z** Register for the EU One-Stop-Shop (OSS / "Unieregeling") at the Belastingdienst.
-- [ ] **C** Use the BTW-id from Company details for the VAT-number checks of business
-      buyers (official consultation number) — no need to send it; Claude wires it up.
+- [x] **C** Use the BTW-id from Company details for the VAT-number checks of business
+      buyers (official consultation number). (done 2026-10-26, VIES returns a consultation number)
 - [x] **Z** Company details complete in Admin → Taxes & duties → Company details
       (address / virtual office, KvK, BTW, EORI, return address). (all filled in, checked 2026-10-26)
 - [x] **Z+C** Short written agreement with each brother (seller terms, "I agree" at login — done 2026-10-26; accountant/lawyer to check the text): 12% service fee, payout after the
