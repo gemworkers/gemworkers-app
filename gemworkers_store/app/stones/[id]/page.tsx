@@ -531,13 +531,30 @@ export default async function StoneDetailPage({
               )}
             </div>
           ) : (
-            <div>
-              <Link href={`/auth/login?next=${nextParam}`} style={pillDark}>
-                Log in to buy
-              </Link>
-              <p style={{ fontSize: 14, color: '#6B6052', marginTop: 12, textAlign: 'center' }}>
-                New here?{' '}
-                <Link href={`/auth/signup?next=${nextParam}`} className="pd-link">Create an account</Link>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Guest checkout: Buy now with only an email (guestBuyNow). Cart and
+                  offers still need an account. */}
+              {item.sale_method !== 'accept_offers' && item.selling_price != null ? (
+                <BuyButton
+                  itemId={item.id}
+                  itemTitle={item.title}
+                  sellingPrice={item.selling_price}
+                  shippingCost={cost}
+                  vatAmount={quote?.taxAmount ?? 0}
+                  vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
+                  isLoggedIn={false}
+                  fx={fx}
+                />
+              ) : (
+                <Link href={`/auth/login?next=${nextParam}`} style={pillDark}>
+                  Log in to make an offer
+                </Link>
+              )}
+              <p style={{ fontSize: 14, color: '#6B6052', textAlign: 'center' }}>
+                <Link href={`/auth/login?next=${nextParam}`} className="pd-link">Log in</Link>
+                {' '}or{' '}
+                <Link href={`/auth/signup?next=${nextParam}`} className="pd-link">create an account</Link>
+                {' '}to use the cart{item.sale_method !== 'buy_now' ? ' or make an offer' : ''}.
               </p>
             </div>
           )}

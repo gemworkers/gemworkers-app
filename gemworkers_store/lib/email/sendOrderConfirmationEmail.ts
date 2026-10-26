@@ -38,7 +38,7 @@ function buildSubject(orders: EmailOrderLine[]): string {
   return 'Your GemWorkers order is confirmed'
 }
 
-function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
+function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress, accountLink?: string | null): string {
 
   const rows = orders.map(o => `
       <tr>
@@ -79,6 +79,13 @@ function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress): string {
       ${phoneRow}
     </div>
 
+${accountLink ? `
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px 24px;margin-bottom:32px">
+      <p style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#9ca3af;margin:0 0 12px">Your GemWorkers account</p>
+      <p style="font-size:14px;line-height:1.6;color:#374151;margin:0 0 16px">We created an account with this email for your order, so you can follow it, request a return or leave a review. Choose a password to log in on any device:</p>
+      <a href="${esc(accountLink)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-size:14px">Choose my password</a>
+      <p style="font-size:12px;color:#9ca3af;margin:12px 0 0;line-height:1.5">The button works once and for a limited time. Later? Use &ldquo;Forgot password&rdquo; on the login page with this email.</p>
+    </div>` : ''}
     <p style="font-size:12px;color:#9ca3af;margin:0">This is an automated message &mdash; please do not reply. Questions? Email us at hello@gemworkers.com</p>
   </div>
 </body></html>`
@@ -90,12 +97,14 @@ export async function sendOrderConfirmationEmail(opts: {
   to:       string[]
   orders:   EmailOrderLine[]
   shipping: ShippingAddress
+  // Guest checkout: one-time "choose my password" link (lib/guest-account.ts).
+  accountLink?: string | null
 }): Promise<void> {
   if (opts.to.length === 0) return
   await getResend().emails.send({
     from:    FROM,
     to:      opts.to,
     subject: buildSubject(opts.orders),
-    html:    buildHtml(opts.orders, opts.shipping),
+    html:    buildHtml(opts.orders, opts.shipping, opts.accountLink),
   })
 }

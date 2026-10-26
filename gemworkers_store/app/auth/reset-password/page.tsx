@@ -18,8 +18,11 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  // ?welcome=1: first password for an account made at guest checkout.
+  const [welcome, setWelcome] = useState(false)
 
   useEffect(() => {
+    setWelcome(new URLSearchParams(window.location.search).get('welcome') === '1')
     // ?expired=1 comes from /auth/confirm when the link was used or expired.
     if (new URLSearchParams(window.location.search).get('expired') === '1') {
       setSignedIn(false)
@@ -43,7 +46,7 @@ export default function ResetPasswordPage() {
     }
     setError(null)
     setLoading(true)
-    const { error: updateError } = await createClient().auth.updateUser({ password })
+    const { error: updateError } = await createClient().auth.updateUser({ password, data: { guest: false } })
     if (updateError) {
       setError(updateError.message)
       setLoading(false)
@@ -55,7 +58,7 @@ export default function ResetPasswordPage() {
   }
 
   if (checking) {
-    return <AuthShell title="Choose a new password"><p style={{ fontSize: 15, color: '#5A5045' }}>One moment…</p></AuthShell>
+    return <AuthShell title={welcome ? 'Choose your password' : 'Choose a new password'}><p style={{ fontSize: 15, color: '#5A5045' }}>One moment…</p></AuthShell>
   }
 
   if (!signedIn) {
@@ -72,17 +75,22 @@ export default function ResetPasswordPage() {
 
   if (done) {
     return (
-      <AuthShell title="Password changed">
+      <AuthShell title={welcome ? 'Your account is ready' : 'Password changed'}>
         <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, marginBottom: 20 }}>
-          Your new password is saved and you&apos;re logged in.
+          Your {welcome ? '' : 'new '}password is saved and you&apos;re logged in.
         </p>
-        <Link href="/" className="pd-link">Continue shopping</Link>
+        <Link href={welcome ? '/orders' : '/'} className="pd-link">{welcome ? 'See my orders' : 'Continue shopping'}</Link>
       </AuthShell>
     )
   }
 
   return (
-    <AuthShell title="Choose a new password">
+    <AuthShell title={welcome ? 'Choose your password' : 'Choose a new password'}>
+      {welcome && (
+        <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, marginBottom: 20 }}>
+          Your GemWorkers account was made with your order. Choose a password to log in on any device.
+        </p>
+      )}
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 18 }}>
           <label style={labelStyle}>New password (at least 8 characters)</label>
@@ -106,7 +114,7 @@ export default function ResetPasswordPage() {
         {error && <p style={authErrorStyle}>{error}</p>}
 
         <button type="submit" disabled={!canSubmit} style={canSubmit ? pillDark : pillDisabled}>
-          {loading ? 'Saving…' : 'Save new password'}
+          {loading ? 'Saving…' : welcome ? 'Save my password' : 'Save new password'}
         </button>
       </form>
     </AuthShell>

@@ -11,6 +11,7 @@ import { refundAmountInChargeCurrency, sessionEurTotal } from '@/lib/stripe/refu
 import { recordFeeForPayment } from '@/lib/stripe/fees'
 import { sendDisputeAlertEmail } from '@/lib/email/sendDisputeAlertEmail'
 import { sendFraudWarningEmail } from '@/lib/email/sendFraudWarningEmail'
+import { guestAccountLink } from '@/lib/guest-account'
 import {
   sendLatePaymentOwnerEmail,
   sendLatePaymentBuyerEmail,
@@ -223,12 +224,13 @@ async function notifyCustomerSingleOrder(
 
   const { data: ordData } = await admin
     .from('orders')
-    .select('order_number, order_total, tax_amount, charge_currency, charge_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .select('buyer_id, order_number, order_total, tax_amount, charge_currency, charge_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('id', orderId)
     .single()
   if (!ordData) { console.error('[webhook] customer email: order not found', orderId); return }
 
   const o = ordData as {
+    buyer_id: string | null
     order_number: string; order_total: string | number; tax_amount: string | number | null
     charge_currency: string; charge_amount: string | number | null
     shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
@@ -261,6 +263,7 @@ async function notifyCustomerSingleOrder(
     to:       [customerEmail],
     orders:   [{ orderNumber: o.order_number, itemTitle, ...buyerPaid(o) }],
     shipping,
+    accountLink: await guestAccountLink(admin, o.buyer_id),
   })
 }
 
@@ -338,7 +341,10 @@ async function notifyCustomerGroupOrder(
     ...buyerPaid(o),
   }))
 
-  await sendOrderConfirmationEmail({ to: [customerEmail], orders: lines, shipping })
+  await sendOrderConfirmationEmail({
+    to: [customerEmail], orders: lines, shipping,
+    accountLink: await guestAccountLink(admin, orders[0]!.buyer_id),
+  })
 }
 
 // ── Late payment (order no longer pending) ────────────────────────────────────

@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { buyNow } from '@/app/actions/commerce'
-import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel } from '@/lib/ui'
+import { buyNow, guestBuyNow } from '@/app/actions/commerce'
+import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel, inputStyle, labelStyle } from '@/lib/ui'
+import { Turnstile, TURNSTILE_ENABLED } from '@/app/components/Turnstile'
 import { formatEur, formatMoney } from '@/lib/money'
 import { localPrice, type FxContext } from '@/lib/price-shown'
 import { paidTotal } from '@/lib/tax'
@@ -21,11 +22,15 @@ type Props = {
   fx?: FxContext | null
 }
 
-type State = 'idle' | 'confirm' | 'loading' | 'error'
+type State = 'idle' | 'confirm' | 'loading' | 'error' | 'existing'
 
 export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAmount = 0, vatLabel = 'VAT', isLoggedIn, fx }: Props) {
   const [state, setState] = useState<State>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // Guest checkout (logged out): email + Turnstile, account made on the spot.
+  const [email, setEmail] = useState('')
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
 
   if (sellingPrice == null) return null
 
@@ -36,12 +41,20 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
     ? formatMoney(localPrice(sellingPrice, fx!.rate) + localPrice(shippingCost ?? 0, fx!.rate), fx!.code)
     : formatEur(paidTotal(sellingPrice + (shippingCost ?? 0), vatAmount))
 
-  // ── Logged-out ────────────────────────────────────────────────────────────
-  if (!isLoggedIn) {
+  const loginHref = `/auth/login?next=${encodeURIComponent(`/stones/${itemId}`)}`
+  const guestReady = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()) && (!TURNSTILE_ENABLED || !!captchaToken)
+
+  // ── Email already has an account (guest checkout) ──────────────────────────
+  if (state === 'existing') {
     return (
-      <Link href={`/auth/login?next=${encodeURIComponent(`/stones/${itemId}`)}`} style={pillDark}>
-        Log in to buy
-      </Link>
+      <div style={panel}>
+        <p style={{ fontSize: 14, color: '#5A5045', lineHeight: 1.6, marginBottom: 14 }}>
+          This email already has a GemWorkers account (maybe from an earlier order). Please log in
+          to buy — no password yet? Use <strong>Forgot password</strong> on the login page and we&apos;ll
+          email you a link.
+        </p>
+        <Link href={loginHref} style={pillDarkSm}>Log in to buy</Link>
+      </div>
     )
   }
 
@@ -58,11 +71,14 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
   if (state === 'confirm') {
     async function handleConfirm() {
       setState('loading')
-      const result = await buyNow(itemId)
+      const result = isLoggedIn ? await buyNow(itemId) : await guestBuyNow(itemId, email, captchaToken)
       if ('checkoutUrl' in result) {
         window.location.href = result.checkoutUrl
+      } else if ('existing' in result) {
+        setState('existing')
       } else {
         setErrorMsg(result.error)
+        setCaptchaReset(n => n + 1)
         setState('error')
       }
     }
@@ -117,9 +133,28 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
         <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 18, lineHeight: 1.5 }}>
           This reserves the stone — it will no longer be available to other buyers.
         </p>
+        {!isLoggedIn && (
+          <div style={{ marginBottom: 16 }}>
+            <label htmlFor="guest-email" style={labelStyle}>Your email</label>
+            <input
+              id="guest-email" type="email" autoComplete="email" inputMode="email"
+              value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}
+              placeholder="you@example.com"
+            />
+            <p style={{ fontSize: 12, color: '#6B6052', lineHeight: 1.5, margin: '8px 0 12px' }}>
+              No account needed — we create one with this email so you can follow your order,
+              return it or leave a review. Already have one? <Link href={loginHref} className="pd-link">Log in</Link>
+            </p>
+            <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={handleConfirm} style={{ ...pillDarkSm, flex: '1 1 160px', width: 'auto' }}>
-            Confirm purchase
+          <button
+            onClick={handleConfirm}
+            disabled={!isLoggedIn && !guestReady}
+            style={{ ...(isLoggedIn || guestReady ? pillDarkSm : pillDisabled), flex: '1 1 160px', width: 'auto' }}
+          >
+            {isLoggedIn ? 'Confirm purchase' : 'Continue to payment'}
           </button>
           <button onClick={() => setState('idle')} style={{ ...pillOutlineSm, flex: '1 1 120px', width: 'auto' }}>
             Cancel

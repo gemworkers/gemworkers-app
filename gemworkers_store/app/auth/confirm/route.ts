@@ -34,6 +34,13 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
     if (!error) {
+      // A recovery link proves the mailbox is theirs: log out every other
+      // device (old sessions, or one opened at guest checkout by whoever
+      // typed this email). This device stays logged in.
+      if (type === 'recovery') {
+        const { error: outErr } = await supabase.auth.signOut({ scope: 'others' })
+        if (outErr) console.error('[auth/confirm] sign out others failed:', outErr.message)
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
     console.error('[auth/confirm] verifyOtp failed:', error.message)

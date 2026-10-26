@@ -6,7 +6,7 @@ export const metadata = { title: 'Privacy Policy · GemWorkers' }
 export default async function PrivacyPage() {
   const c = await companyInfo()
   return (
-    <ContentPage eyebrow="Legal" title="Privacy Policy" lastUpdated="25 October 2026">
+    <ContentPage eyebrow="Legal" title="Privacy Policy" lastUpdated="26 October 2026">
       {/* LEGAL REVIEW before launch: partner data transfers outside the EU (Thailand/Pakistan, standard contractual clauses?). Update cookies if analytics are added. */}
 
       <h2>Who we are</h2>
@@ -19,7 +19,11 @@ export default async function PrivacyPage() {
 
       <h2>What we collect</h2>
       <ul>
-        <li>Account details: your name and email address.</li>
+        <li>
+          Account details: your name and email address. If you buy without logging in, we
+          create an account with the email you give, so you can follow your order, request a
+          return and see your invoice; you can choose a password later or ask us to delete it.
+        </li>
         <li>
           Order details: your name, shipping address, phone number (if given), and what
           you ordered.

@@ -10,6 +10,7 @@ import { applyOrderTax, vatLineItem, reverseChargeText } from '@/lib/tax'
 import { createCheckoutSession } from '@/lib/stripe/checkout'
 import { refreshBusinessCheck } from '@/lib/business'
 import { chargeCurrencyFor, offerCurrencyNow } from '@/lib/fx'
+import { verifyTurnstile } from '@/lib/turnstile'
 
 // US / UK / AU / CA buyers pay in their own currency (sql/local_currency.sql):
 // locks today's rate on the pending orders and returns what to charge per
@@ -56,7 +57,65 @@ export async function buyNow(
   if (!user) {
     return { error: 'You must be logged in to buy.' }
   }
+  return startBuyNow(supabase, user, itemId)
+}
 
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>
+
+// Guest checkout: Buy now with only an email. A new email gets a GemWorkers
+// account created on the spot (no password; the order email has a link to set
+// one) and is logged in on this device. An email that already has an account
+// must log in — typing someone's email never opens their account.
+// Turnstile (lib/turnstile.ts) stops bots from reserving stones.
+export async function guestBuyNow(
+  itemId: string,
+  rawEmail: string,
+  captchaToken: string | null,
+): Promise<{ orderId: string; checkoutUrl: string } | { error: string } | { existing: true }> {
+  const email = rawEmail.trim().toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 254) {
+    return { error: 'Please enter a valid email address.' }
+  }
+  const supabase = await createClient()
+  const { data: { user: current } } = await supabase.auth.getUser()
+  if (current) return startBuyNow(supabase, current, itemId)
+
+  if (!(await verifyTurnstile(captchaToken))) {
+    return { error: 'Please complete the check and try again.' }
+  }
+
+  const admin = createAdminClient()
+  const { error: createErr } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: false,
+    user_metadata: { source: 'storefront', guest: true },   // source → buyers row (handle_new_buyer)
+  })
+  if (createErr) {
+    if (createErr.code === 'email_exists' || /already/i.test(createErr.message)) return { existing: true }
+    console.error('[guestBuyNow] create user failed:', createErr.message)
+    return { error: 'Checkout failed — please try again.' }
+  }
+
+  // Log the new account in on this device (server-side one-time login link).
+  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: 'magiclink', email })
+  const tokenHash = link?.properties?.hashed_token
+  if (linkErr || !tokenHash) {
+    console.error('[guestBuyNow] login link failed:', linkErr?.message)
+    return { error: 'Checkout failed — please try again.' }
+  }
+  const { data: session, error: otpErr } = await supabase.auth.verifyOtp({ type: 'magiclink', token_hash: tokenHash })
+  if (otpErr || !session.user) {
+    console.error('[guestBuyNow] login failed:', otpErr?.message)
+    return { error: 'Checkout failed — please try again.' }
+  }
+  return startBuyNow(supabase, session.user, itemId)
+}
+
+async function startBuyNow(
+  supabase: ServerSupabase,
+  user: { id: string; email?: string | null },
+  itemId: string,
+): Promise<{ orderId: string; checkoutUrl: string } | { error: string }> {
   // Before any order exists: we must ship to the buyer's chosen country.
   const shipTo = await checkoutShipTo(supabase)
   if ('error' in shipTo) return { error: shipTo.error }
