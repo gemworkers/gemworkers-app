@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/services/user_profile_service.dart';
 import '../../core/utils/money.dart';
+import '../../core/utils/share/share.dart';
 import '../../models/inventory_item.dart';
 import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
@@ -679,6 +681,56 @@ class _InventoryPageState extends State<InventoryPage>
         if (item.id != null) _enterSelectionMode(preSelected: {item.id!});
       case _RowAction.details:
         _openDetail(item);
+      case _RowAction.share:
+        _shareItem(item);
+      case _RowAction.soldElsewhere:
+        _soldElsewhere(item);
+      case _RowAction.edit:
+        _openEdit(item);
+    }
+  }
+
+  /// The stone's shop link: phone share menu, or copied on a computer.
+  Future<void> _shareItem(InventoryItem item) async {
+    final url = 'https://www.gemworkers.com/stones/${item.id}';
+    if (await shareLink(url, item.title) || !mounted) return;
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link copied — paste it in Instagram, WhatsApp, Facebook…')));
+  }
+
+  /// Sold on Etsy / Instagram / in person: off GemWorkers at once (not a
+  /// GemWorkers sale — no order, invoice or fee).
+  Future<void> _soldElsewhere(InventoryItem item) async {
+    if (item.id == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sold somewhere else?'),
+        content: Text('"${item.title}" is taken off GemWorkers right away and marked as sold.\n\n'
+            'This is not a GemWorkers sale: no order, invoice or fee is made.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, sold elsewhere')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final now = DateTime.now();
+    final stamp = 'Sold elsewhere ${now.day}/${now.month}/${now.year}';
+    final notes = item.notes.trim().isEmpty ? stamp : '${item.notes.trim()}\n$stamp';
+    try {
+      final done = await _repository.markSoldElsewhere(item.id!, notes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(done
+            ? 'Taken off GemWorkers and marked sold.'
+            : 'Not changed: a GemWorkers buyer has reserved or bought this stone.'),
+      ));
+      if (done) _loadItems();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
     }
   }
 
@@ -729,6 +781,7 @@ class _InventoryPageState extends State<InventoryPage>
   /// Header, tabs, search + controls, banners.
   Widget _buildTop(bool wide) {
     final textTheme = Theme.of(context).textTheme;
+    final phone = MediaQuery.sizeOf(context).width < 600;
     final counts = _tabCounts;
     final number = AppTheme.numeric(textTheme.bodyMedium);
     final summary = TextSpan(
@@ -760,7 +813,7 @@ class _InventoryPageState extends State<InventoryPage>
                 children: [
                   Text('Listings',
                       style: textTheme.headlineLarge?.copyWith(
-                          fontSize: wide ? 40 : 32, height: 1.1)),
+                          fontSize: wide ? 40 : (phone ? 26 : 32), height: 1.1)),
                   if (_all.isNotEmpty || _selectionMode) ...[
                     const SizedBox(height: 2),
                     Text.rich(summary,
@@ -778,9 +831,29 @@ class _InventoryPageState extends State<InventoryPage>
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: phone ? 12 : 20),
 
-        // ── Status tabs ──
+        // ── Status (phones: a picker like Etsy's "Status: Open") ──
+        if (phone)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PopupMenuButton<_ListingTab>(
+              onSelected: (t) => _tabController.index = t.index,
+              itemBuilder: (_) => [
+                for (final t in _ListingTab.values) PopupMenuItem(value: t, child: Text('${t.label} (${counts[t]})')),
+              ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(color: AppColors.raised, borderRadius: BorderRadius.circular(20)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('Status: ${_selectedTab.label} (${counts[_selectedTab]})',
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const Icon(Icons.arrow_drop_down),
+                ]),
+              ),
+            ),
+          )
+        else
         TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -948,6 +1021,23 @@ class _InventoryPageState extends State<InventoryPage>
 
   /// The white card holding the rows (header row on wide screens).
   Widget _buildList(List<InventoryItem> display, bool wide) {
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return SliverList.separated(
+        itemCount: display.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (_, i) {
+          final item = display[i];
+          return _PhoneListingCard(
+            item,
+            selectionMode: _selectionMode,
+            isSelected: item.id != null && _selectedIds.contains(item.id),
+            onToggleSelect: item.id != null ? () => _toggleItem(item.id!) : null,
+            onTap: _openDetail,
+            onAction: _onRowAction,
+          );
+        },
+      );
+    }
     final headerOffset = wide ? 1 : 0;
     final allSelected = display.isNotEmpty &&
         display.every((i) => i.id != null && _selectedIds.contains(i.id));
@@ -1036,7 +1126,7 @@ class _InventoryPageState extends State<InventoryPage>
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
 
-enum _RowAction { list, unlist, approve, reject, recordSale, select, details }
+enum _RowAction { list, unlist, approve, reject, recordSale, select, details, share, soldElsewhere, edit }
 
 /// Outline pill used for the filter/sort/select controls. With [onTap] null
 /// it is purely visual (e.g. as a PopupMenuButton child).
@@ -1400,6 +1490,83 @@ class _ListingRow extends StatelessWidget {
                     bottom: BorderSide(color: AppColors.rowDivider)),
           ),
           child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// Phones: Etsy Seller-style listing card with quick actions.
+class _PhoneListingCard extends StatelessWidget {
+  final InventoryItem item;
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback? onToggleSelect;
+  final Future<void> Function(InventoryItem) onTap;
+  final void Function(_RowAction, InventoryItem) onAction;
+
+  const _PhoneListingCard(
+    this.item, {
+    required this.selectionMode,
+    required this.isSelected,
+    required this.onToggleSelect,
+    required this.onTap,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final status = _listingStatus(item);
+    final price = (item.sellingPrice ?? 0) > 0 ? formatEur(item.sellingPrice!) : 'No price';
+    final available = item.status == 'available';
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: selectionMode ? onToggleSelect : () => onTap(item),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+          child: Row(children: [
+            if (selectionMode)
+              Checkbox(value: isSelected, onChanged: (_) => onToggleSelect?.call()),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(width: 76, height: 76, child: _Photo(item)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Row(children: [
+                  Text(price, style: AppTheme.numeric(t.bodyMedium)),
+                  const SizedBox(width: 8),
+                  _StatusChip(status),
+                ]),
+              ]),
+            ),
+            if (!selectionMode)
+              PopupMenuButton<_RowAction>(
+                tooltip: 'Quick actions',
+                icon: const Icon(Icons.more_vert),
+                onSelected: (a) => onAction(a, item),
+                itemBuilder: (_) => [
+                  if (item.isListed)
+                    const PopupMenuItem(value: _RowAction.share, child: Text('Share')),
+                  if (available && !item.isListed)
+                    const PopupMenuItem(value: _RowAction.list, child: Text('List on GemWorkers')),
+                  if (item.isListed)
+                    const PopupMenuItem(value: _RowAction.unlist, child: Text('Listing settings / unlist')),
+                  const PopupMenuItem(value: _RowAction.edit, child: Text('Edit')),
+                  if (available)
+                    const PopupMenuItem(value: _RowAction.soldElsewhere, child: Text('Sold elsewhere')),
+                  const PopupMenuItem(value: _RowAction.details, child: Text('Details')),
+                ],
+              ),
+          ]),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/user_profile_service.dart';
+import '../../core/utils/money.dart';
 import '../../models/order.dart';
 import '../../repositories/order_repository.dart';
 import '../../theme/app_theme.dart';
@@ -57,6 +58,8 @@ class _OrdersPageState extends State<OrdersPage>
   bool _loading = true;
   _OrdersTab _tab = _OrdersTab.toShip;
   final Set<String> _shippingIds = {};
+  // Phones: search box (title, order number, buyer).
+  String _query = '';
 
   @override
   void initState() {
@@ -171,6 +174,17 @@ class _OrdersPageState extends State<OrdersPage>
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
     final gutter = wide ? 32.0 : 16.0;
+    final phone = MediaQuery.sizeOf(context).width < 600;
+    final q = _query.trim().toLowerCase();
+    final shown = !phone || q.isEmpty
+        ? _orders
+        : _orders.where((o) => [
+              o.orderNumber,
+              ...o.items.map((i) => i.itemTitle),
+              o.customerName,
+              o.buyerName ?? '',
+              o.shippingName ?? '',
+            ].any((v) => v.toLowerCase().contains(q))).toList();
 
     return Scaffold(
       body: RefreshIndicator(
@@ -180,14 +194,14 @@ class _OrdersPageState extends State<OrdersPage>
           slivers: [
             SliverPadding(
               padding: EdgeInsets.fromLTRB(gutter, wide ? 28 : 20, gutter, 20),
-              sliver: SliverToBoxAdapter(child: _buildTop(wide)),
+              sliver: SliverToBoxAdapter(child: phone ? _buildPhoneTop() : _buildTop(wide)),
             ),
             if (_loading)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (_orders.isEmpty)
+            else if (shown.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: _EmptyState(message: _tab.emptyMessage),
@@ -196,10 +210,10 @@ class _OrdersPageState extends State<OrdersPage>
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 32),
                 sliver: SliverList.separated(
-                  itemCount: _orders.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemCount: shown.length,
+                  separatorBuilder: (_, _) => SizedBox(height: phone ? 8 : 12),
                   itemBuilder: (_, i) {
-                    final order = _orders[i];
+                    final order = shown[i];
                     return _OrderCard(
                       order,
                       wide: wide,
@@ -213,6 +227,49 @@ class _OrdersPageState extends State<OrdersPage>
           ],
         ),
       ),
+    );
+  }
+
+  /// Phones, like the Etsy Seller app: "Orders", search, status picker.
+  Widget _buildPhoneTop() {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          Expanded(child: Text('Orders', style: textTheme.headlineMedium)),
+          IconButton(tooltip: 'New manual order', onPressed: _openAdd, icon: const Icon(Icons.add)),
+        ]),
+        const SizedBox(height: 10),
+        TextField(
+          onChanged: (v) => setState(() => _query = v),
+          decoration: InputDecoration(
+            hintText: 'Search all orders',
+            prefixIcon: const Icon(Icons.search),
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: PopupMenuButton<_OrdersTab>(
+            onSelected: (t) => _tabController.index = t.index,
+            itemBuilder: (_) => [
+              for (final t in _OrdersTab.values)
+                PopupMenuItem(value: t, child: Text('${t.label} (${_countFor(t)})')),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(color: AppColors.raised, borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Status: ${_tab.label} (${_countFor(_tab)})', style: const TextStyle(fontWeight: FontWeight.w600)),
+                const Icon(Icons.arrow_drop_down),
+              ]),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -447,8 +504,80 @@ class _OrderCard extends StatelessWidget {
         ),
       );
 
+  /// Phones: "Ship today" headline, photo, title, price • date • buyer.
+  String get _phoneHeadline {
+    switch (order.status) {
+      case 'confirmed':
+        final by = _shipBy;
+        final today = DateTime.now();
+        final d = DateTime(by.year, by.month, by.day);
+        final now = DateTime(today.year, today.month, today.day);
+        if (d.isBefore(now)) return 'Overdue — ship now';
+        if (d == now) return 'Ship today';
+        if (d == now.add(const Duration(days: 1))) return 'Ship tomorrow';
+        return 'Ship by ${_date(by)}';
+      case 'pending_payment':
+        return 'Awaiting payment';
+      case 'shipped':
+        return 'Shipped';
+      case 'received':
+        return 'Delivered';
+      case 'paid':
+        return 'Completed';
+      case 'refunded':
+        return 'Refunded';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return order.status;
+    }
+  }
+
+  Widget _buildPhone(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final headline = _phoneHeadline;
+    final date = order.paidAt ?? order.orderDate;
+    final buyer = _buyerName?.split(' ').first;
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => onTap(order),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _Photo(_imageUrl, size: 84),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(headline,
+                    style: t.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: headline.startsWith('Overdue') ? AppColors.error : AppColors.ink,
+                    )),
+                const SizedBox(height: 2),
+                Text(_itemLine, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodyMedium),
+                const SizedBox(height: 2),
+                Text(
+                  [formatEur(_total), _date(date), if (buyer != null && buyer.isNotEmpty) buyer].join(' • '),
+                  style: t.bodySmall?.copyWith(color: AppColors.muted),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < 600) return _buildPhone(context);
     final t = Theme.of(context).textTheme;
     final muted = t.bodyMedium?.copyWith(fontSize: 13, color: AppColors.muted);
     final due = _dueLine(t);
