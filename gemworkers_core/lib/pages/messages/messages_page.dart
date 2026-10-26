@@ -78,6 +78,9 @@ class _MessagesPageState extends State<MessagesPage> {
   bool _loading = true;
   String? _loadError;
   bool _unreadOnly = false;
+  // "Needs reply": the buyer wrote last. Search: stone, buyer, message text.
+  bool _needsReplyOnly = false;
+  String _query = '';
 
   // Open thread
   String? _selectedId;
@@ -432,13 +435,16 @@ class _MessagesPageState extends State<MessagesPage> {
     final textTheme = Theme.of(context).textTheme;
     final unreadCount =
         _conversations.where((c) => c.isUnreadFor(isOwner: _isOwner)).length;
+    final needsReplyCount = _conversations.where((c) => c.lastMessageRole == 'buyer').length;
+    final q = _query.trim().toLowerCase();
     // Keep the open thread in the Unread list after it has been read.
-    final visible = _unreadOnly
-        ? _conversations
-            .where((c) =>
-                c.isUnreadFor(isOwner: _isOwner) || c.id == _selectedId)
-            .toList()
-        : _conversations;
+    final visible = _conversations.where((c) {
+      if (_unreadOnly && !(c.isUnreadFor(isOwner: _isOwner) || c.id == _selectedId)) return false;
+      if (_needsReplyOnly && !(c.lastMessageRole == 'buyer' || c.id == _selectedId)) return false;
+      if (q.isEmpty) return true;
+      return [c.stoneTitle, c.stoneSku, c.buyerFirstName ?? '', c.lastMessagePreview, c.sellerName]
+          .any((v) => v.toLowerCase().contains(q));
+    }).toList();
 
     final Widget list;
     if (_loading && _conversations.isEmpty) {
@@ -447,10 +453,14 @@ class _MessagesPageState extends State<MessagesPage> {
       list = _CenteredMessage(_loadError!, scrollable: true);
     } else if (visible.isEmpty) {
       list = _CenteredMessage(
-        _unreadOnly
-            ? "No unread messages — you're all caught up."
-            : 'No messages yet. Buyers\' questions about your stones will '
-                'appear here.',
+        q.isNotEmpty
+            ? 'No conversations match "${_query.trim()}".'
+            : _unreadOnly
+                ? "No unread messages — you're all caught up."
+                : _needsReplyOnly
+                    ? 'Nobody is waiting for a reply.'
+                    : 'No messages yet. Buyers\' questions about your stones will '
+                        'appear here.',
         scrollable: true,
       );
     } else {
@@ -489,21 +499,38 @@ class _MessagesPageState extends State<MessagesPage> {
                   style: textTheme.headlineLarge
                       ?.copyWith(fontSize: wide ? 36 : 30, height: 1.1),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: 'Search all messages',
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 6,
                   children: [
                     ChoiceChip(
                       label: Text('All  ${_conversations.length}'),
-                      selected: !_unreadOnly,
+                      selected: !_unreadOnly && !_needsReplyOnly,
                       showCheckmark: false,
-                      onSelected: (_) => setState(() => _unreadOnly = false),
+                      onSelected: (_) => setState(() { _unreadOnly = false; _needsReplyOnly = false; }),
                     ),
                     ChoiceChip(
                       label: Text('Unread  $unreadCount'),
                       selected: _unreadOnly,
                       showCheckmark: false,
-                      onSelected: (_) => setState(() => _unreadOnly = true),
+                      onSelected: (_) => setState(() { _unreadOnly = true; _needsReplyOnly = false; }),
+                    ),
+                    ChoiceChip(
+                      label: Text('Needs reply  $needsReplyCount'),
+                      selected: _needsReplyOnly,
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() { _needsReplyOnly = true; _unreadOnly = false; }),
                     ),
                   ],
                 ),
@@ -618,6 +645,22 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
+  /// Saved replies (sql/saved_replies.sql): pick one → it goes into the reply
+  /// box (you can still change it before sending). Also save the current text.
+  Future<void> _openSavedReplies() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _SavedRepliesSheet(currentText: _replyController.text),
+    );
+    if (picked == null || !mounted) return;
+    final cur = _replyController.text.trimRight();
+    _replyController.text = cur.isEmpty ? picked : '$cur\n\n$picked';
+    _replyController.selection = TextSelection.collapsed(offset: _replyController.text.length);
+    setState(() {});
+  }
+
   Widget _buildComposer() {
     final textTheme = Theme.of(context).textTheme;
     final canSend = _replyController.text.trim().isNotEmpty && !_sending;
@@ -669,6 +712,12 @@ class _MessagesPageState extends State<MessagesPage> {
           const SizedBox(height: 4),
           Row(
             children: [
+              IconButton.outlined(
+                tooltip: 'Saved replies',
+                onPressed: _sending ? null : _openSavedReplies,
+                icon: const Icon(Icons.bookmark_border, size: 20),
+              ),
+              const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _sending ? null : _attach,
                 icon: const Icon(Icons.diamond_outlined, size: 18),
@@ -704,6 +753,126 @@ class _MessagesPageState extends State<MessagesPage> {
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+class _SavedRepliesSheet extends StatefulWidget {
+  final String currentText;
+  const _SavedRepliesSheet({required this.currentText});
+
+  @override
+  State<_SavedRepliesSheet> createState() => _SavedRepliesSheetState();
+}
+
+class _SavedRepliesSheetState extends State<_SavedRepliesSheet> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _replies = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await _db.from('saved_replies').select('id, title, body').order('created_at');
+      if (mounted) setState(() { _replies = (rows as List).cast<Map<String, dynamic>>(); _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _add() async {
+    final title = TextEditingController();
+    final body = TextEditingController(text: widget.currentText.trim());
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New saved reply'),
+        content: SizedBox(
+          width: 420,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: title, maxLength: 80,
+                decoration: const InputDecoration(labelText: 'Short name, e.g. "Ships tomorrow"')),
+            TextField(controller: body, minLines: 3, maxLines: 8, maxLength: 2000,
+                decoration: const InputDecoration(labelText: 'Reply text')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok == true && title.text.trim().isNotEmpty && body.text.trim().isNotEmpty) {
+      try {
+        await _db.from('saved_replies').insert({'title': title.text.trim(), 'body': body.text.trim()});
+        await _load();
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+      }
+    }
+    title.dispose();
+    body.dispose();
+  }
+
+  Future<void> _delete(String id) async {
+    try {
+      await _db.from('saved_replies').delete().eq('id', id);
+      await _load();
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text('Saved replies', style: t.titleLarge)),
+            TextButton.icon(onPressed: _add, icon: const Icon(Icons.add), label: const Text('New')),
+          ]),
+          const SizedBox(height: 8),
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+          else if (_replies.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'No saved replies yet. Tap New to save an answer you send often, '
+                'e.g. "Thank you! Your stone ships tomorrow with tracking."',
+                style: t.bodyMedium?.copyWith(color: AppColors.muted),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.55),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _replies.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final r = _replies[i];
+                  return ListTile(
+                    title: Text(r['title'].toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(r['body'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    onTap: () => Navigator.pop(context, r['body'].toString()),
+                    trailing: IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _delete(r['id'].toString()),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+}
 
 class _NoThreadSelected extends StatelessWidget {
   const _NoThreadSelected();
