@@ -14,7 +14,7 @@ Owner: Zakaria (non-technical founder). Explain in plain English, one small step
 
 ## Repo layout (C:\Users\Zakaria\Desktop\gemworkers_app)
 - gemworkers_store — Next.js 15 storefront, www.gemworkers.com (Vercel, auto-deploys on push to main). Callbacks/webhooks must use www.
-- gemworkers_core — Flutter web admin, sell.gemworkers.com. Manual deploy: flutter build web → cd build\web → npx vercel --prod. Flutter is NOT on PATH: C:\Users\Zakaria\Desktop\Flutter\flutter\bin\flutter.bat
+- gemworkers_core — Flutter web admin, sell.gemworkers.com. Deploy ONLY with gemworkers_core/deploy_admin.sh (build with BUILD_ID + build.json + vercel --prod; open tabs then show "A new version… Reload", lib/widgets/update_notice.dart). Flutter is NOT on PATH: C:\Users\Zakaria\Desktop\Flutter\flutter\bin\flutter.bat
 - gemworkers_core/sql/ — SQL source of truth. supabase/functions/ — Edge Functions (deploy via CLI from gemworkers_app).
 - Supabase project ref: cvqzidqnwthzfodhzepz.
 
