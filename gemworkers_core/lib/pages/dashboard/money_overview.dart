@@ -126,7 +126,7 @@ class MoneyOverviewState extends State<MoneyOverview> {
         lines = [
           'Checked ${c['stripe_payments'] ?? 0} Stripe payments, ${c['paid_orders'] ?? 0} paid orders and '
               '${c['stripe_refunds'] ?? 0} refunds of the last 7 days, ${c['invoices'] ?? 0} invoices '
-              'and ${c['payouts'] ?? 0} payouts.',
+              "and ${c['payouts'] ?? 0} payout${c['payouts'] == 1 ? '' : 's'}.",
         ];
       }
     } catch (e) {
