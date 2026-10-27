@@ -62,7 +62,11 @@ class MessagesPage extends StatefulWidget {
   /// Called after a thread is marked read so the sidebar badge can refresh.
   final VoidCallback? onUnreadChanged;
 
-  const MessagesPage({super.key, this.onUnreadChanged});
+  /// Opens this conversation once the inbox has loaded (e.g. from an order's
+  /// "Message buyer" button).
+  final String? initialConversationId;
+
+  const MessagesPage({super.key, this.onUnreadChanged, this.initialConversationId});
 
   @override
   State<MessagesPage> createState() => _MessagesPageState();
@@ -104,7 +108,16 @@ class _MessagesPageState extends State<MessagesPage> {
   void initState() {
     super.initState();
     _replyController.addListener(() => setState(() {}));
-    _loadConversations();
+    _loadConversations().then((_) {
+      final id = widget.initialConversationId;
+      if (!mounted || id == null) return;
+      for (final c in _conversations) {
+        if (c.id == id) {
+          _open(c);
+          break;
+        }
+      }
+    });
     _timer = Timer.periodic(_threadRefreshInterval, (_) => _poll());
   }
 

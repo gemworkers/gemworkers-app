@@ -13,6 +13,7 @@ import '../../core/utils/open_url/open_url.dart';
 import 'add_edit_order_page.dart';
 import 'mark_shipped_dialog.dart';
 import 'order_status.dart';
+import '../messages/messages_page.dart';
 
 class OrderDetailPage extends StatefulWidget {
   final String orderId;
@@ -267,6 +268,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     return result == true;
   }
 
+  /// Opens (or starts) the conversation with this order's buyer about its
+  /// stone (sql/order_conversation.sql), in a full-screen Messages view.
+  Future<void> _messageBuyer(Order order) async {
+    try {
+      final id = await Supabase.instance.client
+          .rpc('order_conversation', params: {'p_order_id': order.id});
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Messages')),
+          body: MessagesPage(initialConversationId: id.toString()),
+        ),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open the conversation: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = _order;
@@ -360,6 +381,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               _row('Shop', order.sellerName!),
             _row('Customer',
                 order.customerName.isNotEmpty ? order.customerName : '—'),
+            if (order.saleChannel == 'platform' && order.paidAt != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _messageBuyer(order),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Message buyer'),
+                ),
+              ),
             _row(
                 'Date',
                 '${order.orderDate.day.toString().padLeft(2, '0')}/'

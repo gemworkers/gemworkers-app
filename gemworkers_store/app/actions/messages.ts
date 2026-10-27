@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { findLinkedStoneId } from '@/lib/stone-links'
 
 // Message portal actions. Always run as the logged-in buyer (session client);
@@ -174,4 +175,21 @@ export async function searchAttachableStones(
   }))
 
   return { stones }
+}
+
+// "Message us about this order" (My orders): opens the conversation about the
+// order's stone, creating it when there is none (sql/order_conversation.sql),
+// then goes to it. Form action, so it works without JavaScript.
+export async function openOrderMessages(formData: FormData): Promise<void> {
+  const orderId = formData.get('orderId')
+  if (typeof orderId !== 'string') redirect('/orders')
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login?next=/orders')
+  const { data, error } = await supabase.rpc('order_conversation', { p_order_id: orderId })
+  if (error || typeof data !== 'string') {
+    console.error('[messages] order conversation failed:', error?.message)
+    redirect('/messages')
+  }
+  redirect(`/messages/${data}`)
 }

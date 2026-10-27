@@ -9,12 +9,26 @@ import { formatEur, formatMoney } from '@/lib/money'
 import { paidTotal } from '@/lib/tax'
 import { ReturnPanel, type BuyerReturn } from './ReturnPanel'
 import { canRequestReturn } from '@/lib/returns'
+import { openOrderMessages } from '@/app/actions/messages'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 // What the buyer paid, in euros incl. VAT (GemWorkers charges euros only).
 function paidOf(o: BuyerOrder): { total: number; currency: string } | null {
   return o.order_total == null ? null : { total: paidTotal(o.order_total, o.tax_amount), currency: 'EUR' }
+}
+
+// Paid orders: ask GemWorkers a question about this order (sql/order_conversation.sql).
+function OrderMessageButton({ order }: { order: BuyerOrder }) {
+  if (!['paid', 'confirmed', 'shipped', 'received', 'refunded'].includes(order.status)) return null
+  return (
+    <form action={openOrderMessages} style={{ marginTop: 10 }}>
+      <input type="hidden" name="orderId" value={order.id} />
+      <button type="submit" className="pd-link" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontSize: 14 }}>
+        Message us about this order
+      </button>
+    </form>
+  )
 }
 
 type BuyerOrder = {
@@ -223,6 +237,7 @@ function SingleOrderCard({
           {order.status === 'received' && <Received />}
           <ReviewLink order={order} reviewed={reviewed} />
           <ReturnPanel orderId={order.id} ret={returns.get(order.id) ?? null} eligible={canRequestReturn(order)} />
+          <OrderMessageButton order={order} />
           <InvoiceLinks links={invoices.get(order.id)} />
           {awaitingOfferPayment && (
             <div style={{ marginTop: 14, maxWidth: 320 }}>
@@ -328,6 +343,7 @@ function GroupedOrderCard({
                 {o.status === 'received' && <Received />}
                 <ReviewLink order={o} reviewed={reviewed} />
                 <ReturnPanel orderId={o.id} ret={returns.get(o.id) ?? null} eligible={canRequestReturn(o)} />
+                <OrderMessageButton order={o} />
                 <InvoiceLinks links={invoices.get(o.id)} />
               </div>
 
