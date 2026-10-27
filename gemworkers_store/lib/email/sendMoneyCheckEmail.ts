@@ -12,7 +12,7 @@ function esc(s: string): string {
 export async function sendMoneyCheckEmail(opts: { to: string; problems: string[]; failed?: string }): Promise<void> {
   const title = opts.failed
     ? 'The daily money check could not run'
-    : `${opts.problems.length} thing${opts.problems.length === 1 ? '' : 's'} in the money don't match`
+    : opts.problems.length === 1 ? '1 thing in the money doesn\'t match' : `${opts.problems.length} things in the money don't match`
   const items = opts.failed ? [opts.failed] : opts.problems
   const rows = items.map(p => `<li style="margin:0 0 8px">${esc(p)}</li>`).join('')
 

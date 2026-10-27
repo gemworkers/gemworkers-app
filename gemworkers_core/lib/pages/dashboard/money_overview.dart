@@ -121,7 +121,7 @@ class MoneyOverviewState extends State<MoneyOverview> {
       final c = Map<String, dynamic>.from((body['checked'] as Map?) ?? const {});
       title = lines.isEmpty
           ? 'Everything matches'
-          : "${lines.length} thing${lines.length == 1 ? '' : 's'} don't match";
+          : lines.length == 1 ? "1 thing doesn't match" : "${lines.length} things don't match";
       if (lines.isEmpty) {
         lines = [
           'Checked ${c['stripe_payments'] ?? 0} Stripe payments, ${c['paid_orders'] ?? 0} paid orders and '

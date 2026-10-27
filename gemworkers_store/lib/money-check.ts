@@ -16,6 +16,7 @@
 import type Stripe from 'stripe'
 import { stripe } from '@/lib/stripe/server'
 import type { createAdminClient } from '@/lib/supabase/admin'
+import { findPaymentIntent } from '@/lib/admin-api'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -89,13 +90,18 @@ export async function runMoneyCheck(admin: Admin): Promise<MoneyCheck> {
   checked.paid_orders = paid.length
   const byId = new Map(payments.map(p => [p.id, p]))
   for (const o of paid) {
-    if (!o.stripe_payment_intent) {
-      problems.push(`${o.order_number} is marked paid but has no Stripe payment linked.`)
+    // Older orders may lack the link: look the payment up in Stripe by its
+    // order / cart number before calling it a problem.
+    const piId = o.stripe_payment_intent ?? await findPaymentIntent({
+      id: o.id, checkout_group_id: o.checkout_group_id, stripe_payment_intent: null, stripe_checkout_session_id: null,
+    })
+    if (!piId) {
+      problems.push(`${o.order_number} is marked paid but no Stripe payment was found for it.`)
       continue
     }
-    let pi = byId.get(o.stripe_payment_intent)
+    let pi = byId.get(piId)
     if (!pi) {
-      try { pi = await stripe.paymentIntents.retrieve(o.stripe_payment_intent) } catch { /* reported below */ }
+      try { pi = await stripe.paymentIntents.retrieve(piId) } catch { /* reported below */ }
     }
     if (!pi || pi.status !== 'succeeded') {
       problems.push(`${o.order_number} is marked paid, but its Stripe payment is ${pi ? pi.status : 'not found'}.`)
