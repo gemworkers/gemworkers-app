@@ -72,6 +72,7 @@ function buildHtml(orders: EmailOrderLine[], addr: ShippingAddress, accountLink?
       </thead>
       <tbody>${rows}</tbody>
     </table>
+    <p style="font-size:12px;color:#9ca3af;margin:-12px 0 24px;line-height:1.5">Paid in another currency? The exact amount you paid is shown on your card or bank statement.</p>
 
     <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px 24px;margin-bottom:32px">
       <p style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#9ca3af;margin:0 0 12px">Ship to</p>
