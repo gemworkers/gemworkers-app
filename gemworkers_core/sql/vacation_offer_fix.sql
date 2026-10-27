@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Fix: vacation-mode check broke every new offer
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-27
 --
 -- Found 2026-10-27 while rehearsing sql/one_currency_cleanup.sql: the shared
 -- trigger function from sql/vacation_mode.sql reads NEW.sale_channel in one

@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — One currency: euros (clean-up of the buyer-currency layer)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-27
 --
 -- Zakaria 2026-10-27: "one currency like Etsy, clean, no old files".
 -- Inside GemWorkers everything is euros. Buyers outside the euro see an

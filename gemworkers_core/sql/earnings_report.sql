@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Earnings: what GemWorkers keeps (per order + totals)
 -- =============================================================================
--- Applied to live DB 2026-10-26
+-- Applied to live DB 2026-10-26 (currency margin removed 2026-10-27, sql/one_currency_cleanup.sql)
 --
 -- Zakaria 2026-10-26: "how much the platform earned from commissions etc,
 -- what remains after payouts and taxes — per order and a sum too".
@@ -16,10 +16,8 @@
 --   postage      postage GemWorkers paid (orders.postage_paid)
 --   stone_cost   cost_price of GemWorkers' own stones (kind own), unless the
 --                order was fully refunded (stone back in stock)
---   fx           euros Stripe credited − what the buyer owed in euros (the
---                2% local-currency margin; 0 when not known yet)
 --   earned       sales − refunded − payout + recovered − stripe_fee − postage
---                − stone_cost + fx
+--                − stone_cost
 --   vat          VAT collected − VAT refunded (goes to the tax office)
 -- Before income tax and before fixed costs (hosting, insurance, …).
 -- =============================================================================
@@ -69,14 +67,12 @@ BEGIN
            coalesce(b.stripe_fee, 0) AS fee,
            coalesce(b.postage_paid, 0) AS postage,
            CASE WHEN b.payout_kind = 'own' AND b.status <> 'refunded'
-                THEN coalesce(b.cost, 0) ELSE 0 END AS stone_cost,
-           CASE WHEN b.eur_received IS NOT NULL
-                THEN b.eur_received - (b.order_total + b.tax_amount) ELSE 0 END AS fx
+                THEN coalesce(b.cost, 0) ELSE 0 END AS stone_cost
     FROM base b
   ), rows AS (
     SELECT c.*,
            c.order_total - c.refunded - c.payout + c.recovered - c.fee - c.postage
-             - c.stone_cost + c.fx AS earned,
+             - c.stone_cost AS earned,
            c.tax_amount - c.refunded_vat AS vat
     FROM calc c
   )
@@ -91,7 +87,6 @@ BEGIN
         'stripe_fee',  coalesce(sum(fee), 0),
         'postage',     coalesce(sum(postage), 0),
         'stone_cost',  coalesce(sum(stone_cost), 0),
-        'fx',          coalesce(sum(fx), 0),
         'earned',      coalesce(sum(earned), 0),
         'vat',         coalesce(sum(vat), 0),
         'fee_pending', count(*) FILTER (WHERE stripe_fee IS NULL),
@@ -101,7 +96,7 @@ BEGIN
         'order_id', id, 'order_number', order_number, 'paid_at', paid_at, 'status', status,
         'kind', payout_kind, 'stone', stone, 'sales', order_total, 'refunded', refunded,
         'payout', payout, 'payout_paid', payout_status = 'paid', 'recovered', recovered,
-        'stripe_fee', stripe_fee, 'postage', postage, 'stone_cost', stone_cost, 'fx', fx,
+        'stripe_fee', stripe_fee, 'postage', postage, 'stone_cost', stone_cost,
         'earned', earned, 'vat', vat,
         'cost_missing', payout_kind = 'own' AND status <> 'refunded' AND coalesce(cost, 0) = 0
       ) ORDER BY paid_at DESC), '[]') FROM rows)

@@ -57,8 +57,10 @@ AS $$
 BEGIN
   -- Orders: only new store purchases (Buy now / cart). Accepted offers
   -- (offer_id set) and manual sales are allowed.
-  IF TG_TABLE_NAME = 'orders' AND (NEW.sale_channel IS DISTINCT FROM 'platform' OR NEW.offer_id IS NOT NULL) THEN
-    RETURN NEW;
+  IF TG_TABLE_NAME = 'orders' THEN   -- nested: offers have no sale_channel (sql/vacation_offer_fix.sql)
+    IF NEW.sale_channel IS DISTINCT FROM 'platform' OR NEW.offer_id IS NOT NULL THEN
+      RETURN NEW;
+    END IF;
   END IF;
   IF EXISTS (SELECT 1 FROM sellers WHERE id = NEW.seller_id AND on_vacation) THEN
     RAISE EXCEPTION 'This stone isn''t available right now — please try again later.';
