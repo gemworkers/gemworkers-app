@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -97,6 +100,55 @@ class MoneyOverviewState extends State<MoneyOverview> {
     }
   }
 
+  bool _checking = false;
+
+  /// Runs the daily money check now (store /api/cron/money-check, owner token)
+  /// and shows what doesn't match — Stripe vs orders, refunds, invoices, payouts.
+  Future<void> _runMoneyCheck() async {
+    final token = _sb.auth.currentSession?.accessToken;
+    if (token == null) return;
+    setState(() => _checking = true);
+    String title;
+    List<String> lines;
+    try {
+      final res = await http.post(
+        Uri.parse('https://www.gemworkers.com/api/cron/money-check'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+      );
+      final body = jsonDecode(res.body.isEmpty ? '{}' : res.body) as Map<String, dynamic>;
+      if (res.statusCode != 200) throw Exception(body['error'] ?? 'status ${res.statusCode}');
+      lines = ((body['problems'] as List?) ?? const []).map((e) => e.toString()).toList();
+      final c = Map<String, dynamic>.from((body['checked'] as Map?) ?? const {});
+      title = lines.isEmpty
+          ? 'Everything matches'
+          : "${lines.length} thing${lines.length == 1 ? '' : 's'} don't match";
+      if (lines.isEmpty) {
+        lines = [
+          'Checked ${c['stripe_payments'] ?? 0} Stripe payments, ${c['paid_orders'] ?? 0} paid orders and '
+              '${c['stripe_refunds'] ?? 0} refunds of the last 7 days, ${c['invoices'] ?? 0} invoices '
+              'and ${c['payouts'] ?? 0} payouts.',
+        ];
+      }
+    } catch (e) {
+      title = 'The money check could not run';
+      lines = ['$e'];
+    }
+    if (!mounted) return;
+    setState(() => _checking = false);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            for (final l in lines) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(l)),
+          ]),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -108,7 +160,16 @@ class MoneyOverviewState extends State<MoneyOverview> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 14),
-          child: Text('Money', style: t.titleLarge),
+          child: Row(children: [
+            Expanded(child: Text('Money', style: t.titleLarge)),
+            TextButton.icon(
+              onPressed: _checking ? null : _runMoneyCheck,
+              icon: _checking
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.fact_check_outlined, size: 18),
+              label: const Text('Check the money'),
+            ),
+          ]),
         ),
         if (_loading)
           const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator())

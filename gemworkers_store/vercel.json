@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/stripe-fees", "schedule": "0 5 * * *" }
+    { "path": "/api/cron/stripe-fees", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/money-check", "schedule": "30 5 * * *" }
   ]
 }
