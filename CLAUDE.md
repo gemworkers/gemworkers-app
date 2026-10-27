@@ -22,7 +22,8 @@ Owner: Zakaria (non-technical founder). Explain in plain English, one small step
 - Admin updates: open tabs show a "new version — Reload" bar within 5 minutes (deploy_admin.sh). Tabs from before 2026-10-26 12:04 UTC still need one Ctrl+Shift+R.
 - Inspect before building. One verified change per commit. Report what changed and what is untested.
 - SQL-first: write SQL file → Zakaria runs it in the Supabase SQL Editor → verify the live change (prosrc / information_schema) → then app code. Mark the file header "Applied to live DB <date>".
-- Money / payment SQL (respond_to_offer, submit_storefront_offer, sweeps, checkout): copy the LIVE definition exactly and change only what's needed; show a diff. (Example trap: respond_to_offer_owner_override.sql is NOT live — commission_default_zero.sql + offer_notify.sql stamps are.)
+- Money / payment SQL (respond_to_offer, submit_storefront_offer, sweeps, checkout): copy the LIVE definition exactly and change only what's needed; show a diff.
+- Money practice tests (2026-10-28): run `node gemworkers_core/sql/tests/run_money_tests.js` BEFORE and AFTER every money change (orders, offers, fees, refunds, invoices, payouts, VAT, vacation). 28 checks on the live DB, always rolled back (gemworkers_core/sql/tests/money_tests.sql). Add a check when you add a money rule. Uses Testseller + Zakaria's test buyer — when those are removed before launch, point the test at new test accounts. (Example trap: respond_to_offer_owner_override.sql is NOT live — commission_default_zero.sql + offer_notify.sql stamps are.)
 - Views: columns only appended; DROP + CREATE when structure changes.
 - Supabase returns numerics as strings → parse before math. Money is stored to the cent; never round silently. Display rule: whole euros if integer (€55), else 2 decimals (€49.80) — lib/money.ts / lib/core/utils/money.dart.
 - Never run `npm run build` while `npm run dev` is running (corrupts .next; fix: delete .next).
