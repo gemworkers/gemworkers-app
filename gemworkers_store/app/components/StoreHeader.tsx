@@ -129,8 +129,10 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
               </button>
 
               {shopOpen && (
+                // The 12px gap is padding of this wrapper, so moving the mouse
+                // from "Shop" down to the menu never leaves the hover area.
+                <div style={{ position: 'absolute', top: '100%', left: 0, paddingTop: 12, zIndex: 200 }}>
                 <div style={{
-                  position: 'absolute', top: 'calc(100% + 12px)', left: 0,
                   background: '#FFFFFF', border: '1px solid #ECE5D8',
                   borderRadius: 6, boxShadow: '0 16px 48px rgba(0,0,0,0.10)',
                   minWidth: 196, padding: '6px 0', zIndex: 200,
@@ -156,6 +158,7 @@ export function StoreHeader({ user }: { user: NavUser | null }) {
                       {sl.label}
                     </Link>
                   ))}
+                </div>
                 </div>
               )}
             </div>
