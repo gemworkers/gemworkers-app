@@ -4,8 +4,8 @@ import { ContentPage } from '@/app/components/ContentPage'
 export const metadata = { title: 'Payment Information · GemWorkers' }
 
 // Facts here must match the code: Stripe Checkout, methods in
-// lib/stripe/checkout.ts (card fallback), currency EUR or the buyer's own
-// (US/GB/AU/CA: lib/fx.ts + sql/local_currency.sql, offers stay EUR); VAT per lib/tax.ts +
+// lib/stripe/checkout.ts (card fallback), currency EUR only (Stripe Adaptive
+// Pricing lets buyers pay in their own currency; ≈ hints lib/fx.ts); VAT per lib/tax.ts +
 // sql/order_tax.sql / order_tax_b2b.sql; Buy now / cart orders are
 // released after 30 min unpaid (sweep_expired_pending_orders); accepted
 // offers and counter-offers have 48 h with a reminder ~12 h before
@@ -31,18 +31,13 @@ export default function PaymentPage() {
         The payment page shows the methods most used in your country and on your device.
       </p>
       <p>
-        <strong>Shipping to the United States, the United Kingdom, Australia or Canada?</strong>{' '}
-        You see our prices in your own currency (US$, £, A$ or C$) and pay exactly that amount —
-        no conversion by your bank. Prices in your currency are based on the day&apos;s exchange
-        rate and can change slightly from day to day; the amount you pay is fixed when you go to
-        payment, and refunds are made in the same currency.
-      </p>
-      <p>
-        Everywhere else our prices are in euros (€); in many countries we also show an
-        approximate price in your currency. On the payment page you can usually choose to pay
-        in your own currency: the exact amount, converted by our payment provider (Stripe), is
-        shown before you pay. Or pay in euros and let your bank convert it (your bank may
-        charge a small fee). Offers are made in euros.
+        <strong>Paying in your own currency.</strong>{' '}
+        Our prices are in euros (€). Outside the euro area we also show an approximate price in
+        your currency (for example ≈ US$380). On the payment page you can usually pay in your
+        own currency: the exact amount, converted by our payment provider (Stripe), is shown
+        before you pay. Or pay in euros and let your bank convert it (your bank may charge a
+        small fee). Offers are made in euros, with the approximate amount in your currency
+        shown as you type. Refunds go back to your original payment method.
       </p>
 
       <h2>Safe and secure</h2>

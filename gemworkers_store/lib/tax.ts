@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatEur } from '@/lib/money'
-import { priceText, type FxContext } from '@/lib/price-shown'
+import { priceText } from '@/lib/price-shown'
 
 // Tax at checkout (sql/order_tax.sql). We only collect VAT that the law
 // requires (stone ships from NL to an EU buyer); everywhere else the buyer
@@ -96,10 +96,9 @@ export function taxNote(
   q: TaxQuote | null,
   countryName: string,
   hasPrice: boolean,
-  fx?: FxContext | null,   // amounts in the buyer's currency when they pay in it
 ): { text: string; warn: boolean } | null {
   if (!q) return null
-  const money = (v: number) => priceText(v, fx)
+  const money = (v: number) => priceText(v)
   if (hasPrice && q.minOrderEur != null && q.goodsTotal < q.minOrderEur) {
     return { text: `Orders shipped to ${countryName} must be at least ${money(q.minOrderEur)}.`, warn: true }
   }

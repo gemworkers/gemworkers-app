@@ -213,7 +213,7 @@ export default async function StoneDetailPage({
   if (user) {
     const { data: offer } = await supabase
       .from('buyer_offers')
-      .select('id, offered_price, status, counter_price, counter_expires_at, offer_currency, local_offered, local_counter')
+      .select('id, offered_price, status, counter_price, counter_expires_at')
       .eq('inventory_item_id', id)
       .in('status', ['pending', 'countered', 'accepted', 'declined', 'expired'])
       .order('created_at', { ascending: false })
@@ -224,7 +224,7 @@ export default async function StoneDetailPage({
     if (offerRow?.status === 'accepted') {
       const { data: offerOrder } = await supabase
         .from('orders')
-        .select('id, order_total, payment_due_at, charge_currency, charge_amount')
+        .select('id, order_total, payment_due_at')
         .eq('offer_id', offerRow.id)
         .eq('buyer_id', user.id)
         .eq('status', 'pending_payment')
@@ -232,10 +232,7 @@ export default async function StoneDetailPage({
         .maybeSingle();
       if (offerOrder?.payment_due_at) {
         payable = {
-          // Agreed in the buyer's currency: that amount (incl. shipping).
-          ...(offerOrder.charge_currency !== 'EUR' && offerOrder.charge_amount != null
-            ? { orderTotal: Number(offerOrder.charge_amount), currency: offerOrder.charge_currency }
-            : { orderTotal: Number(offerOrder.order_total) }),
+          orderTotal: Number(offerOrder.order_total),
           dueAt: offerOrder.payment_due_at,
           canPay: canStartOfferPayment(offerOrder.payment_due_at),
         };
@@ -366,7 +363,7 @@ export default async function StoneDetailPage({
   // VAT we must collect (NL → EU) or an import-tax reminder (everywhere else).
   const quote = shipToRow?.enabled ? await taxQuote(supabase, item.id, shipToCode) : null;
   const tax = shipToRow?.enabled
-    ? taxNote(quote, shipToRow.name, item.sale_method !== 'accept_offers' && item.selling_price != null, fx)
+    ? taxNote(quote, shipToRow.name, item.sale_method !== 'accept_offers' && item.selling_price != null)
     : null;
 
   // EU consumers: prices incl. VAT when the stone ships from inside the EU.
@@ -376,7 +373,7 @@ export default async function StoneDetailPage({
   const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx).amount;
 
   const shippingLine = joinParts([
-    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${priceText(shownShip!, fx)} shipping`,
+    cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${priceText(shownShip!)} shipping`,
     shipFromName ? `Ships from ${shipFromName}` : null,
   ], ' · ');
 
@@ -447,11 +444,11 @@ export default async function StoneDetailPage({
             ) : item.selling_price != null ? (
               <>
                 <p className="pd-price">
-                  {priceText(shownStone!.amount, fx)}
+                  {priceText(shownStone!.amount)}
                   {shownStone!.inclVat && <span style={{ fontSize: 14, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
                 </p>
                 {approxPrice(shownStone!.amount, fx) && (
-                  <p className="pd-shipline" title="Approximate — the payment page shows the exact amount in your currency (or pay in euros)">
+                  <p className="pd-shipline" title="Approximate — the payment page shows the exact amount in your currency">
                     {approxPrice(shownStone!.amount, fx)} · exact amount in your currency when you pay
                   </p>
                 )}
@@ -653,7 +650,7 @@ export default async function StoneDetailPage({
             <DetailSection title="Shipping">
               <DetailRow label="Ships from" value={shipFromName} />
               <DetailRow label="Courier"    value={item.courier} />
-              <DetailRow label="Cost"       value={cost === null ? null : cost === 0 ? 'Free' : priceText(shownShip!, fx)} />
+              <DetailRow label="Cost"       value={cost === null ? null : cost === 0 ? 'Free' : priceText(shownShip!)} />
               <DetailRow label="Delivery"   value={deliveryRange} />
               {item.prep_days != null && (
                 <DetailRow label="Handling" value={`Ready in ${item.prep_days} days`} />

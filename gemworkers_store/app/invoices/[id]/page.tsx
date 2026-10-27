@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { formatEurExact, formatMoneyExact } from '@/lib/money'
+import { formatEurExact } from '@/lib/money'
 import { ratePercent } from '@/lib/tax'
 import { PrintButton } from './PrintButton'
 
@@ -11,9 +11,8 @@ export const metadata = { title: 'Invoice · GemWorkers' }
 // comes from the frozen snapshot in invoices.data — never re-calculated.
 // Buyers read their own through buyer_invoices; the owner (same login on the
 // store) can open any invoice through the invoices table (owner RLS).
-// Paid in USD / GBP / AUD / CAD (sql/local_currency.sql): data.charge holds
-// what the buyer paid; amounts show in that currency with the euro value.
-// A credit note shows its share of it (a full refund = exactly the total).
+// Always in euros (GemWorkers charges euros only; Stripe converts for buyers
+// who pay in their own currency).
 
 type Line = { description: string; detail?: string | null; quantity: number; amount: number | string }
 type InvoiceData = {
@@ -31,10 +30,6 @@ type InvoiceData = {
   tax_rate: number | string | null
   vat_note: string | null
   diamond_statement: string | null
-  charge?: {
-    currency: string; total: number | string; goods: number | string; shipping: number | string
-    eur_total: number | string; rate: number | string; markup: number | string
-  } | null
 }
 type InvoiceRow = {
   id: string; number: string; kind: 'invoice' | 'credit_note'; issued_at: string
@@ -77,20 +72,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const vat = Math.round((total - net) * 100) / 100
   const rate = d.tax_rate == null ? null : Number(d.tax_rate)
   const muted = { color: '#6B6052', fontSize: 13, lineHeight: 1.55 } as const
-
-  // Paid in another currency: every amount in it (no VAT on these orders).
-  const ch = d.charge ?? null
-  const cur = ch?.currency ?? 'EUR'
-  const chTotal = Number(ch?.total ?? 0)
-  const chEur = Number(ch?.eur_total ?? 0)
-  const localOf = (eur: number, line?: Line): number => {
-    if (!ch) return eur
-    if (!credit && line) return Number(line.description === 'Shipping' ? ch.shipping : ch.goods)
-    if (Math.abs(eur) >= chEur - 0.005) return Math.sign(eur) * chTotal
-    return Math.round(eur * chTotal / chEur * 100) / 100
-  }
-  const show = (eur: number | string, line?: Line) =>
-    ch ? formatMoneyExact(localOf(Number(eur), line), cur) : money(eur)
 
   return (
     <main className="pd-wrap" style={{ paddingTop: 28, paddingBottom: 96, maxWidth: 820 }}>
@@ -155,7 +136,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   {l.detail && <div style={muted}>{l.detail}</div>}
                 </td>
                 <td style={{ padding: '10px 0', textAlign: 'right' }}>{l.quantity}</td>
-                <td style={{ padding: '10px 0', textAlign: 'right' }}>{show(l.amount, l)}</td>
+                <td style={{ padding: '10px 0', textAlign: 'right' }}>{money(l.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -163,14 +144,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
         <div style={{ marginLeft: 'auto', maxWidth: 320, marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-            <span>Subtotal (excl. VAT)</span><span>{show(net)}</span>
+            <span>Subtotal (excl. VAT)</span><span>{money(net)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
             <span>{d.tax_name || 'VAT'} {vat !== 0 && rate != null ? `${ratePercent(rate)}%` : '0%'}</span>
-            <span>{show(vat)}</span>
+            <span>{money(vat)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid #ECE5D8', marginTop: 4, fontWeight: 700, fontSize: 16 }}>
-            <span>{credit ? 'Total credited' : 'Total paid'}</span><span>{show(total)}</span>
+            <span>{credit ? 'Total credited' : 'Total paid'}</span><span>{money(total)}</span>
           </div>
         </div>
 
@@ -178,13 +159,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           {d.vat_note && <p style={{ ...muted, margin: '0 0 6px' }}>{d.vat_note}</p>}
           {d.ships_from && <p style={{ ...muted, margin: '0 0 6px' }}>Shipped from {d.ships_from}.</p>}
           {d.diamond_statement && <p style={{ ...muted, margin: '0 0 6px' }}>{d.diamond_statement}</p>}
-          {ch && (
-            <p style={{ ...muted, margin: '0 0 6px' }}>
-              Amounts in {cur}. Value in euros: {money(total)} (ECB reference rate 1 EUR = {Number(ch.rate)} {cur}
-              {Number(ch.markup) > 0 ? `, plus ${Math.round(Number(ch.markup) * 100)}% currency conversion` : ''}).
-            </p>
-          )}
-          <p style={{ ...muted, margin: 0 }}>Paid in full by card or online payment · Currency: {cur}</p>
+          <p style={{ ...muted, margin: 0 }}>Paid in full by card or online payment · Currency: EUR</p>
         </div>
       </article>
     </main>

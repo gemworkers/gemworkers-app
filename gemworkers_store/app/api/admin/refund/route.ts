@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { refundAmountInChargeCurrency } from '@/lib/stripe/refunds'
+import { refundAmount } from '@/lib/stripe/refunds'
 
 // Refund a returned stone (sql/returns_setup.sql). Called by the admin app
 // (sell.gemworkers.com) with the owner's Supabase access token:
@@ -88,10 +88,6 @@ export async function POST(req: NextRequest) {
   }
   if (!pi) return reply(req, { error: 'Could not find the Stripe payment for this order — refund it in the Stripe dashboard.' }, 409)
 
-  // Everything still refundable on this order? (exact remainder in the buyer's currency)
-  const { data: leftData } = await admin.rpc('order_refundable', { p_order_id: order.id })
-  const final = leftData != null && cents >= Math.round(Number(leftData) * 100)
-
   // ── 4. Stripe refund (reuse one already made for this return) ──────────────
   let refundId: string
   try {
@@ -103,7 +99,7 @@ export async function POST(req: NextRequest) {
       const refund = await stripe.refunds.create(
         {
           payment_intent: pi,
-          amount: await refundAmountInChargeCurrency(pi, cents, { orderId: order.id, final }),   // EUR → the buyer's currency
+          amount: await refundAmount(pi, cents),
           metadata: { order_id: order.id, order_number: order.order_number, return_id: returnId, reason: 'return' },
         },
         { idempotencyKey: `return-${returnId}-${cents}` },

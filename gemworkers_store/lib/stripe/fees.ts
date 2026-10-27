@@ -1,8 +1,8 @@
 // SERVER ONLY — Stripe's fee and the euros Stripe credits, saved per order.
 //
 // stripe_fee feeds consignment profit splits and the money overview;
-// eur_received is what a USD/GBP/… payment became in euros
-// (sql/local_currency.sql). A cart is one payment: both are split over its
+// eur_received is the euros Stripe credited for the payment
+// (sql/local_currency.sql column). A cart is one payment: both are split over its
 // orders by what each order cost the buyer. For a payment in another currency
 // Stripe often has no euro figures yet when the webhook arrives — the daily
 // catch-up (app/api/cron/stripe-fees) fills those in later.

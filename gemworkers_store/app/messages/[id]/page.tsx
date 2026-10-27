@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ThreadView } from './ThreadView'
 import type { StoneCardData, ThreadMessage } from '../shared'
 import { priceContext } from '@/lib/display-price'
-import { shownPrice, localPrice } from '@/lib/price-shown'
+import { shownPrice, approxPrice } from '@/lib/price-shown'
 import { fxContext } from '@/lib/fx'
 
 export const metadata = { title: 'Messages · GemWorkers' }
@@ -39,19 +39,6 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
 
   const messages = (msgData ?? []) as ThreadMessage[]
 
-  // Offers made in the buyer's currency (US/GB/AU/CA): show the cards in it.
-  const offerIds = [...new Set(messages.map(m => m.offer_id).filter((x): x is string => !!x))]
-  if (offerIds.length > 0) {
-    const { data: offs } = await supabase
-      .from('buyer_offers').select('id, offer_currency, local_offered, local_counter').in('id', offerIds)
-    const byId = new Map(((offs ?? []) as { id: string; offer_currency: string; local_offered: string | null; local_counter: string | null }[]).map(o => [o.id, o]))
-    for (const m of messages) {
-      const o = m.offer_id ? byId.get(m.offer_id) : undefined
-      if (!o || o.offer_currency === 'EUR') continue
-      const local = m.kind.startsWith('counter') || m.kind === 'offer_countered' ? o.local_counter : o.local_offered
-      if (local != null) { m.offer_amount = local; m.offer_currency = o.offer_currency }
-    }
-  }
   const stoneId = (conv.inventory_item_id as string | null) ?? null
 
   const ids = [...new Set([
@@ -75,11 +62,12 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         stones[f.id] = { ...card, selling_price: shown.amount, incl_vat: shown.inclVat }
       }
     }
-    // US / UK / AU / CA buyers: prices in their own currency.
+    // Buyers outside the euro: an "≈ $" hint next to the euro price.
     const fx = await fxContext()
-    if (fx?.exact) {
+    if (fx) {
       for (const [sid, card] of Object.entries(stones)) {
-        if (card.selling_price != null) stones[sid] = { ...card, selling_price: localPrice(Number(card.selling_price), fx.rate), currency: fx.code }
+        const approx = card.selling_price != null ? approxPrice(Number(card.selling_price), fx) : null
+        if (approx) stones[sid] = { ...card, approx }
       }
     }
   }

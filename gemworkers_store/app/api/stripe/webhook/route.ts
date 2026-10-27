@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendNewOrderEmail, type EmailOrderLine, type ShippingAddress } from '@/lib/email/sendNewOrderEmail'
 import { sendOrderConfirmationEmail } from '@/lib/email/sendOrderConfirmationEmail'
 import { paidTotal } from '@/lib/tax'
-import { refundAmountInChargeCurrency, sessionEurTotal } from '@/lib/stripe/refunds'
+import { refundAmount, sessionEurTotal } from '@/lib/stripe/refunds'
 import { recordFeeForPayment } from '@/lib/stripe/fees'
 import { sendDisputeAlertEmail } from '@/lib/email/sendDisputeAlertEmail'
 import { sendFraudWarningEmail } from '@/lib/email/sendFraudWarningEmail'
@@ -192,12 +192,11 @@ async function notifyGroupOrders(admin: AdminClient, groupId: string, orderIdsIn
   }
 }
 
-// What the buyer paid for an order, in their currency (sql/local_currency.sql).
-type ChargeCols = { order_total: string | number; tax_amount: string | number | null; charge_currency: string; charge_amount: string | number | null }
+// What the buyer paid for an order, in euros (GemWorkers charges euros only;
+// Stripe converts for buyers who pay in their own currency).
+type ChargeCols = { order_total: string | number; tax_amount: string | number | null }
 function buyerPaid(o: ChargeCols): { orderTotal: number; currency: string } {
-  return o.charge_currency !== 'EUR' && o.charge_amount != null
-    ? { orderTotal: Number(o.charge_amount), currency: o.charge_currency }
-    : { orderTotal: paidTotal(o.order_total, o.tax_amount), currency: 'EUR' }
+  return { orderTotal: paidTotal(o.order_total, o.tax_amount), currency: 'EUR' }
 }
 
 async function notifyCustomerSingleOrder(
@@ -224,7 +223,7 @@ async function notifyCustomerSingleOrder(
 
   const { data: ordData } = await admin
     .from('orders')
-    .select('buyer_id, order_number, order_total, tax_amount, charge_currency, charge_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .select('buyer_id, order_number, order_total, tax_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('id', orderId)
     .single()
   if (!ordData) { console.error('[webhook] customer email: order not found', orderId); return }
@@ -232,7 +231,6 @@ async function notifyCustomerSingleOrder(
   const o = ordData as {
     buyer_id: string | null
     order_number: string; order_total: string | number; tax_amount: string | number | null
-    charge_currency: string; charge_amount: string | number | null
     shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
     shipping_city: string | null; shipping_state: string | null
     shipping_postal_code: string | null; shipping_country: string | null; shipping_phone: string | null
@@ -275,7 +273,6 @@ async function notifyCustomerGroupOrder(
 ): Promise<void> {
   type GroupOrderRow = {
     id: string; buyer_id: string; order_number: string; order_total: string | number; tax_amount: string | number | null
-    charge_currency: string; charge_amount: string | number | null
     shipping_name: string | null; shipping_line1: string | null; shipping_line2: string | null
     shipping_city: string | null; shipping_state: string | null
     shipping_postal_code: string | null; shipping_country: string | null; shipping_phone: string | null
@@ -283,7 +280,7 @@ async function notifyCustomerGroupOrder(
 
   const { data: ordersData } = await admin
     .from('orders')
-    .select('id, buyer_id, order_number, order_total, tax_amount, charge_currency, charge_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
+    .select('id, buyer_id, order_number, order_total, tax_amount, shipping_name, shipping_line1, shipping_line2, shipping_city, shipping_state, shipping_postal_code, shipping_country, shipping_phone')
     .eq('checkout_group_id', groupId)
     .in('id', orderIdsInScope)
   const orders = (ordersData as GroupOrderRow[] | null) ?? []
@@ -372,7 +369,7 @@ function paymentIntentId(session: Stripe.Checkout.Session): string | null {
 async function refundLateOrder(
   paymentIntent: string,
   orderId: string,
-  amountCents?: number,   // in EUR; omitted = full refund (converted if the buyer paid in another currency)
+  amountCents?: number,   // in EUR; omitted = full refund
 ): Promise<boolean> {
   const existing = await stripe.refunds.list({ payment_intent: paymentIntent, limit: 100 })
   if (existing.data.some(r => r.metadata?.order_id === orderId && r.metadata?.reason === 'late_payment')) {
@@ -381,7 +378,7 @@ async function refundLateOrder(
   await stripe.refunds.create(
     {
       payment_intent: paymentIntent,
-      ...(amountCents !== undefined ? { amount: await refundAmountInChargeCurrency(paymentIntent, amountCents, { orderId, final: true }) } : {}),
+      ...(amountCents !== undefined ? { amount: await refundAmount(paymentIntent, amountCents) } : {}),
       metadata: { order_id: orderId, reason: 'late_payment' },
     },
     { idempotencyKey: `refund-late-${orderId}` },
@@ -505,7 +502,7 @@ async function alertOwnerOfDispute(admin: AdminClient, dispute: Stripe.Dispute, 
 type LateLine = RefundedOrderLine & { buyerPaid?: { orderTotal: number; currency: string } }
 async function loadRefundedLines(admin: AdminClient, orderIds: string[]): Promise<LateLine[]> {
   const { data: ordersData } = await admin
-    .from('orders').select('id, order_number, order_total, tax_amount, charge_currency, charge_amount').in('id', orderIds)
+    .from('orders').select('id, order_number, order_total, tax_amount').in('id', orderIds)
   const orders = (ordersData as ({ id: string; order_number: string } & ChargeCols)[] | null) ?? []
 
   const { data: itemsData } = await admin

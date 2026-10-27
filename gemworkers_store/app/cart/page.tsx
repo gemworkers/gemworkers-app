@@ -6,10 +6,10 @@ import { BuyAllButton } from './BuyAllButton'
 import { TrustList } from '@/app/components/TrustList'
 import { countryName } from '@/lib/countries'
 import { pillDark, pillOutline } from '@/lib/ui'
-import { formatEur, formatMoney } from '@/lib/money'
+import { formatEur } from '@/lib/money'
 import { currentShipToCode } from '@/lib/ship-to'
 import { priceContext } from '@/lib/display-price'
-import { shownPrice, approxPrice, priceText, localPrice, type PriceContext, type FxContext } from '@/lib/price-shown'
+import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext } from '@/lib/price-shown'
 import { fxContext } from '@/lib/fx'
 import { taxQuote, taxNote, paidTotal, ratePercent, type TaxQuote } from '@/lib/tax'
 
@@ -148,18 +148,10 @@ export default async function CartPage() {
   const vatTotal = quotes.reduce((sum, q) => paidTotal(sum, q.taxAmount), 0)
   const vatRates = [...new Set(quotes.filter(q => q.taxAmount > 0 && q.taxRate != null).map(q => ratePercent(q.taxRate!)))]
   const payTotal = paidTotal(grandTotal, vatTotal)
-  // US / UK / AU / CA: each stone and its shipping in the buyer's currency,
-  // rounded like checkout charges them (sql/local_currency.sql).
-  const cur = fx?.exact ? fx.code : 'EUR'
-  const local = (eur: number) => (fx?.exact ? localPrice(eur, fx.rate) : eur)
-  const buyable = cartItems.flatMap(({ listing }) => (isBuyable(listing) ? [listing] : []))
-  const subShown = fx?.exact ? buyable.reduce((s, l) => s + local(Number(l.selling_price)), 0) : subtotal
-  const shipShown = fx?.exact ? buyable.reduce((s, l) => s + local(Number(l.shipping_cost ?? 0)), 0) : shippingTotal
-  const totalShown = fx?.exact ? subShown + shipShown : payTotal
   // Under-minimum warning first (e.g. UK), else one import reminder if any stone needs it.
   const cartTaxNote =
-    quotes.map(q => taxNote(q, shipTo?.name ?? shipToCode, true, fx)).find(n => n?.warn) ??
-    taxNote(quotes.find(q => q.scheme === 'buyer_pays') ?? null, shipTo?.name ?? shipToCode, false, fx)
+    quotes.map(q => taxNote(q, shipTo?.name ?? shipToCode, true)).find(n => n?.warn) ??
+    taxNote(quotes.find(q => q.scheme === 'buyer_pays') ?? null, shipTo?.name ?? shipToCode, false)
 
   return (
     <PageShell>
@@ -184,11 +176,11 @@ export default async function CartPage() {
               </h2>
               <div className="cart-sum-row">
                 <span>Subtotal{vatTotal > 0 ? ' (excl. VAT)' : ''}</span>
-                <span>{formatMoney(subShown, cur)}</span>
+                <span>{formatEur(subtotal)}</span>
               </div>
               <div className="cart-sum-row">
                 <span>Shipping</span>
-                <span>{shipShown === 0 ? 'Free' : formatMoney(shipShown, cur)}</span>
+                <span>{shippingTotal === 0 ? 'Free' : formatEur(shippingTotal)}</span>
               </div>
               {vatTotal > 0 && (
                 <div className="cart-sum-row">
@@ -198,7 +190,7 @@ export default async function CartPage() {
               )}
               <div className="cart-sum-row cart-sum-total">
                 <span>Total</span>
-                <span>{formatMoney(totalShown, cur)}</span>
+                <span>{formatEur(payTotal)}</span>
               </div>
               {approxPrice(payTotal, fx) && (
                 <p style={{ fontSize: 13, color: '#6B6052', margin: '-4px 0 12px', textAlign: 'right' }}>
@@ -262,7 +254,7 @@ function AvailableItem({ itemId, listing, quote, pctx, fx }: { itemId: string; l
               ? <span style={{ fontSize: 14, fontWeight: 500, color: '#7A5A22' }}>Accepting offers</span>
               : listing.selling_price != null
                 ? <>
-                    {priceText(shownPrice(Number(listing.selling_price), listing.seller_country, pctx).amount, fx)}
+                    {priceText(shownPrice(Number(listing.selling_price), listing.seller_country, pctx).amount)}
                     {shownPrice(0, listing.seller_country, pctx).inclVat && (
                       <span style={{ fontSize: 12, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>
                     )}
@@ -271,7 +263,7 @@ function AvailableItem({ itemId, listing, quote, pctx, fx }: { itemId: string; l
             }
             {cost !== null && listing.selling_price != null && listing.sale_method !== 'accept_offers' && (
               <span className="cart-sub" style={{ display: 'block', fontWeight: 400 }}>
-                {cost === 0 ? 'Free shipping' : `+ ${priceText(shownPrice(cost, listing.seller_country, pctx).amount, fx)} shipping`}
+                {cost === 0 ? 'Free shipping' : `+ ${priceText(shownPrice(cost, listing.seller_country, pctx).amount)} shipping`}
               </span>
             )}
           </div>

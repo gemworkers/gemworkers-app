@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { StoneGrid } from '@/app/components/StoneGrid'
 import type { StoneCardItem } from '@/app/components/StoneCard'
-import { shownPrice, displayAmount, currencySymbol } from '@/lib/price-shown'
+import { shownPrice } from '@/lib/price-shown'
 import { countryName } from '@/lib/countries'
 import { favouriteIds } from '@/lib/favourites'
 import { fxContext } from '@/lib/fx'
@@ -140,11 +140,11 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
   }
   const minN = toNum(min)
   const maxN = toNum(max)
-  // Filters compare the price as the buyer sees it (incl. VAT / in their currency).
-  const fx = await fxContext()
+  const fx = await fxContext()   // "≈ $" hints on the cards
+  // Filters compare the euro price as the buyer sees it (incl. VAT where charged).
   const priceOf = (i: StoneCardItem) =>
     i.selling_price == null || i.sale_method === 'accept_offers'
-      ? null : displayAmount(shownPrice(i.selling_price, i.seller_country, pctx).amount, fx)
+      ? null : shownPrice(i.selling_price, i.seller_country, pctx).amount
 
   let items = allItems.filter(i => {
     if (gem && i.gem_type !== gem) return false
@@ -211,11 +211,11 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       <form method="get" action={`/shop/${type}`} className="browse-filters">
         {gem && <input type="hidden" name="gem" value={gem} />}
         <label className="browse-filter">
-          <span>Price from {currencySymbol(fx)}</span>
+          <span>Price from €</span>
           <input name="min" inputMode="decimal" defaultValue={min ?? ''} placeholder="0" />
         </label>
         <label className="browse-filter">
-          <span>to {currencySymbol(fx)}</span>
+          <span>to €</span>
           <input name="max" inputMode="decimal" defaultValue={max ?? ''} placeholder="any" />
         </label>
         {shipsFrom.length > 1 && (

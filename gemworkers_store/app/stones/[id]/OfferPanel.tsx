@@ -10,8 +10,8 @@ import {
 } from '@/lib/ui'
 import { PayOfferButton, PaymentDeadline } from '@/app/components/PayOfferButton'
 import { PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
-import { formatEur, formatMoney, formatMoneyExact } from '@/lib/money'
-import { currencySymbol, type FxContext } from '@/lib/price-shown'
+import { formatEur, formatMoneyExact } from '@/lib/money'
+import { approxPrice, type FxContext } from '@/lib/price-shown'
 
 export type BuyerOffer = {
   id: string
@@ -20,18 +20,10 @@ export type BuyerOffer = {
   // Our counter-offer (one per offer); null if never countered.
   counter_price?: number | string | null
   counter_expires_at?: string | null
-  // US / UK / AU / CA buyers: the offer in their own currency
-  // (sql/offers_local_currency.sql); EUR otherwise.
-  offer_currency?: string | null
-  local_offered?: number | string | null
-  local_counter?: number | string | null
 }
 
-// The buyer's own offer / our counter-offer, in the currency they offered in.
+// The buyer's own offer / our counter-offer (offers are always in euros).
 function offerAmount(o: BuyerOffer, which: 'offer' | 'counter'): string {
-  const cur = o.offer_currency && o.offer_currency !== 'EUR' ? o.offer_currency : null
-  const local = which === 'counter' ? o.local_counter : o.local_offered
-  if (cur && local != null) return formatMoney(local, cur)
   return formatEur((which === 'counter' ? o.counter_price : o.offered_price) ?? 0)
 }
 
@@ -46,7 +38,6 @@ const utcDate = new Intl.DateTimeFormat('en-GB', {
 // still inside its payment window. Loaded server-side under the buyer's RLS.
 export type PayableOrder = {
   orderTotal: number
-  currency?: string   // what orderTotal is in (default EUR)
   dueAt: string
   // false when < 35 min remain (computed server-side) — Pay button hidden
   canPay: boolean
@@ -111,10 +102,9 @@ export function OfferPanel({
   // Stone is available for offers — lets the buyer re-offer after an
   // expired/declined offer (SQL only blocks while an offer is 'pending').
   isAvailable?: boolean
-  // US / UK / AU / CA buyers offer in their own currency.
+  // Buyers outside the euro: "≈ $" next to the euro amount they type.
   fx?: FxContext | null
 }) {
-  const typeCurrency = fx?.exact ? fx.code : 'EUR'
   const router = useRouter()
   const [state, setState] = useState<State>(initState(initialOffer))
   const [offer, setOffer] = useState<BuyerOffer | null>(initialOffer)
@@ -172,7 +162,6 @@ export function OfferPanel({
       } else {
         setOffer({
           id: res.offerId, offered_price: parsed, status: 'pending',
-          offer_currency: typeCurrency, local_offered: typeCurrency === 'EUR' ? null : parsed,
         })
         setState('pending')
       }
@@ -185,7 +174,7 @@ export function OfferPanel({
         </p>
 
         <div>
-          <label style={labelStyle} htmlFor="offer-price">Your price ({currencySymbol(fx)})</label>
+          <label style={labelStyle} htmlFor="offer-price">Your price (€)</label>
           <input
             id="offer-price"
             type="text" inputMode="decimal" autoComplete="off"
@@ -198,6 +187,11 @@ export function OfferPanel({
             aria-describedby={inputError ? 'offer-price-error' : undefined}
             style={inputStyle}
           />
+          {parsed !== null && approxPrice(parsed, fx) && (
+            <p style={{ fontSize: 13, color: '#6B6052', margin: '6px 0 0' }}>
+              {approxPrice(parsed, fx)} in your currency
+            </p>
+          )}
           {inputError && (
             <p id="offer-price-error" style={{ fontSize: 13, color: '#B42318', margin: '6px 0 0' }}>
               {inputError}
@@ -232,7 +226,7 @@ export function OfferPanel({
               cursor: busy || !validPrice ? 'default' : 'pointer',
             }}
           >
-            {busy ? 'Sending…' : parsed !== null ? `Send offer of ${formatMoneyExact(parsed, typeCurrency)}` : 'Send offer'}
+            {busy ? 'Sending…' : parsed !== null ? `Send offer of ${formatMoneyExact(parsed, 'EUR')}` : 'Send offer'}
           </button>
           <button
             onClick={() => setState(initState(offer))}
@@ -386,7 +380,7 @@ export function OfferPanel({
         </p>
         {payable.canPay ? (
           <>
-            <PayOfferButton offerId={offer.id} label={`Pay ${formatMoney(payable.orderTotal, payable.currency ?? 'EUR')}`} />
+            <PayOfferButton offerId={offer.id} label={`Pay ${formatEur(payable.orderTotal)}${approxPrice(payable.orderTotal, fx) ? ` (${approxPrice(payable.orderTotal, fx)})` : ''}`} />
             <PaymentDeadline dueAt={payable.dueAt} style={{ margin: 0, textAlign: 'center' }} />
           </>
         ) : (

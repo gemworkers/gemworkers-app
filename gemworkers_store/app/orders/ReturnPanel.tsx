@@ -20,8 +20,7 @@ export type BuyerReturn = {
 
 const muted = { fontSize: 14, color: '#5A5045', lineHeight: 1.55 } as const
 
-// refundShown: the refund in the currency the buyer paid (set by My orders).
-export function ReturnPanel({ orderId, ret, eligible, refundShown }: { orderId: string; ret: BuyerReturn | null; eligible: boolean; refundShown?: string | null }) {
+export function ReturnPanel({ orderId, ret, eligible }: { orderId: string; ret: BuyerReturn | null; eligible: boolean }) {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [faulty, setFaulty] = useState(false)
@@ -97,7 +96,7 @@ export function ReturnPanel({ orderId, ret, eligible, refundShown }: { orderId: 
   if (status === 'refunded') {
     return (
       <p style={{ ...muted, marginTop: 12 }}>
-        ✓ Refunded {refundShown ?? (ret!.refund_amount != null ? formatEur(ret!.refund_amount) : '')} to your original payment method
+        ✓ Refunded {ret!.refund_amount != null ? formatEur(ret!.refund_amount) : ''} to your original payment method
         {ret!.decision_note ? ` — ${ret!.decision_note}` : ''}.
       </p>
     )

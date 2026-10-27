@@ -100,7 +100,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
           </p>
         ) : item.selling_price != null ? (
           <p style={{ fontSize: 17, fontWeight: 600, color: '#1F1B16' }}>
-            {priceText(price!.amount, fx)}
+            {priceText(price!.amount)}
             {price!.inclVat && <span style={{ fontSize: 12, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>}
             {approxPrice(price!.amount, fx) && (
               <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#6B6052' }}>{approxPrice(price!.amount, fx)}</span>
@@ -112,7 +112,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
 
         {cost !== null && (
           <p style={{ fontSize: 12, marginTop: 4, color: '#6B6052' }}>
-            {cost === 0 ? 'Free shipping' : `+ ${priceText(shipShown!, fx)} shipping`}
+            {cost === 0 ? 'Free shipping' : `+ ${priceText(shipShown!)} shipping`}
           </p>
         )}
       </div>

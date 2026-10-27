@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { buyNow, guestBuyNow } from '@/app/actions/commerce'
 import { pillDark, pillDisabled, pillDarkSm, pillOutlineSm, panel, errorPanel, inputStyle, labelStyle } from '@/lib/ui'
 import { Turnstile, TURNSTILE_ENABLED } from '@/app/components/Turnstile'
-import { formatEur, formatMoney } from '@/lib/money'
-import { localPrice, type FxContext } from '@/lib/price-shown'
+import { formatEur } from '@/lib/money'
+import { approxPrice, type FxContext } from '@/lib/price-shown'
 import { paidTotal } from '@/lib/tax'
 
 type Props = {
@@ -18,7 +18,7 @@ type Props = {
   vatAmount?: number
   vatLabel?: string
   isLoggedIn: boolean
-  // US / UK / AU / CA buyers: amounts in their currency, as checkout charges.
+  // Buyers outside the euro: an "≈ $" hint (Stripe charges their currency).
   fx?: FxContext | null
 }
 
@@ -34,12 +34,11 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
 
   if (sellingPrice == null) return null
 
-  const exact = !!fx?.exact && vatAmount === 0
-  const money = (eur: number) => (exact ? formatMoney(localPrice(eur, fx!.rate), fx!.code) : formatEur(eur))
+  const money = formatEur
   const formatted = money(sellingPrice)
-  const totalText = exact
-    ? formatMoney(localPrice(sellingPrice, fx!.rate) + localPrice(shippingCost ?? 0, fx!.rate), fx!.code)
-    : formatEur(paidTotal(sellingPrice + (shippingCost ?? 0), vatAmount))
+  const totalEur = paidTotal(sellingPrice + (shippingCost ?? 0), vatAmount)
+  const totalText = formatEur(totalEur)
+  const totalApprox = approxPrice(totalEur, fx)
 
   const loginHref = `/auth/login?next=${encodeURIComponent(`/stones/${itemId}`)}`
   const guestReady = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()) && (!TURNSTILE_ENABLED || !!captchaToken)
@@ -123,6 +122,11 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
               <span>Total</span>
               <span>{totalText}</span>
             </div>
+            {totalApprox && (
+              <p style={{ fontSize: 12, color: '#6B6052', textAlign: 'right', marginTop: 4 }}>
+                {totalApprox} · you pay the exact amount in your currency
+              </p>
+            )}
           </div>
         ) : (
           <p style={{ fontSize: 14, color: '#5A5045', lineHeight: 1.55, marginBottom: 6 }}>
