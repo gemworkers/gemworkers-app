@@ -7,7 +7,9 @@ Everything left before real customers can pay. Tick items off as they're done.
 - [ ] **Z** Accountant review: VAT/OSS set-up, GemWorkers as merchant of record, the
       service-fee (commission) model for the brothers' stones, and which amount counts as
       turnover for foreign-currency orders (euro price or euros received). Also the
-      "ACCOUNTANT REVIEW" wording on the Payment page.
+      "ACCOUNTANT REVIEW" wording on the Payment page. And: at what US sales level
+      (per state, usually ~$100,000/year) must GemWorkers collect US sales tax? That is
+      the moment to consider Stripe Tax (≈0.5% per sale); until then it stays off.
 - [ ] **Z** Register for the EU One-Stop-Shop (OSS / "Unieregeling") at the Belastingdienst.
 - [x] **C** Use the BTW-id from Company details for the VAT-number checks of business
       buyers (official consultation number). (done 2026-10-26, VIES returns a consultation number)
