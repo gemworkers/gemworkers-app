@@ -42,10 +42,6 @@ interface OfferRecord {
   counter_price?:      number | string | null
   counter_expires_at?: string | null
   countered_by_role?:  string | null
-  // Offers in the buyer's own currency (sql/offers_local_currency.sql)
-  offer_currency?:     string | null
-  local_offered?:      number | string | null
-  local_counter?:      number | string | null
 }
 
 interface WebhookPayload {
@@ -60,20 +56,13 @@ interface OrderRow {
   order_total:    number | string | null
   shipping_cost:  number | string | null
   payment_due_at: string | null
-  charge_currency?: string | null
-  charge_amount?:   number | string | null
-  charge_shipping?: number | string | null
 }
 
-const ORDER_PAY_COLS = "order_total, shipping_cost, payment_due_at, charge_currency, charge_amount, charge_shipping"
+const ORDER_PAY_COLS = "order_total, shipping_cost, payment_due_at"
 
-// What the buyer pays for an order: in their own currency when it was agreed
-// in it (US/GB/AU/CA), else euros. Shipping null = none.
+// What the buyer pays for an order, in euros (GemWorkers charges euros only;
+// Stripe converts for buyers who pay in their own currency). Shipping null = none.
 function orderPay(o: OrderRow): { total: string; shipping: string | null } {
-  if (o.charge_currency && o.charge_currency !== "EUR" && o.charge_amount != null) {
-    const ship = Number(o.charge_shipping ?? 0)
-    return { total: money(Number(o.charge_amount), o.charge_currency), shipping: ship > 0 ? money(ship, o.charge_currency) : null }
-  }
   const ship = Number(o.shipping_cost ?? 0)
   return { total: eur(Number(o.order_total)), shipping: ship > 0 ? eur(ship) : null }
 }
@@ -128,16 +117,6 @@ const eurCents = new Intl.NumberFormat("en-IE", { style: "currency", currency: "
 
 function eur(n: number): string {
   return Number.isInteger(n) ? eurWhole.format(n) : eurCents.format(n)
-}
-
-// $300, £49.50, A$120, C$75 — same whole / 2-decimal rule.
-const LOCALE: Record<string, string> = { USD: "en-US", GBP: "en-GB", AUD: "en-AU", CAD: "en-CA" }
-function money(n: number, currency: string): string {
-  if (currency === "EUR") return eur(n)
-  const digits = Number.isInteger(n) ? 0 : 2
-  return new Intl.NumberFormat(LOCALE[currency] ?? "en-GB", {
-    style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits,
-  }).format(n)
 }
 
 const utcDate = new Intl.DateTimeFormat("en-GB", {
@@ -576,7 +555,7 @@ async function handlePaymentReminder(req: Request): Promise<Response> {
 
   const { data: orderData, error: orderErr } = await supabase
     .from("orders")
-    .select("id, status, buyer_id, offer_id, order_total, shipping_cost, payment_due_at, charge_currency, charge_amount, charge_shipping")
+    .select("id, status, buyer_id, offer_id, order_total, shipping_cost, payment_due_at")
     .eq("id", orderId)
     .maybeSingle()
   const order = orderData as ReminderOrderRow | null
@@ -1162,13 +1141,11 @@ Deno.serve(async (req: Request) => {
   // Set once the offer was countered; an accepted offer with a counter price
   // was accepted at that price.
   const counterEur = offer.counter_price != null ? eur(Number(offer.counter_price)) : null
-  // Buyer's currency (US/GB/AU/CA offers): buyers see only that; staff see
-  // both, e.g. "$300 (€262.61)".
-  const cur = offer.offer_currency && offer.offer_currency !== "EUR" ? offer.offer_currency : null
-  const buyerAmount = cur && offer.local_offered != null ? money(Number(offer.local_offered), cur) : amountEur
-  const buyerCounter = cur && offer.local_counter != null ? money(Number(offer.local_counter), cur) : counterEur
-  const amount = buyerAmount !== amountEur ? `${buyerAmount} (${amountEur})` : amountEur
-  const counterAmount = counterEur && buyerCounter !== counterEur ? `${buyerCounter} (${counterEur})` : counterEur
+  // Offers are in euros for everyone (buyers and staff).
+  const buyerAmount = amountEur
+  const buyerCounter = counterEur
+  const amount = amountEur
+  const counterAmount = counterEur
 
   if (event.startsWith("counter") && !counterAmount) {
     console.error("[offer-notify] offer", offer.id, "event", event, "has no counter_price — no email")

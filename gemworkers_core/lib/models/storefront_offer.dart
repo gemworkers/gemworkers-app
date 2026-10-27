@@ -13,11 +13,6 @@ class StorefrontOffer {
   /// Staff counter-offer (one per offer); null if never countered.
   final double? counterPrice;
   final DateTime? counterExpiresAt;
-  /// US / UK / AU / CA buyers offer in their own currency (the euro amounts
-  /// above stay the basis): currency + what the buyer sees.
-  final String offerCurrency;
-  final double? localOffered;
-  final double? localCounter;
   final String buyerNote;
   final String sellerNote;
   final String buyerEmail;   // from buyers join; '' if RLS blocks
@@ -42,9 +37,6 @@ class StorefrontOffer {
     required this.status,
     this.counterPrice,
     this.counterExpiresAt,
-    this.offerCurrency = 'EUR',
-    this.localOffered,
-    this.localCounter,
     required this.buyerNote,
     required this.sellerNote,
     required this.buyerEmail,
@@ -55,14 +47,6 @@ class StorefrontOffer {
     this.orderStatus,
     this.orderPaymentDueAt,
   });
-
-  /// "$300" / "£49.50" — the buyer's own amount, or null for euro offers.
-  static String? localLabel(String currency, double? amount) {
-    if (currency == 'EUR' || amount == null) return null;
-    const symbols = {'USD': r'$', 'GBP': '£', 'AUD': r'A$', 'CAD': r'C$'};
-    final n = amount == amount.roundToDouble() ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2);
-    return '${symbols[currency] ?? '$currency '}$n';
-  }
 
   factory StorefrontOffer.fromMap(Map<String, dynamic> map) {
     final item  = map['inventory_items'] as Map<String, dynamic>?;
@@ -99,9 +83,6 @@ class StorefrontOffer {
       counterExpiresAt: map['counter_expires_at'] != null
                             ? DateTime.parse(map['counter_expires_at'].toString())
                             : null,
-      offerCurrency:    map['offer_currency']?.toString() ?? 'EUR',
-      localOffered:     parseNumeric(map['local_offered']),
-      localCounter:     parseNumeric(map['local_counter']),
       buyerNote:        map['buyer_note']?.toString() ?? '',
       sellerNote:       map['seller_note']?.toString() ?? '',
       buyerEmail:       buyer?['email']?.toString() ?? '',

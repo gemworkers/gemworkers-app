@@ -140,7 +140,6 @@ class _TotalsCard extends StatelessWidget {
         _Line('Stripe fees', -n('stripe_fee')),
         _Line('Postage you paid', -n('postage')),
         _Line('Cost of your own stones', -n('stone_cost')),
-        _Line('Currency margin (dollar, pound … payments)', n('fx')),
         const Divider(height: 24),
         _Line('GemWorkers keeps', earned, bold: true),
         const SizedBox(height: 16),
@@ -250,7 +249,6 @@ class _OrderTile extends StatelessWidget {
             o['cost_missing'] == true
                 ? const _Pending('Cost of the stone', 'no cost price filled in')
                 : _Line('Cost of the stone', -n('stone_cost')),
-          if (n('fx') != 0) _Line('Currency margin', n('fx')),
           const Divider(height: 16),
           _Line('GemWorkers keeps', earned, bold: true),
           if (n('vat') != 0) _Line('VAT (for the tax office)', n('vat')),

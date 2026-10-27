@@ -409,14 +409,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 ),
               ],
             ),
-            if (order.chargeCurrency != 'EUR' && order.chargeAmount != null) ...[
-              // Paid in the buyer's own currency — euros above stay the basis
-              // for payouts and VAT; GemWorkers keeps/carries the difference.
-              _row('Buyer paid in ${order.chargeCurrency}',
-                  '${order.chargeCurrency} ${order.chargeAmount!.toStringAsFixed(2)}'),
-              if (order.eurReceived != null && UserProfileService.instance.isOwner)
-                _row('Euros received from Stripe', '€${order.eurReceived!.toStringAsFixed(2)}'),
-            ],
+            if (order.eurReceived != null && UserProfileService.instance.isOwner)
+              _row('Euros received from Stripe', '€${order.eurReceived!.toStringAsFixed(2)}'),
             if (order.saleChannel == 'platform') ..._payoutRows(order),
             if (order.saleChannel == 'platform' && UserProfileService.instance.isOwner) ..._refundRows(order),
           ],
