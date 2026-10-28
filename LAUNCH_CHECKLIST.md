@@ -55,6 +55,10 @@ Everything left before real customers can pay. Tick items off as they're done.
       so password links in order emails still work the next day.
 - [ ] **Z** Change the admin password.
 
+- [x] **C+Z** Weekly encrypted database backup to iCloud Drive (Sundays; check "last backup.txt" says OK now and then). Supabase free plan has NO backups of its own.
+- [ ] **Z** Upgrade Supabase to Pro (~$25/month: daily backups, never paused) once orders are regular (about 10+ a month, or a stone above €1,000 sold).
+- [ ] **Z** Keep original stone photos/videos on your own computer or cloud too (not in the database backup).
+
 ## 5. Launch day
 - [ ] **Z+C** One real purchase with your own card (small stone), then refund it.
 - [x] **Z** Social accounts (one GemWorkers account per platform) → send the links → **C** adds
