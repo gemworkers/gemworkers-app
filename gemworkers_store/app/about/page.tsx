@@ -72,7 +72,7 @@ export default function AboutPage() {
           Trusted on Etsy since 2018
         </h2>
         <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, margin: '0 0 16px' }}>
-          Before this shop, our family sold through four GemWorkers shops on Etsy: more than
+          Our family also sells through four GemWorkers shops on Etsy: together more than
           4,200 sales and 1,100 reviews, rated 4.8 to 5.0 stars. You can read every review there.
         </p>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6, fontSize: 14 }}>
