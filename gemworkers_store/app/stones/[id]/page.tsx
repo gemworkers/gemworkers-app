@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { PhotoGallery } from './PhotoGallery';
 import { BuyButton } from './BuyButton';
+import { TrustStrip } from '@/app/components/TrustStrip';
 import { CartButton } from './CartButton';
 import { OfferPanel, type BuyerOffer, type PayableOrder } from './OfferPanel';
 import { VideoPlayer } from './VideoPlayer';
@@ -587,6 +588,8 @@ export default async function StoneDetailPage({
               </Link>
             )}
           </div>
+
+          <TrustStrip />
 
           {/* Trust list */}
           <TrustList />

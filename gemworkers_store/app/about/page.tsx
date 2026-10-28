@@ -64,6 +64,31 @@ export default function AboutPage() {
           </div>
         ))}
       </div>
+
+      {/* Our record on Etsy (numbers as shown there, October 2026 — floors, so
+          they stay true; update now and then). Only here, never on stone pages. */}
+      <div className="not-prose" style={{ marginTop: 48, paddingTop: 32, borderTop: '1px solid #ECE5D8' }}>
+        <h2 style={{ fontFamily: 'var(--font-cormorant, Georgia, serif)', fontSize: 26, fontWeight: 500, margin: '0 0 10px', color: '#1F1B16' }}>
+          Trusted on Etsy since 2018
+        </h2>
+        <p style={{ fontSize: 15, color: '#5A5045', lineHeight: 1.6, margin: '0 0 16px' }}>
+          Before this shop, our family sold through four GemWorkers shops on Etsy: more than
+          4,200 sales and 1,100 reviews, rated 4.8 to 5.0 stars. You can read every review there.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6, fontSize: 14 }}>
+          {[
+            { name: 'GemWorkers1', url: 'https://www.etsy.com/shop/GemWorkers1', note: '★4.9 · 700+ reviews · 2,100+ sales' },
+            { name: 'GemWorkers2', url: 'https://www.etsy.com/shop/GemWorkers2', note: '★4.8 · 400+ reviews · 1,900+ sales' },
+            { name: 'GemWorkers', url: 'https://www.etsy.com/shop/GemWorkers', note: '★4.9 · 20+ reviews' },
+            { name: 'GemWorkersEU', url: 'https://www.etsy.com/shop/GemWorkersEU', note: '★5.0' },
+          ].map(s => (
+            <li key={s.name}>
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="pd-link">{s.name} on Etsy</a>
+              <span style={{ color: '#6B6052' }}> — {s.note}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </ContentPage>
   )
 }
