@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — OSS start date: Dutch VAT on EU sales until the Unieregeling starts
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-28
 --
 -- Zakaria registered for the Unieregeling (OSS, EU scheme) on 2026-10-28,
 -- starting next quarter = 2027-01-01. Until then a sale of a stone shipped
