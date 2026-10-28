@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Pre-launch test-data wipe (run ONCE, right before going live)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-28
 --
 -- Zakaria 2026-10-28: delete all test activity, all 12 test stones, the test
 -- sellers (Testseller, GW1-Thailand, GemWorkers Thailand — re-invited later)

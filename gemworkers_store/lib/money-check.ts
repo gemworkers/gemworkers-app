@@ -22,9 +22,9 @@ type Admin = ReturnType<typeof createAdminClient>
 
 const DAYS = 7
 const INVOICES_FROM = '2026-10-24'
-// The shop moved to the company Stripe account (acct_1PDQip…) on this moment;
-// orders paid earlier were paid on the old account, which these keys can't see.
-const STRIPE_ACCOUNT_SINCE = '2026-10-28T19:00:00Z'
+// Records start here: the pre-launch wipe (sql/prelaunch_wipe.sql) removed
+// all earlier test orders, and they were paid on test / old Stripe accounts.
+const STRIPE_ACCOUNT_SINCE = '2026-10-28T21:00:00Z'
 
 type OrderRow = {
   id: string; order_number: string; status: string; paid_at: string | null
@@ -40,7 +40,7 @@ export type MoneyCheck = { checked: Record<string, number>; problems: string[] }
 export async function runMoneyCheck(admin: Admin): Promise<MoneyCheck> {
   const problems: string[] = []
   const checked: Record<string, number> = {}
-  const since = Math.floor(Date.now() / 1000) - DAYS * 24 * 3600
+  const since = Math.max(Math.floor(Date.now() / 1000) - DAYS * 24 * 3600, Math.floor(Date.parse(STRIPE_ACCOUNT_SINCE) / 1000))
   const sinceIso = new Date(since * 1000).toISOString()
 
   // ── 1. Stripe payments → our orders ────────────────────────────────────────
