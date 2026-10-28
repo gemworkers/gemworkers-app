@@ -669,7 +669,11 @@ export async function POST(req: NextRequest) {
     // SDK v22+: address lives at collected_information.shipping_details (not top-level shipping_details).
     // Phone is on customer_details.phone (unchanged across SDK versions).
     // All fields written; nulls fine for optional ones like line2/state.
+    // Webhooks on an older API version (before 2025-03-31) still send it at the
+    // top-level shipping_details — read both, so an endpoint's version can't lose the address.
+    type ShippingDetails = NonNullable<NonNullable<Stripe.Checkout.Session['collected_information']>['shipping_details']>
     const addr = session.collected_information?.shipping_details
+      ?? (session as unknown as { shipping_details?: ShippingDetails | null }).shipping_details
     const custEmail = session.customer_details?.email?.trim() || null
     const shippingData = {
       shipping_name:        addr?.name                ?? null,
