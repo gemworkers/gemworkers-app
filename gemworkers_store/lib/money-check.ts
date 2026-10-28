@@ -22,6 +22,9 @@ type Admin = ReturnType<typeof createAdminClient>
 
 const DAYS = 7
 const INVOICES_FROM = '2026-10-24'
+// The shop moved to the company Stripe account (acct_1PDQip…) on this moment;
+// orders paid earlier were paid on the old account, which these keys can't see.
+const STRIPE_ACCOUNT_SINCE = '2026-10-28T19:00:00Z'
 
 type OrderRow = {
   id: string; order_number: string; status: string; paid_at: string | null
@@ -84,8 +87,9 @@ export async function runMoneyCheck(admin: Admin): Promise<MoneyCheck> {
   }
 
   // ── 2. Our paid orders → Stripe ────────────────────────────────────────────
+  const fromIso = sinceIso > STRIPE_ACCOUNT_SINCE ? sinceIso : STRIPE_ACCOUNT_SINCE
   const { data: paidData } = await admin.from('orders').select(cols)
-    .eq('sale_channel', 'platform').gte('paid_at', sinceIso)
+    .eq('sale_channel', 'platform').gte('paid_at', fromIso)
   const paid = (paidData as OrderRow[] | null) ?? []
   checked.paid_orders = paid.length
   const byId = new Map(payments.map(p => [p.id, p]))
