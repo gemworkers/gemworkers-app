@@ -13,6 +13,19 @@ const IGNORE = [
 let windowStart = 0
 let written = 0
 
+// Vercel freezes a function as soon as its response is sent; waitUntil keeps
+// it alive until the log write is done (the same hook @vercel/functions uses).
+function keepAlive(p: Promise<unknown>): void {
+  try {
+    const ctx = (globalThis as Record<symbol, { get?: () => { waitUntil?: (p: Promise<unknown>) => void } } | undefined>)[
+      Symbol.for('@vercel/request-context')
+    ]
+    ctx?.get?.()?.waitUntil?.(p)
+  } catch {
+    /* not on Vercel */
+  }
+}
+
 export function logError(source: string, message: string): Promise<void> {
   try {
     if (!message || IGNORE.some(r => r.test(message))) return Promise.resolve()
@@ -23,11 +36,13 @@ export function logError(source: string, message: string): Promise<void> {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return Promise.resolve()
-    return fetch(`${url}/rest/v1/app_errors`, {
+    const p = fetch(`${url}/rest/v1/app_errors`, {
       method: 'POST',
       headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({ source: source.slice(0, 40), message: message.slice(0, 2000) }),
     }).then(() => {}, () => {})
+    keepAlive(p)
+    return p
   } catch {
     return Promise.resolve()   // never break the caller
   }
