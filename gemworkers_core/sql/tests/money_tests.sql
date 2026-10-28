@@ -3,7 +3,8 @@
 -- =============================================================================
 -- Run:  node gemworkers_core/sql/tests/run_money_tests.js   (from gemworkers_app)
 --
--- Plays real flows on the LIVE database with test stones and the test buyer,
+-- Plays real flows on the LIVE database with a temporary practice seller,
+-- test stones and Zakaria's own test buyer,
 -- checks every amount, then UNDOES EVERYTHING: the block always ends with an
 -- error ("TESTRESULT …"), so the whole transaction rolls back — no orders,
 -- offers, invoices, refunds, payouts or emails are kept (pg_net webhook calls
@@ -21,8 +22,8 @@ BEGIN;
 
 DO $test$
 DECLARE
-  c_seller constant uuid := '8c1219af-9ca8-4647-ae50-b0716a2ea525';  -- Testseller (TH, 12%)
-  c_buyer  constant uuid := 'f79ba266-0fe6-44f6-aefb-f00ffaf3dd70';  -- Zakaria's test buyer
+  c_seller constant uuid := '00000000-0000-4000-8000-00000000aaaa';  -- temporary practice seller (TH, 12%), made below
+  c_buyer  constant uuid := 'bcefea86-26ee-4296-8ab4-0cbd7c7e298f';  -- Zakaria's own test buyer (printforzakaria…)
   v_owner  uuid;
   s1 uuid; s2 uuid; s3 uuid;           -- test stones
   o1 uuid; o2 uuid; o3 uuid;           -- orders
@@ -35,7 +36,9 @@ DECLARE
 BEGIN
   SELECT id INTO v_owner FROM user_profiles WHERE role = 'owner' LIMIT 1;
   -- Rate as the tests expect (rolled back anyway).
-  UPDATE sellers SET commission_rate = 0.12, on_vacation = false WHERE id = c_seller;
+  -- A practice seller that exists only inside this rolled-back test.
+  INSERT INTO sellers (id, name, country, status, commission_rate)
+  VALUES (c_seller, 'Practice seller', 'TH', 'active', 0.12);
 
   -- Fixtures: three listed test stones of the Testseller.
   INSERT INTO inventory_items (sku, title, seller_id, selling_price, shipping_cost, is_listed, status, sale_method, product_type, quantity)
