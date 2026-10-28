@@ -14,7 +14,7 @@
 -- counter-offer → order amounts, partial + full refund (credit notes, seller
 -- charged once), payout = sales − open charges, earnings, vacation mode
 -- blocks offers and purchases, VAT rules (NL→EU OSS, NL→NL, TH/PK buyer pays,
--- UK minimum).
+-- UK minimum, Dutch 21% before the OSS start date).
 -- =============================================================================
 
 BEGIN;
@@ -151,6 +151,8 @@ BEGIN
   UPDATE sellers SET on_vacation = false WHERE id = c_seller;
 
   -- ── 10. VAT rules ─────────────────────────────────────────────────────────
+  -- OSS active (start date in the past) for the buyer-country cases.
+  UPDATE store_settings SET value = '2000-01-01' WHERE key = 'oss_start_date';
   FOR x IN SELECT * FROM (VALUES
       ('NL', 'DE', 'oss',        19::numeric, NULL::numeric),
       ('NL', 'NL', 'domestic',   21,          NULL),
@@ -164,6 +166,10 @@ BEGIN
        OR t = x.scheme || '/' || x.vat || '/' || coalesce(x.min_eur::text || '.00', '-') THEN pass := pass + 1;
     ELSE fails := fails || format('10 VAT %s→%s on €100: %s, want %s/%s/%s', x.o, x.d, t, x.scheme, x.vat, coalesce(x.min_eur::text, '-')); END IF;
   END LOOP;
+  -- Before the OSS start date: NL → other EU consumer pays Dutch 21% (sql/oss_start_date.sql).
+  UPDATE store_settings SET value = '2999-01-01' WHERE key = 'oss_start_date';
+  SELECT scheme || '/' || tax_amount INTO t FROM _tax_calc('NL', 'DE', 'loose_stone', 100, NULL);
+  IF t = 'domestic/21.00' THEN pass := pass + 1; ELSE fails := fails || format('10b before OSS start NL→DE: %s, want domestic/21.00', t); END IF;
 
   RAISE EXCEPTION 'TESTRESULT passed=% failed=% %', pass, cardinality(fails),
     CASE WHEN cardinality(fails) = 0 THEN '' ELSE ':: ' || array_to_string(fails, ' || ') END;

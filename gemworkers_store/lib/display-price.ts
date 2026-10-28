@@ -7,6 +7,7 @@
 
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { currentShipToCode } from '@/lib/ship-to'
 import type { PriceContext } from '@/lib/price-shown'
 
@@ -37,12 +38,20 @@ export const priceContext = cache(async (): Promise<PriceContext | null> => {
     if (b?.vies_valid && fresh && b.vat_country === code) return { rate: 0, country: '', origins: [] }
   }
 
-  const [{ data: union }, { data: country }] = await Promise.all([
+  const [{ data: union }, { data: country }, { data: ossStart }, { data: nl }] = await Promise.all([
     supabase.from('tax_rules').select('country_code').eq('customs_union', r.customs_union),
     supabase.from('shipping_countries').select('name').eq('code', code).maybeSingle(),
+    createAdminClient().from('store_settings').select('value').eq('key', 'oss_start_date').maybeSingle(),
+    supabase.from('tax_rules').select('tax_rate').eq('country_code', 'NL').maybeSingle(),
   ])
+  // Before the OSS start date, EU stones (all ship from NL) to another EU
+  // country carry the Dutch rate — same rule as _tax_calc (sql/oss_start_date.sql).
+  const start = (ossStart as { value: string | null } | null)?.value
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Amsterdam' })   // YYYY-MM-DD
+  const nlRate = (nl as { tax_rate: string | number | null } | null)?.tax_rate
+  const beforeOss = code !== 'NL' && !!start && today < start && nlRate != null
   return {
-    rate: Number(r.tax_rate),
+    rate: beforeOss ? Number(nlRate) : Number(r.tax_rate),
     country: (country as { name: string } | null)?.name ?? code,
     origins: ((union as { country_code: string }[] | null) ?? []).map(u => u.country_code),
   }
