@@ -118,6 +118,8 @@ class MoneyOverviewState extends State<MoneyOverview> {
       final body = jsonDecode(res.body.isEmpty ? '{}' : res.body) as Map<String, dynamic>;
       if (res.statusCode != 200) throw Exception(body['error'] ?? 'status ${res.statusCode}');
       lines = ((body['problems'] as List?) ?? const []).map((e) => e.toString()).toList();
+      // Errors and failed scheduled jobs of the last 24 hours (sql/error_log.sql).
+      final health = ((body['health'] as List?) ?? const []).map((e) => e.toString()).toList();
       final c = Map<String, dynamic>.from((body['checked'] as Map?) ?? const {});
       title = lines.isEmpty
           ? 'Everything matches'
@@ -129,6 +131,13 @@ class MoneyOverviewState extends State<MoneyOverview> {
               "and ${c['payouts'] ?? 0} payout${c['payouts'] == 1 ? '' : 's'}.",
         ];
       }
+      lines = [
+        ...lines,
+        health.isEmpty
+            ? 'Errors and failed jobs (last 24 hours): none.'
+            : 'Errors and failed jobs (last 24 hours):',
+        ...health.map((h) => '• $h'),
+      ];
     } catch (e) {
       title = 'The money check could not run';
       lines = ['$e'];
