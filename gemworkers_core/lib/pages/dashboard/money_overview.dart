@@ -102,6 +102,12 @@ class MoneyOverviewState extends State<MoneyOverview> {
 
   bool _checking = false;
 
+  /// "1 refund" / "3 refunds".
+  static String _n(dynamic count, String word) {
+    final n = (count as num?)?.toInt() ?? 0;
+    return '$n $word${n == 1 ? '' : 's'}';
+  }
+
   /// Runs the daily money check now (store /api/cron/money-check, owner token)
   /// and shows what doesn't match — Stripe vs orders, refunds, invoices, payouts.
   Future<void> _runMoneyCheck() async {
@@ -126,8 +132,8 @@ class MoneyOverviewState extends State<MoneyOverview> {
           : lines.length == 1 ? "1 thing doesn't match" : "${lines.length} things don't match";
       if (lines.isEmpty) {
         lines = [
-          'Checked ${c['stripe_payments'] ?? 0} Stripe payments, ${c['paid_orders'] ?? 0} paid orders and '
-              '${c['stripe_refunds'] ?? 0} refunds of the last 7 days, ${c['invoices'] ?? 0} invoices '
+          'Checked ${_n(c['stripe_payments'], 'Stripe payment')}, ${_n(c['paid_orders'], 'paid order')} and '
+              '${_n(c['stripe_refunds'], 'refund')} of the last 7 days, ${_n(c['invoices'], 'invoice')} '
               "and ${c['payouts'] ?? 0} payout${c['payouts'] == 1 ? '' : 's'}.",
         ];
       }
