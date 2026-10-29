@@ -14,9 +14,13 @@ import type { PriceContext } from '@/lib/price-shown'
 export type { PriceContext }
 
 /** Null = show prices without VAT. One lookup per request. */
-export const priceContext = cache(async (): Promise<PriceContext | null> => {
+export const priceContext = cache(async (): Promise<PriceContext | null> =>
+  priceContextFor(await currentShipToCode(), true))
+
+/** The same for a given ship-to country (the Google feed asks per country;
+ *  withBusiness = false skips the logged-in buyer's VAT-number check). */
+export async function priceContextFor(code: string, withBusiness: boolean): Promise<PriceContext | null> {
   const supabase = await createClient()
-  const code = await currentShipToCode()
 
   const { data: rule } = await supabase
     .from('tax_rules')
@@ -27,7 +31,7 @@ export const priceContext = cache(async (): Promise<PriceContext | null> => {
   if (!r || r.mode !== 'collect' || r.tax_rate == null || !r.customs_union) return null
 
   // A verified EU business in another country pays 0% (reverse charge).
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = withBusiness ? await supabase.auth.getUser() : { data: { user: null } }
   if (user) {
     const { data: biz } = await supabase
       .from('buyer_business')
@@ -55,4 +59,4 @@ export const priceContext = cache(async (): Promise<PriceContext | null> => {
     country: (country as { name: string } | null)?.name ?? code,
     origins: ((union as { country_code: string }[] | null) ?? []).map(u => u.country_code),
   }
-})
+}
