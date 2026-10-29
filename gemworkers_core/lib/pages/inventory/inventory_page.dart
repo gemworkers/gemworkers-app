@@ -15,7 +15,6 @@ import 'add_item_type_picker_page.dart';
 import 'edit_inventory_page.dart';
 import 'inventory_detail_page.dart';
 import 'listing_sheet.dart';
-import 'record_sale_sheet.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/reject_listing_dialog.dart';
 
@@ -351,40 +350,6 @@ class _InventoryPageState extends State<InventoryPage>
     if (mounted) _exitSelectionMode();
   }
 
-  // ── Record sale ───────────────────────────────────────────────────────────
-
-  Future<void> _showRecordSaleSheet() => _recordSale(_all
-      .where((i) =>
-          i.id != null && _selectedIds.contains(i.id) && i.status != 'sold')
-      .toList());
-
-  Future<void> _recordSale(List<InventoryItem> sellable) async {
-    if (sellable.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No sellable items selected')),
-      );
-      return;
-    }
-
-    final result = await showRecordSaleSheet(context, sellable);
-    if (result == null || !mounted) return;
-
-    _exitSelectionMode();
-    await _loadItems();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Sale recorded · ${result.orderNumber} · '
-            'payout €${result.sellerPayout.toStringAsFixed(2)}',
-          ),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
   // ── Listing actions ───────────────────────────────────────────────────────
 
   Future<void> _openListingSheet(InventoryItem item) async {
@@ -691,8 +656,6 @@ class _InventoryPageState extends State<InventoryPage>
         _approveListing(item);
       case _RowAction.reject:
         _rejectListing(item);
-      case _RowAction.recordSale:
-        _recordSale([item]);
       case _RowAction.select:
         if (item.id != null) _enterSelectionMode(preSelected: {item.id!});
       case _RowAction.details:
@@ -1127,12 +1090,6 @@ class _InventoryPageState extends State<InventoryPage>
                 icon: const Icon(Icons.location_on_outlined, size: 18),
                 label: const Text('Assign Location'),
               ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: count > 0 ? _showRecordSaleSheet : null,
-                icon: const Icon(Icons.sell_outlined, size: 18),
-                label: const Text('Record Sale'),
-              ),
             ],
           ),
         ),
@@ -1143,7 +1100,7 @@ class _InventoryPageState extends State<InventoryPage>
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
 
-enum _RowAction { list, unlist, approve, reject, recordSale, select, details, share, soldElsewhere, edit }
+enum _RowAction { list, unlist, approve, reject, select, details, share, soldElsewhere, edit }
 
 /// Outline pill used for the filter/sort/select controls. With [onTap] null
 /// it is purely visual (e.g. as a PopupMenuButton child).
@@ -1408,9 +1365,6 @@ class _ListingRow extends StatelessWidget {
                   child: Text(item.isAwaitingApproval
                       ? 'Edit listing request'
                       : 'List on marketplace')),
-        if (item.status != 'sold')
-          const PopupMenuItem(
-              value: _RowAction.recordSale, child: Text('Record sale')),
         if (!selectionMode)
           const PopupMenuItem(value: _RowAction.select, child: Text('Select')),
         const PopupMenuItem(
