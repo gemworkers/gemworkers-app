@@ -909,3 +909,6 @@
   body { background: #fff !important; }
   .invoice-doc { box-shadow: none !important; border: none !important; padding: 0 !important; }
 }
+
+/* Hero collage (app/components/HeroCollage.tsx): gentle zoom on hover. */
+.home-hero-tile:hover { transform: scale(1.04); }

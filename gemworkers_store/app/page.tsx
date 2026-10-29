@@ -10,6 +10,7 @@ import { PUBLIC_REVIEW_COLUMNS, type PublicReview } from "@/app/reviews/ReviewLi
 import { countryName } from "@/lib/countries";
 import { StoneGrid } from "@/app/components/StoneGrid";
 import type { StoneCardItem } from "@/app/components/StoneCard";
+import { HeroCollage } from '@/app/components/HeroCollage'
 
 type ListedItem = {
   id: string;
@@ -89,6 +90,9 @@ export default async function HomePage() {
   }))
   // public_listings exposes no listing timestamp, so view order is used as-is.
   const newArrivals = cardItems.slice(0, 8)
+  // Hero: a public/hero.jpg wins; otherwise the photos of up to 4 listed stones.
+  const heroStones = items.filter(i => !!i.image_url).slice(0, 4)
+    .map(i => ({ id: i.id, title: i.title, image_url: i.image_url as string }))
 
   return (
     <main>
@@ -115,6 +119,8 @@ export default async function HomePage() {
         {hasHero ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src="/hero.jpg" alt="Natural gemstones" className="home-hero-media" style={{ objectFit: 'cover' }} />
+        ) : heroStones.length > 0 ? (
+          <HeroCollage stones={heroStones} />
         ) : (
           <div className="home-hero-media home-panel" aria-hidden="true" />
         )}
