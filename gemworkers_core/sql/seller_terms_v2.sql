@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Seller terms version 2 (with the GemWorkers Standards / SOPs)
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-29
 --
 -- Text: docs/seller-terms-v2.md (approved by Zakaria before running). v1 stays
 -- stored unchanged (agreed versions are never edited); v2 becomes current, so
