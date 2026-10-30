@@ -6,7 +6,7 @@ import { stripe } from '@/lib/stripe/server'
 import type Stripe from 'stripe'
 import { canStartOfferPayment, PAY_WINDOW_CLOSING_MESSAGE } from '@/lib/offer-payment'
 import { checkoutShipTo } from '@/lib/ship-to'
-import { applyOrderTax, vatLineItem, reverseChargeText } from '@/lib/tax'
+import { applyOrderTax, vatLineItem, checkoutText } from '@/lib/tax'
 import { createCheckoutSession } from '@/lib/stripe/checkout'
 import { refreshBusinessCheck } from '@/lib/business'
 import { verifyTurnstile } from '@/lib/turnstile'
@@ -160,7 +160,7 @@ async function startBuyNow(
         allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
-      custom_text: reverseChargeText([order]),
+      custom_text: checkoutText([order]),
       // Stripe minimum is 30 min; our sweep cancels the order at 30 min.
       expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       success_url: `${base}/orders?paid=1&order=${orderId}`,
@@ -339,7 +339,7 @@ export async function payAcceptedOffer(
         allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
-      custom_text: reverseChargeText([taxRow]),
+      custom_text: checkoutText([taxRow]),
       expires_at: expiresAt,
       success_url: `${base}/orders?paid=1&order=${order.id}`,
       cancel_url:  `${base}/stones/${itemId}?canceled=1&order=${order.id}`,
@@ -603,7 +603,7 @@ export async function checkoutCart(): Promise<
         allowed_countries: [shipTo.code as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry],
       },
       phone_number_collection: { enabled: true },
-      custom_text: reverseChargeText(orderRows),
+      custom_text: checkoutText(orderRows),
       // Stripe minimum is 30 min; our sweep cancels the orders at 30 min.
       expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
       success_url: `${base}/orders?paid=1&group=${groupId}`,

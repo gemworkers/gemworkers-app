@@ -65,11 +65,15 @@ type OrderTaxRow = { tax_amount: string | number | null; tax_name: string | null
 
 type OrderBuyerRow = { tax_scheme: string | null; buyer_company: string | null; buyer_vat_number: string | null }
 
-// Stripe page note for a verified EU business (0% VAT), or undefined.
-export function reverseChargeText(orders: OrderBuyerRow[]): { submit: { message: string } } | undefined {
+/** Note above Stripe's Pay button: reverse charge for a verified EU business,
+ *  or the neutral import-duties line when the buyer pays those on delivery. */
+export function checkoutText(orders: OrderBuyerRow[]): { submit: { message: string } } | undefined {
   const o = orders.find(x => x.tax_scheme === 'reverse_charge')
-  if (!o) return undefined
-  return { submit: { message: `VAT reverse charged (intra-EU supply, 0% VAT) — ${o.buyer_company ?? 'your business'}, VAT ${o.buyer_vat_number ?? ''}`.trim() } }
+  if (o) return { submit: { message: `VAT reverse charged (intra-EU supply, 0% VAT) — ${o.buyer_company ?? 'your business'}, VAT ${o.buyer_vat_number ?? ''}`.trim() } }
+  if (orders.some(x => x.tax_scheme === 'buyer_pays')) {
+    return { submit: { message: 'Import duties and taxes may be charged by your country on delivery.' } }
+  }
+  return undefined
 }
 
 // Stripe line item for the collected VAT, or null when there is none.
@@ -111,10 +115,8 @@ export function taxNote(
       ? { text: `Includes ${formatEur(q.taxAmount)} ${name} (${ratePercent(q.taxRate)}%) for ${countryName} · total ${formatEur(paidTotal(q.goodsTotal, q.taxAmount))} with shipping`, warn: false }
       : { text: `Offers are before ${name} — ${ratePercent(q.taxRate)}% ${name} for ${countryName} is added at checkout`, warn: false }
   }
-  if (q.scheme === 'buyer_pays') {
-    return hasPrice && q.importEstimate != null && q.importEstimate > 0
-      ? { text: `Import taxes/duties of about ${money(q.importEstimate)} may be charged by the courier on delivery — paid by you, not at checkout.`, warn: false }
-      : { text: 'Import taxes or duties may be charged by the courier on delivery — paid by you, not at checkout.', warn: false }
-  }
+  // Import duties the buyer pays on delivery: no note on stone page or cart
+  // (Zakaria 2026-10-30, like Etsy / Gemrock) — one neutral line on Stripe's
+  // payment page instead (checkoutText) and the full story on /shipping.
   return null
 }
