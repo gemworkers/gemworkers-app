@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { searchAttachableStones, type AttachableStone } from '@/app/actions/messages'
 import { pillQuiet, inputStyle } from '@/lib/ui'
 import { formatEur } from '@/lib/money'
+import { cardImage } from '@/lib/media'
 
 // "Attach a stone" for buyer messages: a quiet button that opens a searchable
 // list of public stones (popover on desktop, bottom sheet on mobile), plus the
@@ -160,7 +161,7 @@ export function AttachStonePicker({
                       <span className="msg-attach-thumb">
                         {s.image_url && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={s.image_url} alt="" />
+                          <img src={cardImage(s.image_url)} alt="" />
                         )}
                       </span>
                       <span style={{ minWidth: 0, flex: 1 }}>

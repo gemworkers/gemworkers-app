@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { cardImage, videoPoster } from '@/lib/media';
 
 interface PhotoGalleryProps {
   imageUrls: string[];
   title: string;
-  // Uploaded stone video (inventory-videos bucket); shown as the 2nd item,
+  // Uploaded stone video (Bunny, or an older inventory-videos file); shown as the 2nd item,
   // playing silently on a loop, like Etsy. Old YouTube links don't come here.
   videoUrl?: string | null;
 }
@@ -65,6 +66,7 @@ function LoopVideo({ url, className, onClick }: { url: string; className?: strin
   return (
     <video
       src={url}
+      poster={videoPoster(url) ?? undefined}
       className={className}
       autoPlay
       muted
@@ -94,12 +96,15 @@ function Thumb({ media, active, onClick, label }: { media: Media; active: boolea
     <button type="button" onClick={onClick} aria-label={label} aria-current={active} className={`gallery-thumb${active ? ' is-active' : ''}`}>
       {media.kind === 'video' ? (
         <span className="gallery-thumb-video">
-          <video src={`${media.url}#t=0.1`} muted playsInline preload="metadata" />
+          {videoPoster(media.url)
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={videoPoster(media.url)!} alt="" />
+            : <video src={`${media.url}#t=0.1`} muted playsInline preload="metadata" />}
           <span className="gallery-thumb-play" aria-hidden="true">▶</span>
         </span>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={media.url} alt="" />
+        <img src={cardImage(media.url)} alt="" />
       )}
     </button>
   );

@@ -12,6 +12,7 @@ import { priceContext } from '@/lib/display-price'
 import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext } from '@/lib/price-shown'
 import { fxContext } from '@/lib/fx'
 import { taxQuote, taxNote, paidTotal, ratePercent, type TaxQuote } from '@/lib/tax'
+import { cardImage } from '@/lib/media'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -237,7 +238,7 @@ function AvailableItem({ itemId, listing, quote, pctx, fx }: { itemId: string; l
       <Link href={`/stones/${itemId}`} className="cart-thumb">
         {listing.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={listing.image_url} alt={listing.title} />
+          <img src={cardImage(listing.image_url)} alt={listing.title} />
         )}
       </Link>
 

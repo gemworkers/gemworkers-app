@@ -10,6 +10,7 @@ import { paidTotal } from '@/lib/tax'
 import { ReturnPanel, type BuyerReturn } from './ReturnPanel'
 import { canRequestReturn } from '@/lib/returns'
 import { openOrderMessages } from '@/app/actions/messages'
+import { cardImage } from '@/lib/media'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ function StoneThumb({ stone, size }: { stone: StoneDetails | null; size: number 
     <div className="order-thumb" style={{ width: size, height: size }}>
       {stone?.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={stone.image_url} alt={stone.title} />
+        <img src={cardImage(stone.image_url)} alt={stone.title} />
       )}
     </div>
   )

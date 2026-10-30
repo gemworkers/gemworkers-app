@@ -25,6 +25,7 @@ import { stoneSeoTitle, stoneSeoDescription, stoneJsonLd, type SeoStone } from '
 import { favouriteIds } from '@/lib/favourites';
 import { FavouriteButton } from '@/app/components/FavouriteButton';
 import { ShareButton } from '@/app/components/ShareButton';
+import { isUploadedVideo } from '@/lib/media'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -275,7 +276,7 @@ export default async function StoneDetailPage({
   const item = data as ListingDetail;
   const isReserved = item.status === 'reserved';
   const photos = item.image_urls ?? [];
-  const uploadedVideo = !!item.video_url?.includes('/storage/v1/object/public/inventory-videos/');
+  const uploadedVideo = isUploadedVideo(item.video_url);
   const category = CATEGORY[item.product_type] ?? CATEGORY.loose_stone;
   const nextParam = encodeURIComponent(`/stones/${item.id}`);
 

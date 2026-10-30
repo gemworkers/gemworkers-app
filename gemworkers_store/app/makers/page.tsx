@@ -5,6 +5,7 @@ import { priceContext } from '@/lib/display-price'
 import { shownPrice } from '@/lib/price-shown'
 import { ReviewList, reviewAverage, PUBLIC_REVIEW_COLUMNS, type PublicReview } from '@/app/reviews/ReviewList'
 import { Stars } from '@/app/reviews/Stars'
+import { cardImage } from '@/lib/media'
 
 export const metadata = { title: 'Our Makers · GemWorkers' }
 
@@ -194,7 +195,7 @@ export default async function MakersPage() {
                           }}>
                             {s.image_url && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={s.image_url} alt={s.title}
+                              <img src={cardImage(s.image_url)} alt={s.title}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             )}
                           </div>

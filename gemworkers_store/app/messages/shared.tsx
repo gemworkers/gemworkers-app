@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { formatMoney } from '@/lib/money'
+import { cardImage } from '@/lib/media'
 
 // Shared types + pieces for the buyer message portal (/messages).
 
@@ -144,7 +145,7 @@ export function MessageStoneCard({
       <div className="msg-stone-thumb">
         {stone.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={stone.image_url} alt={stone.title} />
+          <img src={cardImage(stone.image_url)} alt={stone.title} />
         )}
       </div>
 

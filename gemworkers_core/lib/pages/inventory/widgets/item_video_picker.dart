@@ -25,7 +25,7 @@ class VideoChoice {
 }
 
 /// Etsy-style video: one short silent clip per stone, shown in the store's
-/// photo gallery as a looping item. MP4 / MOV / WebM, up to 50 MB.
+/// photo gallery as a looping item. MP4 / MOV / WebM, up to 200 MB (Bunny shrinks it, sql/media_bunny.sql).
 class ItemVideoPicker extends StatelessWidget {
   final VideoChoice value;
   final ValueChanged<VideoChoice> onChanged;
@@ -38,7 +38,7 @@ class ItemVideoPicker extends StatelessWidget {
     this.enabled = true,
   });
 
-  static const int maxBytes = 50 * 1024 * 1024;
+  static const int maxBytes = 200 * 1024 * 1024;
   static const _types = {'mp4', 'mov', 'webm'};
 
   Future<void> _pick(BuildContext context) async {
@@ -57,7 +57,7 @@ class ItemVideoPicker extends StatelessWidget {
     if (!context.mounted) return;
     if (bytes.length > maxBytes) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('That video is larger than 50 MB. Please trim it to '
+          content: Text('That video is larger than 200 MB. Please trim it to '
               '5–15 seconds or choose a smaller file.')));
       return;
     }

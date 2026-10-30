@@ -1,6 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/services/supabase_service.dart';
+import '../core/utils/photo_jpeg/photo_jpeg.dart';
 
 import '../core/services/user_profile_service.dart';
 import '../models/inventory_item.dart';
@@ -308,24 +313,47 @@ class InventoryRepository {
   }
 
   // ── Image management ──────────────────────────────────────────────────────
+  // Photos live on Bunny (media.gemworkers.com, sql/media_bunny.sql) and go
+  // through the Edge Function `media`, which checks the stone is the caller's.
+  // Older photos may still be Supabase Storage URLs until they are moved.
 
+  static const String mediaHost = 'https://media.gemworkers.com';
+  static const String _streamHost = 'https://vz-192edce1-fc4.b-cdn.net';
+
+  Future<Map<String, String>> _authHeaders() async {
+    final token = supabase.auth.currentSession?.accessToken;
+    if (token == null) throw Exception('Please log in again');
+    return {'Authorization': 'Bearer $token', 'apikey': SupabaseService.supabaseKey};
+  }
+
+  Uri get _mediaFn => Uri.parse('${SupabaseService.supabaseUrl}/functions/v1/media');
+
+  Future<Map<String, dynamic>> _media(Map<String, dynamic> body) async {
+    final res = await http.post(_mediaFn,
+        headers: {...await _authHeaders(), 'Content-Type': 'application/json'},
+        body: jsonEncode(body));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Media error ${res.statusCode}');
+    return data;
+  }
+
+  /// Uploads the photo (full + small card copy, both JPEG) and returns its URL.
   Future<String> uploadImage(
     String itemId,
     Uint8List bytes,
     String originalName,
   ) async {
-    final ext = originalName.contains('.')
-        ? originalName.split('.').last.toLowerCase()
-        : 'jpg';
-    final path = '$itemId/${DateTime.now().millisecondsSinceEpoch}.$ext';
-
-    await supabase.storage.from(_bucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(contentType: _mimeType(ext)),
-        );
-
-    return supabase.storage.from(_bucket).getPublicUrl(path);
+    final jpegs = await photoJpegs(bytes);
+    final req = http.MultipartRequest('POST', _mediaFn)
+      ..headers.addAll(await _authHeaders())
+      ..fields['action'] = 'photo'
+      ..fields['item_id'] = itemId
+      ..files.add(http.MultipartFile.fromBytes('file', jpegs.full, filename: 'photo.jpg'))
+      ..files.add(http.MultipartFile.fromBytes('card', jpegs.card, filename: 'card.jpg'));
+    final res = await http.Response.fromStream(await req.send());
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Photo upload failed');
+    return data['url'] as String;
   }
 
   Future<void> updateItemImages(String id, List<String> imageUrls) async {
@@ -335,59 +363,108 @@ class InventoryRepository {
         .eq('id', id);
   }
 
-  /// Removes the file from Storage and the URL from the item's image list.
+  /// Removes the file (Bunny or old Supabase Storage) and the URL from the
+  /// item's image list.
   Future<void> deleteImageByUrl(
       String id, String url, List<String> currentUrls) async {
-    const fragment = '/storage/v1/object/public/$_bucket/';
-    final idx = url.indexOf(fragment);
-    if (idx != -1) {
-      final path = Uri.decodeFull(url.substring(idx + fragment.length));
-      await supabase.storage.from(_bucket).remove([path]);
+    if (url.startsWith('$mediaHost/')) {
+      await _media({'action': 'photo_delete', 'item_id': id, 'url': url});
+    } else {
+      const fragment = '/storage/v1/object/public/$_bucket/';
+      final idx = url.indexOf(fragment);
+      if (idx != -1) {
+        final path = Uri.decodeFull(url.substring(idx + fragment.length));
+        await supabase.storage.from(_bucket).remove([path]);
+      }
     }
 
     final updated = currentUrls.where((u) => u != url).toList();
     await updateItemImages(id, updated);
   }
 
-  // ── Video (Etsy-style upload, sql/storage_inventory_videos.sql) ─────────────
+  // ── Video (Bunny Stream, sql/media_bunny.sql) ─────────────────────────────
+  // The admin uploads straight to Bunny (TUS, 5 MB pieces) with a pass from
+  // the `media` function. Bunny then encodes for a few minutes; meanwhile the
+  // stone has video_pending, and the store keeps showing photos only.
 
   static const String _videoBucket = 'inventory-videos';
   static const String _videoFragment =
       '/storage/v1/object/public/$_videoBucket/';
 
-  /// True for a video uploaded to our storage (vs an old YouTube/Vimeo link).
+  /// True for a video uploaded by us (Bunny, or an older Supabase one) —
+  /// not an old YouTube/Vimeo link.
   static bool isUploadedVideo(String? url) =>
-      url != null && url.contains(_videoFragment);
+      url != null && (url.startsWith('$_streamHost/') || url.contains(_videoFragment));
 
-  /// Uploads into the item's own folder (sellers may only upload into their
-  /// own stones' folders) and returns the public URL.
-  Future<String> uploadVideo(
+  /// Uploads the video to Bunny. Returns null: the playable address is set on
+  /// the stone by the `media` function once Bunny has finished encoding.
+  Future<String?> uploadVideo(
     String itemId,
     Uint8List bytes,
-    String originalName,
-  ) async {
-    final ext = originalName.contains('.')
-        ? originalName.split('.').last.toLowerCase()
-        : 'mp4';
-    final path = '$itemId/${DateTime.now().millisecondsSinceEpoch}.$ext';
-    await supabase.storage.from(_videoBucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            contentType: switch (ext) {
-              'mov' => 'video/quicktime',
-              'webm' => 'video/webm',
-              _ => 'video/mp4',
-            },
-          ),
-        );
-    return supabase.storage.from(_videoBucket).getPublicUrl(path);
+    String originalName, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final pass = await _media({'action': 'video_create', 'item_id': itemId});
+    final ext = originalName.contains('.') ? originalName.split('.').last.toLowerCase() : 'mp4';
+    final type = switch (ext) { 'mov' => 'video/quicktime', 'webm' => 'video/webm', _ => 'video/mp4' };
+    final auth = {
+      'AuthorizationSignature': pass['signature'] as String,
+      'AuthorizationExpire': '${pass['expire']}',
+      'VideoId': pass['video_id'] as String,
+      'LibraryId': pass['library_id'] as String,
+      'Tus-Resumable': '1.0.0',
+    };
+    final endpoint = Uri.parse('https://video.bunnycdn.com/tusupload');
+    final create = await http.post(endpoint, headers: {
+      ...auth,
+      'Upload-Length': '${bytes.length}',
+      'Upload-Metadata': 'filetype ${base64Encode(utf8.encode(type))},title ${base64Encode(utf8.encode(itemId))}',
+    });
+    final location = create.headers['location'];
+    if (create.statusCode != 201 || location == null) {
+      throw Exception('Video upload could not start (${create.statusCode})');
+    }
+    final target = endpoint.resolve(location);
+    const piece = 5 * 1024 * 1024;
+    var offset = 0;
+    var retries = 0;
+    while (offset < bytes.length) {
+      final end = (offset + piece < bytes.length) ? offset + piece : bytes.length;
+      try {
+        final res = await http.patch(target,
+            headers: {...auth, 'Upload-Offset': '$offset', 'Content-Type': 'application/offset+octet-stream'},
+            body: bytes.sublist(offset, end));
+        if (res.statusCode != 204) throw Exception('Video upload stopped (${res.statusCode})');
+        offset = int.tryParse(res.headers['upload-offset'] ?? '') ?? end;
+        retries = 0;
+        onProgress?.call(offset / bytes.length);
+      } catch (e) {
+        // Weak connection: ask Bunny how far it got and carry on from there.
+        if (++retries > 3) rethrow;
+        await Future<void>.delayed(Duration(seconds: 2 * retries));
+        final head = await http.head(target, headers: auth);
+        offset = int.tryParse(head.headers['upload-offset'] ?? '') ?? offset;
+      }
+    }
+    return null;
   }
 
-  /// Deletes an uploaded video file; ignores old YouTube/Vimeo links.
-  Future<void> deleteUploadedVideo(String? url) async {
-    if (!isUploadedVideo(url)) return;
-    final idx = url!.indexOf(_videoFragment);
+  /// Asks Bunny whether the stone's pending video is ready; returns its
+  /// playable URL once it is ('processing' / 'failed' / 'none' otherwise).
+  Future<({String status, String? videoUrl})> checkVideo(String itemId) async {
+    final r = await _media({'action': 'video_check', 'item_id': itemId});
+    return (status: r['status'] as String, videoUrl: r['video_url'] as String?);
+  }
+
+  /// Deletes an uploaded video (Bunny or older Supabase file) and any video
+  /// still encoding; ignores old YouTube/Vimeo links.
+  Future<void> deleteUploadedVideo(String? url, {String? itemId}) async {
+    if (itemId != null && (url == null || url.startsWith('$_streamHost/'))) {
+      await _media({'action': 'video_delete', 'item_id': itemId, 'url': url});
+      return;
+    }
+    if (url == null || !url.contains(_videoFragment)) return;
+    final idx = url.indexOf(_videoFragment);
     final path = Uri.decodeFull(url.substring(idx + _videoFragment.length));
     await supabase.storage.from(_videoBucket).remove([path]);
   }
@@ -398,12 +475,4 @@ class InventoryRepository {
         .update({'video_url': videoUrl})
         .eq('id', id);
   }
-
-  static String _mimeType(String ext) => switch (ext) {
-        'jpg' || 'jpeg' => 'image/jpeg',
-        'png' => 'image/png',
-        'webp' => 'image/webp',
-        'heic' || 'heif' => 'image/heic',
-        _ => 'image/jpeg',
-      };
 }

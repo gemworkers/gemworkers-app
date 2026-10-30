@@ -47,6 +47,10 @@ class InventoryItem {
   // Like makerId: read here, NOT in toMap(); set via setItemFeatured.
   final bool isFeatured;
 
+  // Bunny video still encoding (sql/media_bunny.sql). Read only, NOT in
+  // toMap(): set and cleared by the Edge Function `media`.
+  final String? videoPending;
+
   // Consignment (owner-only, sql/consignment_setup.sql): whose stone this is
   // when it is not GemWorkers' own. Read here but NOT in toMap() — set only via
   // InventoryRepository.setItemConsignment.
@@ -151,6 +155,7 @@ class InventoryItem {
     required this.imageUrls,
     this.makerId,
     this.isFeatured = false,
+    this.videoPending,
     this.consignorId,
     this.consignorPrice,
     this.profitShare,
@@ -237,6 +242,7 @@ class InventoryItem {
       imageUrls: parseUrls(map['image_urls']),
       makerId: map['maker_id']?.toString(),
       isFeatured: map['is_featured'] == true,
+      videoPending: map['video_pending']?.toString(),
       consignorId: map['consignor_id']?.toString(),
       consignorPrice: parseNumeric(map['consignor_price']),
       profitShare: parseNumeric(map['profit_share']),
@@ -393,6 +399,7 @@ class InventoryItem {
     String? notes,
     List<String>? imageUrls,
     bool? isFeatured,
+    Object? videoPending = _omitted,
     // Use Object? with _omitted sentinel so callers can explicitly set null.
     Object? supplierId = _omitted,
     String? supplierName,
@@ -460,6 +467,7 @@ class InventoryItem {
       imageUrls: imageUrls ?? this.imageUrls,
       makerId: makerId,
       isFeatured: isFeatured ?? this.isFeatured,
+      videoPending: identical(videoPending, _omitted) ? this.videoPending : videoPending as String?,
       consignorId: consignorId,
       consignorPrice: consignorPrice,
       profitShare: profitShare,

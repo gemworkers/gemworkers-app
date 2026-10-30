@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { cardImage } from '@/lib/media'
 
 // Homepage hero picture made from the listed stones themselves (first photo
 // of up to 4), so it is never empty and always shows what is for sale.
@@ -31,7 +32,7 @@ export function HeroCollage({ stones }: { stones: HeroStone[] }) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={stone.image_url}
+            src={cardImage(stone.image_url)}
             alt={stone.title}
             loading={i === 0 ? 'eager' : 'lazy'}
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 400ms ease' }}

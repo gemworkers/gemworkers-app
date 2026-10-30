@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { LocalTime, type StoneCardData } from './shared'
+import { cardImage } from '@/lib/media'
 
 export const metadata = { title: 'Messages · GemWorkers' }
 
@@ -64,7 +65,7 @@ export default async function MessagesPage() {
                   <div className="order-thumb" style={{ width: 64, height: 64 }}>
                     {stone?.image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={stone.image_url} alt="" />
+                      <img src={cardImage(stone.image_url)} alt="" />
                     )}
                   </div>
 

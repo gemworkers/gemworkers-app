@@ -17,6 +17,10 @@ Owner: Zakaria (non-technical founder). Explain in plain English, one small step
 - gemworkers_core — Flutter web admin, sell.gemworkers.com. Deploy ONLY with gemworkers_core/deploy_admin.sh (build with BUILD_ID + build.json + vercel --prod; open tabs then show "A new version… Reload", lib/widgets/update_notice.dart). Flutter is NOT on PATH: C:\Users\Zakaria\Desktop\Flutter\flutter\bin\flutter.bat
 - gemworkers_core/sql/ — SQL source of truth. supabase/functions/ — Edge Functions (deploy via CLI from gemworkers_app).
 - Supabase project ref: cvqzidqnwthzfodhzepz.
+- DNS for gemworkers.com is at Cloudflare (nameservers adi / jeff.ns.cloudflare.com) — new DNS records are added there by Zakaria.
+
+## Media plan: Bunny (decided 2026-10-30, not built yet)
+Supabase free plan warned "Cached Egress exceeded", grace until 2026-11-29, then 402 restrictions (videos ~37 MB each were the cause). Plan agreed with Zakaria: ALL photos + videos to Bunny (EU), Supabase keeps only data. Bunny Storage (photos, main DE + 1 replica) + Bunny Stream (videos, max 1080p, original kept), served from our own hostname media.gemworkers.com (CNAME in Cloudflare → no lock-in), small card photos (~600 px) made at upload + backfilled, protected upload Edge Function (seller owns stone, type/size, unique filenames; key only in Supabase secrets; videos via expiring TUS upload pass), migration = copy → verify every file → switch URLs at once → keep Supabase copies 4 weeks. Also: auto-recharge + low-balance email + budget alert + hotlink protection (allow empty referrer for Google/Meta), 2FA, nightly check tests media, weekly backup copies new media to iCloud, monthly orphan clean-up (never sold stones < 1 year — chargeback proof), Bunny DPA + privacy page. Review photos stay on Supabase. Fallback if not working by 2026-11-20: Supabase Pro ($25).
 
 ## How we work
 - Admin updates: open tabs show a "new version — Reload" bar within 5 minutes (deploy_admin.sh). Tabs from before 2026-10-26 12:04 UTC still need one Ctrl+Shift+R.

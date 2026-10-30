@@ -311,9 +311,11 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         }
       }
 
+      // A new video goes to Bunny and replaces the old one only once Bunny has
+      // finished encoding it (Edge Function media), so keep the old URL here.
       String? finalVideoUrl = widget.item.videoUrl;
       if (_video.pending != null) {
-        finalVideoUrl = await _repository.uploadVideo(
+        await _repository.uploadVideo(
           widget.item.id!,
           _video.pendingBytes!,
           _video.pending!.name,
@@ -447,10 +449,10 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
 
       await _repository.updateItem(widget.item.id!, updated);
 
-      // Replaced or removed an uploaded video: delete the old file (best effort).
+      // Removed an uploaded video: delete the old file (best effort).
       if (finalVideoUrl != widget.item.videoUrl) {
         try {
-          await _repository.deleteUploadedVideo(widget.item.videoUrl);
+          await _repository.deleteUploadedVideo(widget.item.videoUrl, itemId: widget.item.id);
         } catch (e) {
           debugPrint('Old video not deleted: $e');
         }

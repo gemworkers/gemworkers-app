@@ -435,3 +435,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/offer-notify/deno.json"
 entrypoint = "./functions/offer-notify/index.ts"
+
+# Photos/videos on Bunny (sql/media_bunny.sql). Checks the caller's login itself
+# (owner / own seller); the Bunny webhook and the one-off migration use secrets.
+[functions.media]
+enabled = true
+verify_jwt = false

@@ -549,13 +549,15 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
       var listed = created;
       if (_video.pending != null && created.id != null) {
         if (mounted) setState(() => _savingStatus = 'Uploading video…');
-        final videoUrl = await _repository.uploadVideo(
+        // Bunny encodes it for a few minutes; the stone gets the video then.
+        await _repository.uploadVideo(
           created.id!,
           _video.pendingBytes!,
           _video.pending!.name,
+          onProgress: (p) {
+            if (mounted) setState(() => _savingStatus = 'Uploading video… ${(p * 100).round()}%');
+          },
         );
-        await _repository.updateItemVideo(created.id!, videoUrl);
-        listed = created.copyWith(videoUrl: videoUrl);
       }
 
       if (!mounted) return;

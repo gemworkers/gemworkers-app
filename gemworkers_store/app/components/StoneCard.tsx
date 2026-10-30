@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { countryName } from '@/lib/countries'
 import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext } from '@/lib/price-shown'
 import { FavouriteButton } from './FavouriteButton'
+import { cardImage } from '@/lib/media'
 
 export type StoneCardItem = {
   id: string
@@ -55,7 +56,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
         {item.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={item.image_url}
+            src={cardImage(item.image_url)}
             alt={item.title}
             className="stone-img"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}

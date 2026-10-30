@@ -58,6 +58,25 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     _loadLocationAndMovements();
     _loadCommissionRate();
     _loadSale();
+    if (_item.videoPending != null) _checkVideo();
+  }
+
+  // A video still encoding at Bunny: ask whether it is ready (the store shows
+  // it as soon as it is; the Bunny webhook usually gets there first).
+  Future<void> _checkVideo() async {
+    if (_item.id == null) return;
+    try {
+      final r = await _repository.checkVideo(_item.id!);
+      if (!mounted) return;
+      if (r.status == 'processing') return;
+      setState(() => _item = _item.copyWith(videoPending: null, videoUrl: r.videoUrl));
+      if (r.status == 'failed') {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('The video could not be processed. Please upload it again (MP4 or MOV).')));
+      }
+    } catch (e) {
+      debugPrint('Video check failed: $e');
+    }
   }
 
   Future<void> _loadCommissionRate() async {
@@ -778,6 +797,14 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           ),
           if (_item.isListed && _item.sellingPrice != null)
             _row('Price', '€${_item.sellingPrice!.toStringAsFixed(2)}'),
+          if (_item.videoPending != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+              title: const Text('Video processing'),
+              subtitle: const Text('Usually a few minutes. It appears on the store by itself when ready.'),
+              trailing: TextButton(onPressed: _checkVideo, child: const Text('Check')),
+            ),
           if (UserProfileService.instance.isOwner && _item.isListed)
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
