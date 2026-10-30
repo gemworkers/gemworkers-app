@@ -472,7 +472,7 @@ export default async function BuyerOrdersPage() {
       {entries.length === 0 ? (
         <div className="browse-empty">
           <p>You have no orders yet.</p>
-          <Link href="/shop/loose_stone" style={{ ...pillOutline, display: 'inline-flex', width: 'auto', marginTop: 12 }}>
+          <Link href="/shop/all" style={{ ...pillOutline, display: 'inline-flex', width: 'auto', marginTop: 12 }}>
             Browse loose gemstones
           </Link>
         </div>

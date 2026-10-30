@@ -48,6 +48,7 @@ const TRUST_POINTS = [
 ]
 
 const SHOP_LINKS = [
+  { label: 'All stones', href: '/shop/all' },
   { label: 'Loose Gemstones', href: '/shop/loose_stone' },
   { label: 'Mineral Specimens', href: '/shop/specimen' },
   { label: 'Jewelry', href: '/shop/jewelry' },

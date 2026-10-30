@@ -25,10 +25,11 @@ type ListedItem = {
   shipping_cost: number | null;
   seller_country: string | null;
   image_url: string | null;
+  listed_at?: string | null;   // sql/public_views_listed_at.sql
 };
 
-// Same route the header uses for "Loose Gemstones"
-const SHOP_HREF = '/shop/loose_stone'
+// The whole collection (all types), newest first
+const SHOP_HREF = '/shop/all'
 
 const GEMS = [
   { name: 'Kunzite',    color: '#D98BB3' },
@@ -64,7 +65,9 @@ export default async function HomePage() {
   const { data, error } = await supabase.from("public_listings").select("*");
   if (error) console.error("[GemWorkers Store] Supabase error:", error.message);
 
-  const items = (data ?? []) as ListedItem[];
+  // Newest listed first — hero, New arrivals and everything below follow it.
+  const items = ((data ?? []) as ListedItem[])
+    .sort((a, b) => (b.listed_at ?? '').localeCompare(a.listed_at ?? ''));
 
   // Newest three approved reviews that have text — not hand-picked.
   const { data: reviewData } = await supabase
@@ -88,7 +91,6 @@ export default async function HomePage() {
     shipping_cost:  item.shipping_cost,
     image_url:      item.image_url,
   }))
-  // public_listings exposes no listing timestamp, so view order is used as-is.
   const newArrivals = cardItems.slice(0, 8)
   // Hero: a public/hero.jpg wins; otherwise the photos of up to 4 listed stones.
   const heroStones = items.filter(i => !!i.image_url).slice(0, 4)

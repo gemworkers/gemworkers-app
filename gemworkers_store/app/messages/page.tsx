@@ -51,7 +51,7 @@ export default async function MessagesPage() {
       {conversations.length === 0 ? (
         <div className="browse-empty">
           <p>No messages yet — ask about any stone and we&apos;ll reply here.</p>
-          <Link href="/shop/loose_stone" className="pd-link">Browse stones →</Link>
+          <Link href="/shop/all" className="pd-link">Browse stones →</Link>
         </div>
       ) : (
         <ul className="msg-list">

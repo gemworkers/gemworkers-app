@@ -9,6 +9,7 @@ import { favouriteIds } from '@/lib/favourites'
 import { fxContext } from '@/lib/fx'
 
 const TYPE_LABELS: Record<string, string> = {
+  all:         'All stones',
   loose_stone: 'Loose Gemstones',
   specimen:    'Mineral Specimens',
   jewelry:     'Jewelry',
@@ -16,12 +17,15 @@ const TYPE_LABELS: Record<string, string> = {
 
 // Singular / plural noun for the count line
 const TYPE_NOUNS: Record<string, [string, string]> = {
+  all:         ['piece', 'pieces'],
   loose_stone: ['stone', 'stones'],
   specimen:    ['specimen', 'specimens'],
   jewelry:     ['piece', 'pieces'],
 }
 
-const VALID_TYPES = new Set(['loose_stone', 'specimen', 'jewelry'])
+// 'all' = the whole collection (Shop the collection / All stones).
+const VALID_TYPES = new Set(['all', 'loose_stone', 'specimen', 'jewelry'])
+const CATEGORY_TABS = [['all', 'All'], ['loose_stone', 'Loose gemstones'], ['specimen', 'Specimens'], ['jewelry', 'Jewelry']] as const
 
 type PageProps = {
   params:       Promise<{ type: string }>
@@ -45,6 +49,7 @@ type CategoryRow = {
   certification_lab?: string | null
   // Present once public_views_available_only.sql is applied; absent before.
   status?:        string | null
+  listed_at?:     string | null   // sql/public_views_listed_at.sql
 }
 
 function Breadcrumb({ label }: { label: string }) {
@@ -58,6 +63,7 @@ function Breadcrumb({ label }: { label: string }) {
 }
 
 const TYPE_SEO: Record<string, string> = {
+  all:         'All natural gemstones, mineral specimens and jewellery at GemWorkers.',
   loose_stone: 'Natural loose gemstones — tourmaline, sapphire, aquamarine and more, cut and certified on request.',
   specimen:    'Natural mineral specimens and crystals, collected from the source.',
   jewelry:     'Handmade jewellery with natural gemstones.',
@@ -86,7 +92,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
         <h1 className="font-serif browse-title">Category not found</h1>
         <div className="browse-empty">
           <p>This category doesn&apos;t exist.</p>
-          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
+          <Link href="/shop/all" className="pd-link">Browse all stones</Link>
         </div>
       </main>
     )
@@ -96,17 +102,16 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
   const [one, many] = TYPE_NOUNS[type]
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('public_listing_details')
-    // '*' rather than a column list: naming `status` would fail against views
-    // that predate it. Reserved stones keep their detail page but stay off the grid.
-    .select('*')
-    .eq('product_type', type)
+  // '*' rather than a column list: naming `status` would fail against views
+  // that predate it. Reserved stones keep their detail page but stay off the grid.
+  const query = supabase.from('public_listing_details').select('*')
+  const { data, error } = await (type === 'all' ? query : query.eq('product_type', type))
 
   if (error) console.error('[shop] query error:', error.message)
 
   const rows = ((data ?? []) as CategoryRow[])
     .filter(row => (row.status ?? 'available') === 'available')
+    .sort((a, b) => (b.listed_at ?? '').localeCompare(a.listed_at ?? ''))   // newest first
 
   const allItems: StoneCardItem[] = rows.map((row: CategoryRow) => ({
     id:             row.id,
@@ -189,6 +194,13 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
         {items.length} {items.length === 1 ? one : many}{gem ? ` · ${gem}` : ''}{filtered ? ' · filtered' : ''}
       </p>
 
+      {/* ── Category tabs: the whole collection or one product type ── */}
+      <div className="browse-chips" style={{ marginBottom: 8 }}>
+        {CATEGORY_TABS.map(([t, l]) => (
+          <Link key={t} href={`/shop/${t}`} className={`browse-chip${type === t ? ' is-active' : ''}`}>{l}</Link>
+        ))}
+      </div>
+
       {/* ── Gem-type filter chips ── */}
       {gemTypes.length > 0 && (
         <div className="browse-chips">
@@ -230,7 +242,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
         <label className="browse-filter">
           <span>Sort</span>
           <select name="sort" defaultValue={sort ?? 'default'}>
-            <option value="default">Recommended</option>
+            <option value="default">Newest first</option>
             <option value="price_asc">Price: low to high</option>
             <option value="price_desc">Price: high to low</option>
           </select>
@@ -249,7 +261,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
           <p>
             {filtered ? 'Nothing matches these filters — try a wider price range or clear the filters.' : gem ? `No ${gem} listed in this category yet.` : 'Nothing listed in this category yet — check back soon.'}
           </p>
-          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
+          <Link href="/shop/all" className="pd-link">Browse all stones</Link>
         </div>
       ) : (
         <StoneGrid items={items} className="home-arrivals-grid" priceCtx={pctx} favouriteIds={favs} fx={fx} />

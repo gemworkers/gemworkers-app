@@ -94,7 +94,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
       {query && !hasError && items.length === 0 && (
         <div className="browse-empty">
           <p>No stones matched &lsquo;{query}&rsquo;.</p>
-          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
+          <Link href="/shop/all" className="pd-link">Browse all stones</Link>
           <p style={{ marginTop: 14 }}>
             Can&apos;t find it?{' '}
             <Link href="/contact?topic=Request%20a%20stone" className="pd-link">Request a stone</Link>

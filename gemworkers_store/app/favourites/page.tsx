@@ -46,7 +46,7 @@ export default async function FavouritesPage() {
       {items.length === 0 ? (
         <div className="browse-empty">
           <p>Tap the heart on any stone to save it here.</p>
-          <Link href="/shop/loose_stone" className="pd-link">Browse loose gemstones</Link>
+          <Link href="/shop/all" className="pd-link">Browse all stones</Link>
         </div>
       ) : (
         <StoneGrid items={items} className="home-arrivals-grid" priceCtx={await priceContext()} favouriteIds={ids} fx={await fxContext()} />

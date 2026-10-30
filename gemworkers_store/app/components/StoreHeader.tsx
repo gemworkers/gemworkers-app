@@ -10,6 +10,7 @@ import type { CSSProperties } from 'react'
 type NavUser = { displayName: string | null; unreadMessages: number }
 
 const SHOP_LINKS: { label: string; href: string }[] = [
+  { label: 'All stones',      href: '/shop/all' },
   { label: 'Loose Gemstones', href: '/shop/loose_stone' },
   { label: 'Mineral Specimens', href: '/shop/specimen' },
   { label: 'Jewelry',           href: '/shop/jewelry' },

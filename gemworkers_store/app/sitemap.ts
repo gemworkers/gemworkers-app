@@ -14,6 +14,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const entries: MetadataRoute.Sitemap = [
     page('/', 1, 'daily'),
+    page('/shop/all', 0.9, 'daily'),
     page('/shop/loose_stone', 0.9, 'daily'),
     page('/shop/specimen', 0.8, 'daily'),
     page('/shop/jewelry', 0.8, 'daily'),
