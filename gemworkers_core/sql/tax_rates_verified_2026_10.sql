@@ -3,7 +3,7 @@
 -- (europa.eu Your Europe "VAT rates", last checked by the EU 13/07/2026),
 -- compared 2026-10-30: all 27 match. Marks a country verified ONLY when its
 -- rate is exactly the official one. Next check: January + July, and before the
--- OSS start (2027-01-01). Run in the Supabase SQL Editor. Safe to run twice.
+-- OSS start (2027-01-01). Applied to live DB 2026-10-30 (verified: 27 verified, 0 not). Safe to run twice.
 -- ============================================================================
 
 UPDATE public.tax_rules t
