@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/utils/country_names.dart';
 import '../../core/utils/open_url/open_url.dart';
 
 import '../../core/services/user_profile_service.dart';
@@ -488,26 +489,29 @@ class _DashboardPageState extends State<DashboardPage> {
               ]),
             ),
 
-            // Where visitors come from + countries (owner).
-            if (UserProfileService.instance.isOwner)
-              FutureBuilder<List<dynamic>>(
+            // Where visitors come from (owner) + countries (owner and sellers;
+            // for a seller page_view_stats counts only their own stones).
+            FutureBuilder<List<dynamic>>(
                 future: Future.wait([_views(), _salesBySource()]),
                 builder: (context, snap) {
                   final viewData = snap.data?[0] as Map<String, dynamic>?;
                   final sales = (snap.data?[1] as List<Map<String, dynamic>>?) ?? const [];
                   final countries = ((viewData?['countries'] as List?) ?? const []).cast<Map>();
                   // One row per source: visits (page views) + paid orders + revenue.
+                  final isOwner = UserProfileService.instance.isOwner;
                   final rows = <String, ({int visits, int orders, double revenue})>{};
-                  for (final r in ((viewData?['sources'] as List?) ?? const []).cast<Map>()) {
+                  // Sources are the owner's; sellers get the countries only.
+                  final sources = isOwner ? ((viewData?['sources'] as List?) ?? const []).cast<Map>() : const <Map>[];
+                  for (final r in sources) {
                     rows[r['source'].toString()] = (visits: (r['visits'] as num).toInt(), orders: 0, revenue: 0);
                   }
-                  for (final r in sales) {
+                  for (final r in isOwner ? sales : const <Map<String, dynamic>>[]) {
                     final k = r['source'].toString();
                     final cur = rows[k] ?? (visits: 0, orders: 0, revenue: 0.0);
                     rows[k] = (visits: cur.visits, orders: (r['orders'] as num).toInt(),
                         revenue: double.tryParse('${r['revenue']}') ?? 0);
                   }
-                  if (rows.isEmpty) return const SizedBox.shrink();
+                  if (rows.isEmpty && countries.isEmpty) return const SizedBox.shrink();
                   final sorted = rows.entries.toList()
                     ..sort((a, b) => b.value.revenue != a.value.revenue
                         ? b.value.revenue.compareTo(a.value.revenue)
@@ -516,10 +520,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     padding: const EdgeInsets.only(top: 12),
                     child: _WhiteCard(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        if (rows.isNotEmpty) ...[
                         Text('Visitors and sales by source', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
                         Text('Visits · orders · revenue', style: t.bodySmall?.copyWith(color: AppColors.muted)),
                         const SizedBox(height: 6),
+                        ],
                         for (final e in sorted.take(8))
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 3),
@@ -530,11 +536,19 @@ class _DashboardPageState extends State<DashboardPage> {
                             ]),
                           ),
                         if (countries.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text('Countries', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          if (rows.isNotEmpty) const SizedBox(height: 10),
+                          Text('Visitors by country', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(isOwner ? 'Visits' : 'Visits to your stones', style: t.bodySmall?.copyWith(color: AppColors.muted)),
                           const SizedBox(height: 6),
-                          Text(countries.map((c) => '${c['country']} ${c['visits']}').join(' · '),
-                              style: t.bodyMedium),
+                          for (final c in countries)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(children: [
+                                Expanded(child: Text(countryName(c['country']?.toString()))),
+                                Text('${c['visits']}', style: AppTheme.numeric(t.bodyMedium)),
+                              ]),
+                            ),
                         ],
                       ]),
                     ),
