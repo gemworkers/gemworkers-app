@@ -202,6 +202,24 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
     }
   }
 
+  Future<void> _setFeatured(bool featured) async {
+    if (_item.id == null) return;
+    try {
+      await _repository.setItemFeatured(_item.id!, featured);
+      if (!mounted) return;
+      setState(() => _item = _item.copyWith(isFeatured: featured));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(featured
+              ? 'Featured — shows on the homepage within a minute.'
+              : 'Removed from Featured.')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not save: $e')));
+      }
+    }
+  }
+
   Future<void> _rejectListing() async {
     if (_item.id == null) return;
     final note = await showRejectListingDialog(context, _item.title);
@@ -760,6 +778,17 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
           ),
           if (_item.isListed && _item.sellingPrice != null)
             _row('Price', '€${_item.sellingPrice!.toStringAsFixed(2)}'),
+          if (UserProfileService.instance.isOwner && _item.isListed)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              secondary: Icon(
+                  _item.isFeatured ? Icons.star : Icons.star_border,
+                  color: _item.isFeatured ? Colors.amber.shade700 : null),
+              title: const Text('Feature on homepage'),
+              subtitle: const Text('Shows in the "Featured" row on gemworkers.com'),
+              value: _item.isFeatured,
+              onChanged: _setFeatured,
+            ),
 
           const SizedBox(height: 16),
           _buildPrivateCard(),

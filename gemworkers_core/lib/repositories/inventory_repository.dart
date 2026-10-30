@@ -177,6 +177,14 @@ class InventoryRepository {
         .eq('id', id);
   }
 
+  // Owner only (trigger inventory_featured_owner_only keeps the old value for others).
+  Future<void> setItemFeatured(String id, bool featured) async {
+    await supabase
+        .from('inventory_items')
+        .update({'is_featured': featured})
+        .eq('id', id);
+  }
+
   Future<void> updateItemCost(String id, double costPrice) async {
     await supabase
         .from('inventory_items')

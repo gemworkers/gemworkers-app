@@ -43,6 +43,10 @@ class InventoryItem {
   // via InventoryRepository.setItemMaker, so no other save can clear it.
   final String? makerId;
 
+  // Homepage "Featured" pick (owner-only, sql/public_views_listed_at.sql).
+  // Like makerId: read here, NOT in toMap(); set via setItemFeatured.
+  final bool isFeatured;
+
   // Consignment (owner-only, sql/consignment_setup.sql): whose stone this is
   // when it is not GemWorkers' own. Read here but NOT in toMap() — set only via
   // InventoryRepository.setItemConsignment.
@@ -146,6 +150,7 @@ class InventoryItem {
     required this.notes,
     required this.imageUrls,
     this.makerId,
+    this.isFeatured = false,
     this.consignorId,
     this.consignorPrice,
     this.profitShare,
@@ -231,6 +236,7 @@ class InventoryItem {
       notes: map['notes'] ?? '',
       imageUrls: parseUrls(map['image_urls']),
       makerId: map['maker_id']?.toString(),
+      isFeatured: map['is_featured'] == true,
       consignorId: map['consignor_id']?.toString(),
       consignorPrice: parseNumeric(map['consignor_price']),
       profitShare: parseNumeric(map['profit_share']),
@@ -386,6 +392,7 @@ class InventoryItem {
     String? status,
     String? notes,
     List<String>? imageUrls,
+    bool? isFeatured,
     // Use Object? with _omitted sentinel so callers can explicitly set null.
     Object? supplierId = _omitted,
     String? supplierName,
@@ -452,6 +459,7 @@ class InventoryItem {
       notes: notes ?? this.notes,
       imageUrls: imageUrls ?? this.imageUrls,
       makerId: makerId,
+      isFeatured: isFeatured ?? this.isFeatured,
       consignorId: consignorId,
       consignorPrice: consignorPrice,
       profitShare: profitShare,
