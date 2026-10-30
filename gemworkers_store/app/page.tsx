@@ -10,7 +10,7 @@ import { PUBLIC_REVIEW_COLUMNS, type PublicReview } from "@/app/reviews/ReviewLi
 import { countryName } from "@/lib/countries";
 import type { StoneCardItem } from "@/app/components/StoneCard";
 import { HeroCollage } from '@/app/components/HeroCollage'
-import { HomeBanner } from '@/app/components/HomeBanner'
+import { PAYMENT_ICONS } from '@/lib/payment-icons'
 import { StoneCarousel } from '@/app/components/StoneCarousel'
 
 type ListedItem = {
@@ -55,16 +55,6 @@ const PROMISES = [
   { title: 'Generations of knowledge',
     body: 'A family in the gem trade for over thirty years, sourcing from mines around the world.' },
 ]
-
-// Facts only — each one is promised on its own page.
-const TRUST = [
-  { icon: '◆', title: 'Natural stones', body: 'Every treatment disclosed', href: '/guarantee' },
-  { icon: '↺', title: '30-day returns', body: 'Changed your mind? Send it back', href: '/returns' },
-  { icon: '✈', title: 'Tracked shipping', body: 'Worldwide, signature on high value', href: '/shipping' },
-  { icon: '🔒', title: 'Secure checkout', body: 'Pay in your own currency', href: '/payment' },
-]
-
-const PAYMENTS = ['Visa', 'Mastercard', 'American Express', 'PayPal', 'Apple Pay', 'Google Pay', 'Klarna', 'iDEAL']
 
 function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel?: string; href?: string }) {
   return (
@@ -113,9 +103,8 @@ export default async function HomePage() {
   const featured = items.filter(i => i.is_featured).map(toCard)
   const withPhoto = items.filter(i => !!i.image_url)
 
-  // Banner: a public/hero.jpg wins; otherwise the newest stones' photos.
+  // Hero: a public/hero.jpg wins; otherwise the newest stones' photos.
   const heroStones = withPhoto.slice(0, 4).map(i => ({ id: i.id, title: i.title, image_url: i.image_url as string }))
-  const spotlight = withPhoto.find(i => i.is_featured) ?? withPhoto[4] ?? withPhoto[0]
   const storyStone = withPhoto.find(i => i.product_type === 'specimen') ?? withPhoto[withPhoto.length - 1]
 
   // Category tiles: photo of the newest stone of that type.
@@ -132,96 +121,34 @@ export default async function HomePage() {
 
   const [pctx, favs, fx] = await Promise.all([priceContext(), favouriteIds(), fxContext()])
 
-  const slides = [
-    // 1 — who we are, with the newest stones
-    <div key="s1" className="home-wrap home-hero">
-      <div>
-        <p className="home-eyebrow">From the mine to your hands</p>
-        <h1 className="font-serif home-h1">Natural gemstones, chosen by a family of gem traders.</h1>
-        <p className="home-lead">
-          Every stone is hand-picked, honestly described and photographed as it is.
-          Generations in the trade, now shipping worldwide.
-        </p>
-        <div className="home-cta-row">
-          <Link href={SHOP_HREF} className="home-btn home-btn-solid">Shop the collection</Link>
-          <Link href="/contact?topic=Request%20a%20stone" className="home-btn home-btn-outline">Request a stone</Link>
-        </div>
-        <ReviewSummary style={{ marginTop: 20 }} />
-      </div>
-      {hasHero ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src="/hero.jpg" alt="Natural gemstones" className="home-hero-media" style={{ objectFit: 'cover' }} />
-      ) : heroStones.length > 0 ? (
-        <HeroCollage stones={heroStones} />
-      ) : (
-        <div className="home-hero-media home-panel" aria-hidden="true" />
-      )}
-    </div>,
-    // 2 — straight from the source, one big stone
-    ...(spotlight ? [
-      <div key="s2" className="home-wrap home-hero">
-        <div>
-          <p className="home-eyebrow">Straight from the source</p>
-          <h2 className="font-serif home-h1">Afghan and Pakistani stones, chosen at the mines.</h2>
-          <p className="home-lead">
-            Tourmaline, kunzite, aquamarine and more — selected by our family where they are
-            found, and sent to you without middlemen.
-          </p>
-          <div className="home-cta-row">
-            <Link href={`/stones/${spotlight.id}`} className="home-btn home-btn-solid">See this stone</Link>
-            <Link href={SHOP_HREF} className="home-btn home-btn-outline">New arrivals</Link>
-          </div>
-        </div>
-        <Link href={`/stones/${spotlight.id}`} className="home-hero-media banner-photo" aria-label={spotlight.title}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={spotlight.image_url as string} alt={spotlight.title} />
-        </Link>
-      </div>,
-    ] : []),
-    // 3 — buying with confidence
-    <div key="s3" className="home-wrap home-hero">
-      <div>
-        <p className="home-eyebrow">Buy with confidence</p>
-        <h2 className="font-serif home-h1">30-day returns. Tracked worldwide.</h2>
-        <p className="home-lead">
-          Pay safely in your own currency with card, PayPal, Apple Pay or Klarna. If a stone
-          isn&apos;t right, send it back within 30 days.
-        </p>
-        <div className="home-cta-row">
-          <Link href="/returns" className="home-btn home-btn-solid">Returns</Link>
-          <Link href="/shipping" className="home-btn home-btn-outline">Shipping</Link>
-        </div>
-      </div>
-      <div className="home-hero-media banner-promise" aria-hidden="true">
-        {TRUST.map(t => (
-          <div key={t.title} className="banner-promise-item">
-            <span className="banner-promise-icon">{t.icon}</span>
-            <span className="banner-promise-title">{t.title}</span>
-            <span className="banner-promise-body">{t.body}</span>
-          </div>
-        ))}
-      </div>
-    </div>,
-  ]
-
   return (
     <main>
-      {/* ── 1. Banner ── */}
-      <HomeBanner slides={slides} />
-
-      {/* ── 2. Trust bar ── */}
-      <section className="home-trustbar">
-        <div className="home-wrap home-trustbar-grid">
-          {TRUST.map(t => (
-            <Link key={t.title} href={t.href} className="home-trustbar-item">
-              <span className="home-trustbar-icon" aria-hidden="true">{t.icon}</span>
-              <span><strong>{t.title}</strong><span>{t.body}</span></span>
-            </Link>
-          ))}
+      {/* ── 1. Hero: who we are, with the newest stones ── */}
+      <section className="home-wrap home-hero">
+        <div>
+          <p className="home-eyebrow">From the mine to your hands</p>
+          <h1 className="font-serif home-h1">Natural gemstones, chosen by a family of gem traders.</h1>
+          <p className="home-lead">
+            Every stone is hand-picked, honestly described and photographed as it is.
+            Generations in the trade, now shipping worldwide.
+          </p>
+          <div className="home-cta-row">
+            <Link href={SHOP_HREF} className="home-btn home-btn-solid">Shop the collection</Link>
+            <Link href="/contact?topic=Request%20a%20stone" className="home-btn home-btn-outline">Request a stone</Link>
+          </div>
+          <ReviewSummary style={{ marginTop: 20 }} />
         </div>
+        {hasHero ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/hero.jpg" alt="Natural gemstones" className="home-hero-media" style={{ objectFit: 'cover' }} />
+        ) : heroStones.length > 0 ? (
+          <HeroCollage stones={heroStones} />
+        ) : (
+          <div className="home-hero-media home-panel" aria-hidden="true" />
+        )}
       </section>
 
-      {/* ── 3. Featured (owner's ⭐ picks) ── */}
+      {/* ── 2. Featured (owner's ⭐ picks) ── */}
       {featured.length > 0 && (
         <section className="home-wrap home-section-tight">
           <SectionHeader title="Featured stones" linkLabel="View all →" href={SHOP_HREF} />
@@ -229,7 +156,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── 4. New arrivals ── */}
+      {/* ── 3. New arrivals ── */}
       <section className="home-wrap home-section-tight">
         <SectionHeader title="New arrivals" linkLabel="View all →" href={SHOP_HREF} />
         {newArrivals.length === 0 ? (
@@ -239,7 +166,7 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* ── 5. Shop by category ── */}
+      {/* ── 4. Shop by category ── */}
       <section className="home-band">
         <div className="home-wrap home-section-tight">
           <SectionHeader title="Shop by category" linkLabel="All stones →" href={SHOP_HREF} />
@@ -262,7 +189,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 6. Shop by gemstone (gems in stock) ── */}
+      {/* ── 5. Shop by gemstone (gems in stock) ── */}
       {gems.length > 0 && (
         <section className="home-wrap home-section-tight">
           <SectionHeader title="Shop by gemstone" linkLabel="Search all →" href="/search" />
@@ -279,7 +206,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── 7. Promise band ── */}
+      {/* ── 6. Promise band ── */}
       <section className="home-dark">
         <div className="home-wrap home-section">
           <div className="home-promise-grid">
@@ -294,7 +221,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 8. Our story ── */}
+      {/* ── 7. Our story ── */}
       <section className="home-wrap home-section home-story">
         {storyStone ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -306,14 +233,14 @@ export default async function HomePage() {
           <p className="home-eyebrow">Our story</p>
           <h2 className="font-serif home-h2" style={{ marginBottom: 20 }}>A family story, generations deep.</h2>
           <p className="home-lead" style={{ marginBottom: 28 }}>
-            From the mines of Afghanistan and Pakistan to trusted partners in Thailand, Africa,
-            the Americas and Europe. Every piece is chosen by hand.
+            From the mines to trusted partners around the world — every piece is chosen by
+            hand and described honestly.
           </p>
           <Link href="/about" className="home-text-link">Read our story →</Link>
         </div>
       </section>
 
-      {/* ── 9. Customer reviews (only once there are approved reviews with text) ── */}
+      {/* ── 8. Customer reviews (only once there are approved reviews with text) ── */}
       {homeReviews.length > 0 && (
         <section className="home-band">
           <div className="home-wrap home-section">
@@ -340,11 +267,16 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── 10. Ways to pay ── */}
+      {/* ── 9. Ways to pay ── */}
       <section className="home-wrap home-payments">
         <p className="home-payments-label">Secure checkout by Stripe · pay with</p>
         <ul className="home-payments-list">
-          {PAYMENTS.map(p => <li key={p}>{p}</li>)}
+          {PAYMENT_ICONS.map(p => (
+            <li key={p.name} title={p.name} style={p.bg ? { background: p.bg, borderColor: p.bg } : undefined}>
+              <svg viewBox="0 0 24 24" role="img" aria-label={p.name} fill={p.hex}><path d={p.path} /></svg>
+            </li>
+          ))}
+          <li title="iDEAL" className="home-pay-ideal" aria-label="iDEAL">iDEAL</li>
         </ul>
       </section>
     </main>
