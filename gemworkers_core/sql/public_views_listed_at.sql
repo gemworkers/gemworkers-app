@@ -1,7 +1,7 @@
 -- =============================================================================
 -- GemWorkers — Homepage: newest first + owner-picked Featured stones
 -- =============================================================================
--- NOT YET APPLIED
+-- Applied to live DB 2026-10-30
 --
 -- Zakaria 2026-10-30: the hero / New arrivals showed stones in view order (new
 -- listings did not come forward), and the new homepage gets a "Featured"
