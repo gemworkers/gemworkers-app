@@ -12,7 +12,7 @@
 -- an unfinished video.
 --
 -- Not in InventoryItem.toMap() → an Edit stone save can't touch it.
--- Run in the Supabase SQL Editor. Safe to run twice.
+-- Applied to live DB 2026-10-30 (verified: video_pending text). Safe to run twice.
 -- ============================================================================
 
 ALTER TABLE public.inventory_items
