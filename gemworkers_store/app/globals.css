@@ -948,9 +948,9 @@
 .home-payments { padding-top: 40px; padding-bottom: 56px; text-align: center; }
 .home-payments-label { font-size: 13px; color: #6B6052; margin-bottom: 14px; letter-spacing: 0.04em; }
 .home-payments-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-.home-payments-list li { display: grid; place-items: center; width: 64px; height: 40px; border: 1px solid #ECE5D8; border-radius: 8px; background: #FFFFFF; }
-.home-payments-list svg { width: 30px; height: 30px; }
-.home-pay-ideal { font-size: 14px; font-weight: 800; color: #CC0066; letter-spacing: -0.02em; }
+/* Official-style badges (public/payment, Shopify payment_icons, MIT): they carry their own frame. */
+.home-payments-list li { display: flex; }
+.home-payments-list img { width: 57px; height: 36px; display: block; }
 
 @media (max-width: 1100px) {
   .carousel-item { flex-basis: calc((100% - 48px) / 3); }

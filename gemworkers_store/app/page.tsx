@@ -10,7 +10,6 @@ import { PUBLIC_REVIEW_COLUMNS, type PublicReview } from "@/app/reviews/ReviewLi
 import { countryName } from "@/lib/countries";
 import type { StoneCardItem } from "@/app/components/StoneCard";
 import { HeroCollage } from '@/app/components/HeroCollage'
-import { PAYMENT_ICONS } from '@/lib/payment-icons'
 import { StoneCarousel } from '@/app/components/StoneCarousel'
 
 type ListedItem = {
@@ -40,6 +39,13 @@ const GEM_COLORS: Record<string, string> = {
   Emerald: '#2B7A3D', Spinel: '#B5333D', Ruby: '#9B1B30', Garnet: '#7A1F2B', Topaz: '#E0A458',
   Peridot: '#8DB33A', Amethyst: '#7A4E9B', Quartz: '#CFC5B4', Beryl: '#9CC7B4', Morganite: '#E8B4A8',
 }
+
+// Badges in public/payment (Shopify payment_icons, MIT — see NOTICE.txt). Only
+// methods that are switched on in Stripe.
+const PAYMENTS = [
+  ['visa', 'Visa'], ['master', 'Mastercard'], ['american_express', 'American Express'], ['paypal', 'PayPal'],
+  ['apple_pay', 'Apple Pay'], ['google_pay', 'Google Pay'], ['klarna', 'Klarna'], ['ideal', 'iDEAL'],
+] as const
 
 const CATEGORIES = [
   { type: 'loose_stone', label: 'Loose gemstones', blurb: 'Faceted and cabochon stones, ready to set.' },
@@ -271,12 +277,12 @@ export default async function HomePage() {
       <section className="home-wrap home-payments">
         <p className="home-payments-label">Secure checkout by Stripe · pay with</p>
         <ul className="home-payments-list">
-          {PAYMENT_ICONS.map(p => (
-            <li key={p.name} title={p.name} style={p.bg ? { background: p.bg, borderColor: p.bg } : undefined}>
-              <svg viewBox="0 0 24 24" role="img" aria-label={p.name} fill={p.hex}><path d={p.path} /></svg>
+          {PAYMENTS.map(([file, name]) => (
+            <li key={file} title={name}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/payment/${file}.svg`} alt={name} width={38} height={24} loading="lazy" />
             </li>
           ))}
-          <li title="iDEAL" className="home-pay-ideal" aria-label="iDEAL">iDEAL</li>
         </ul>
       </section>
     </main>
