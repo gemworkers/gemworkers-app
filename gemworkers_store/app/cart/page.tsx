@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { BuyButton } from '@/app/stones/[id]/BuyButton'
 import { RemoveButton } from './RemoveButton'
+import { QuantitySelect } from './QuantitySelect'
 import { BuyAllButton } from './BuyAllButton'
 import { TrustList } from '@/app/components/TrustList'
 import { countryName } from '@/lib/countries'
@@ -26,6 +27,7 @@ type CartListing = {
   variety: string | null
   seller_country: string | null
   shipping_cost: number | null
+  stock?: number | null   // units in stock (sql/quantity_listings.sql)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ export default async function CartPage() {
   // ── Fetch cart rows ─────────────────────────────────────────────────────────
   const { data: cartRows } = await supabase
     .from('storefront_cart')
-    .select('inventory_item_id, added_at')
+    .select('inventory_item_id, added_at, quantity')
     .order('added_at', { ascending: true })
 
   // ── Empty cart ──────────────────────────────────────────────────────────────
@@ -106,23 +108,25 @@ export default async function CartPage() {
   const itemIds = cartRows.map(r => r.inventory_item_id)
   const { data: listings } = await supabase
     .from('public_listings')
-    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_country, shipping_cost')
+    .select('id, title, selling_price, sale_method, image_url, gem_type, variety, seller_country, shipping_cost, stock')
     .in('id', itemIds)
 
   const listingMap = new Map<string, CartListing>(
     (listings ?? []).map(l => [l.id, l as CartListing])
   )
 
-  const cartItems = cartRows.map(row => ({
-    itemId: row.inventory_item_id,
-    listing: listingMap.get(row.inventory_item_id) ?? null,
-  }))
+  const cartItems = cartRows.map(row => {
+    const listing = listingMap.get(row.inventory_item_id) ?? null
+    const stock = Math.max(1, Number(listing?.stock ?? 1))
+    return { itemId: row.inventory_item_id, listing, stock, qty: Math.min(Math.max(1, Number(row.quantity ?? 1)), stock) }
+  })
+  const qtyOf = new Map(cartItems.map(c => [c.itemId, c.qty]))
 
   const buyableCount = cartItems.filter(({ listing }) => isBuyable(listing)).length
 
-  const grandTotal = cartItems.reduce((sum, { listing }) => {
+  const grandTotal = cartItems.reduce((sum, { listing, qty }) => {
     if (!isBuyable(listing)) return sum
-    return sum + Number(listing.selling_price) + Number(listing.shipping_cost ?? 0)
+    return sum + Number(listing.selling_price) * qty + Number(listing.shipping_cost ?? 0)
   }, 0)
 
   // Display-only split of grandTotal for the summary box
@@ -142,7 +146,15 @@ export default async function CartPage() {
     ? await Promise.all(buyableIds.map(id => taxQuote(supabase, id, shipToCode)))
     : []
   const quoteMap = new Map<string, TaxQuote>()
-  quoteList.forEach((q, i) => { if (q) quoteMap.set(buyableIds[i], q) })
+  quoteList.forEach((q, i) => {
+    if (!q) return
+    const c = cartItems.find(x => x.itemId === buyableIds[i])
+    const price = Number(c?.listing?.selling_price ?? 0), ship = Number(c?.listing?.shipping_cost ?? 0), qty = c?.qty ?? 1
+    const scaled = qty > 1 && price + ship > 0
+      ? Math.round(q.taxAmount * (price * qty + ship) / (price + ship) * 100) / 100
+      : q.taxAmount
+    quoteMap.set(buyableIds[i], { ...q, taxAmount: scaled })
+  })
   const quotes = [...quoteMap.values()]
   const pctx = shipTo?.enabled ? await priceContext() : null
   const fx = await fxContext()
@@ -162,7 +174,7 @@ export default async function CartPage() {
         <div className="cart-list">
           {cartItems.map(({ itemId, listing }) =>
             listing ? (
-              <AvailableItem key={itemId} itemId={itemId} listing={listing} quote={quoteMap.get(itemId) ?? null} pctx={pctx} fx={fx} />
+              <AvailableItem key={itemId} itemId={itemId} listing={listing} quote={quoteMap.get(itemId) ?? null} pctx={pctx} fx={fx} qty={qtyOf.get(itemId) ?? 1} />
             ) : (
               <UnavailableItem key={itemId} itemId={itemId} />
             )
@@ -225,7 +237,8 @@ export default async function CartPage() {
 
 // ── Available item row ────────────────────────────────────────────────────────
 
-function AvailableItem({ itemId, listing, quote, pctx, fx }: { itemId: string; listing: CartListing; quote: TaxQuote | null; pctx: PriceContext | null; fx: FxContext | null }) {
+function AvailableItem({ itemId, listing, quote, pctx, fx, qty = 1 }: { itemId: string; listing: CartListing; quote: TaxQuote | null; pctx: PriceContext | null; fx: FxContext | null; qty?: number }) {
+  const stock = Math.max(1, Number(listing.stock ?? 1))
   const subtitle = [listing.variety, listing.gem_type]
     .filter(Boolean)
     .join(' · ') || null
@@ -249,12 +262,14 @@ function AvailableItem({ itemId, listing, quote, pctx, fx }: { itemId: string; l
             <Link href={`/stones/${itemId}`} className="cart-name">{listing.title}</Link>
             {subtitle && <p className="cart-sub">{subtitle}</p>}
             {shipFrom && <p className="cart-sub">Ships from {shipFrom}</p>}
+            {stock > 1 && listing.sale_method !== 'accept_offers' && <QuantitySelect itemId={itemId} quantity={qty} stock={stock} />}
           </div>
           <div className="cart-price">
             {listing.sale_method === 'accept_offers'
               ? <span style={{ fontSize: 14, fontWeight: 500, color: '#7A5A22' }}>Accepting offers</span>
               : listing.selling_price != null
                 ? <>
+                    {qty > 1 && <span style={{ fontSize: 13, fontWeight: 400, color: '#6B6052' }}>{qty} × </span>}
                     {priceText(shownPrice(Number(listing.selling_price), listing.seller_country, pctx).amount)}
                     {shownPrice(0, listing.seller_country, pctx).inclVat && (
                       <span style={{ fontSize: 12, fontWeight: 400, color: '#6B6052' }}> incl. VAT</span>
@@ -283,6 +298,7 @@ function AvailableItem({ itemId, listing, quote, pctx, fx }: { itemId: string; l
                 vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                 isLoggedIn={true}
                 fx={fx}
+                stock={stock}
               />
             </div>
           )}

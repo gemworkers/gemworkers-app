@@ -101,11 +101,19 @@ class InventoryRepository {
         .toList();
   }
 
-  Future<void> updateItem(String id, InventoryItem item) async {
+  /// [before] = the stone as it was when the Edit page opened: stock, status
+  /// and listed are only saved when the user changed them, so a sale made
+  /// meanwhile (sql/quantity_listings.sql) is never overwritten.
+  Future<void> updateItem(String id, InventoryItem item, {InventoryItem? before}) async {
     final map = item.toMap();
     // A general save never clears the seller: a missing sellerId on the model
     // must not orphan the stone (it would vanish from the store).
     if (map['seller_id'] == null) map.remove('seller_id');
+    if (before != null) {
+      if (item.quantity == before.quantity) map.remove('quantity');
+      if (item.status == before.status) map.remove('status');
+      if (item.isListed == before.isListed) map.remove('is_listed');
+    }
     await supabase
         .from('inventory_items')
         .update(map)
@@ -294,12 +302,20 @@ class InventoryRepository {
   /// sold — NOT a GemWorkers sale (no order, invoice or fee). Only while the
   /// stone is available (never while a GemWorkers buyer is paying for it).
   /// Returns false when the stone was not available.
-  Future<bool> markSoldElsewhere(String id, String notes) async {
+  ///
+  /// Listings with several in stock (sql/quantity_listings.sql): [units] sold
+  /// elsewhere come off the stock; the listing is sold only when none are left.
+  /// The update only applies if the stock is still what the screen showed.
+  Future<bool> markSoldElsewhere(String id, String notes, {int units = 1, int inStock = 1}) async {
+    final left = inStock - units;
     final rows = await supabase
         .from('inventory_items')
-        .update({'status': 'sold', 'is_listed': false, 'notes': notes})
+        .update(left > 0
+            ? {'quantity': left, 'notes': notes}
+            : {'status': 'sold', 'is_listed': false, 'notes': notes})
         .eq('id', id)
         .eq('status', 'available')
+        .eq('quantity', inStock)
         .select('id');
     return (rows as List).isNotEmpty;
   }

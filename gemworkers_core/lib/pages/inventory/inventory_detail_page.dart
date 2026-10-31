@@ -20,6 +20,7 @@ import 'widgets/item_photo_manager.dart';
 import 'widgets/reject_listing_dialog.dart';
 import 'widgets/price_field.dart';
 import 'lot_sort_page.dart';
+import 'widgets/sold_elsewhere_dialog.dart';
 
 class InventoryDetailPage extends StatefulWidget {
   final InventoryItem item;
@@ -138,32 +139,24 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   /// Sold on Etsy, Instagram or in person: off GemWorkers at once, so it can't
   /// be sold twice. Not a GemWorkers sale (no order, invoice or fee).
   Future<void> _soldElsewhere() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sold somewhere else?'),
-        content: const Text(
-          'Sold on Etsy, Instagram, at a fair or in person? The stone is taken off GemWorkers '
-          'right away and marked as sold.\n\nThis is not a GemWorkers sale: no order, invoice or fee is made.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, sold elsewhere')),
-        ],
-      ),
-    );
-    if (ok != true || _item.id == null) return;
+    if (_item.id == null) return;
+    final units = await askSoldElsewhere(context, title: _item.title, inStock: _item.quantity);
+    if (units == null) return;
     final stamp = 'Sold elsewhere ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}';
     final notes = _item.notes.trim().isEmpty ? stamp : '${_item.notes.trim()}\n$stamp';
     try {
-      final done = await _repository.markSoldElsewhere(_item.id!, notes);
+      final inStock = _item.quantity;
+      final done = await _repository.markSoldElsewhere(_item.id!, notes, units: units, inStock: inStock);
       if (!mounted) return;
-      if (done) {
-        setState(() => _item = _item.copyWith(status: 'sold', isListed: false, notes: notes));
+      if (done && units < inStock) {
+        setState(() => _item = _item.copyWith(quantity: inStock - units, notes: notes));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${inStock - units} left for sale.')));
+      } else if (done) {
+        setState(() => _item = _item.copyWith(status: 'sold', isListed: false, quantity: 0, notes: notes));
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Taken off GemWorkers and marked sold.')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Not changed: a GemWorkers buyer has reserved or bought this stone. Check Orders first.'),
+          content: Text('Not changed: a GemWorkers buyer has just reserved or bought it. Reopen the page and check Orders.'),
         ));
       }
     } catch (e) {
@@ -686,7 +679,7 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
           _sectionLabel('Weight & Quantity'),
           _row('Weight', '${_item.weightValue} ${_item.weightUnit}'),
-          _row('Quantity', _item.quantity.toString()),
+          _row('In stock', _item.quantity.toString()),
 
           if (_item.isUnsortedLot) ...[
             _sectionLabel('Lot'),

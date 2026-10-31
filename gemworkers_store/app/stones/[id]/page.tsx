@@ -97,6 +97,8 @@ type ListingDetail = {
   // Stock state ('available' | 'reserved'). Added by
   // public_views_available_only.sql; absent on older views → treat as available.
   status?: string | null;
+  // Units in stock (sql/quantity_listings.sql); > 1 = jewellery-style listing.
+  stock?: number | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -275,6 +277,8 @@ export default async function StoneDetailPage({
 
   const item = data as ListingDetail;
   const isReserved = item.status === 'reserved';
+  const stock = Math.max(1, Number(item.stock ?? 1));
+  const multi = stock > 1;
   const photos = item.image_urls ?? [];
   const uploadedVideo = isUploadedVideo(item.video_url);
   const category = CATEGORY[item.product_type] ?? CATEGORY.loose_stone;
@@ -458,6 +462,7 @@ export default async function StoneDetailPage({
             ) : (
               <p className="pd-price" style={{ color: '#6B6052' }}>Price on request</p>
             )}
+            {multi && <p className="pd-shipline" style={{ color: '#1F1B16', fontWeight: 600 }}>{stock} available</p>}
             {shippingLine && <p className="pd-shipline">{shippingLine}</p>}
             {shipToRow?.enabled ? (
               <p className="pd-shipline">Ships to {shipToRow.name}</p>
@@ -524,6 +529,7 @@ export default async function StoneDetailPage({
                   vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                   isLoggedIn={!!user}
                   fx={fx}
+                  stock={stock}
                 />
               )}
               <CartButton
@@ -531,7 +537,7 @@ export default async function StoneDetailPage({
                 isLoggedIn={!!user}
                 initialInCart={!!cartRow}
               />
-              {item.sale_method !== 'buy_now' && (
+              {item.sale_method !== 'buy_now' && !multi && (
                 <OfferPanel
                   itemId={item.id}
                   isLoggedIn={!!user}
@@ -556,6 +562,7 @@ export default async function StoneDetailPage({
                   vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                   isLoggedIn={false}
                   fx={fx}
+                  stock={stock}
                 />
               ) : (
                 <Link href={`/auth/login?next=${nextParam}`} style={pillDark}>
@@ -566,7 +573,7 @@ export default async function StoneDetailPage({
                 <Link href={`/auth/login?next=${nextParam}`} className="pd-link">Log in</Link>
                 {' '}or{' '}
                 <Link href={`/auth/signup?next=${nextParam}`} className="pd-link">create an account</Link>
-                {' '}to use the cart{item.sale_method !== 'buy_now' ? ' or make an offer' : ''}.
+                {' '}to use the cart{item.sale_method !== 'buy_now' && !multi ? ' or make an offer' : ''}.
               </p>
             </div>
           )}

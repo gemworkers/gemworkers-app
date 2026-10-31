@@ -20,12 +20,16 @@ type Props = {
   isLoggedIn: boolean
   // Buyers outside the euro: an "≈ $" hint (Stripe charges their currency).
   fx?: FxContext | null
+  // Units in stock (sql/quantity_listings.sql): above 1 the buyer picks how many.
+  stock?: number
 }
 
 type State = 'idle' | 'confirm' | 'loading' | 'error' | 'existing'
 
-export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAmount = 0, vatLabel = 'VAT', isLoggedIn, fx }: Props) {
+export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAmount = 0, vatLabel = 'VAT', isLoggedIn, fx, stock = 1 }: Props) {
   const [state, setState] = useState<State>('idle')
+  const [qty, setQty] = useState(1)
+  const maxQty = Math.min(Math.max(1, Math.floor(stock)), 99)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // Guest checkout (logged out): email + Turnstile, account made on the spot.
   const [email, setEmail] = useState('')
@@ -36,7 +40,12 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
 
   const money = formatEur
   const formatted = money(sellingPrice)
-  const totalEur = paidTotal(sellingPrice + (shippingCost ?? 0), vatAmount)
+  // Preview only — the server works out the real totals (one shipping per order).
+  const goods = Math.round(sellingPrice * qty * 100) / 100
+  const base1 = sellingPrice + (shippingCost ?? 0)
+  const vatNow = qty === 1 || base1 <= 0 ? vatAmount
+    : Math.round(vatAmount * (goods + (shippingCost ?? 0)) / base1 * 100) / 100
+  const totalEur = paidTotal(goods + (shippingCost ?? 0), vatNow)
   const totalText = formatEur(totalEur)
   const totalApprox = approxPrice(totalEur, fx)
 
@@ -70,7 +79,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
   if (state === 'confirm') {
     async function handleConfirm() {
       setState('loading')
-      const result = isLoggedIn ? await buyNow(itemId) : await guestBuyNow(itemId, email, captchaToken)
+      const result = isLoggedIn ? await buyNow(itemId, qty) : await guestBuyNow(itemId, email, captchaToken, qty)
       if ('checkoutUrl' in result) {
         window.location.href = result.checkoutUrl
       } else if ('existing' in result) {
@@ -87,14 +96,23 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
         <p style={{ fontSize: 15, fontWeight: 600, color: '#1F1B16', marginBottom: 10 }}>
           Confirm purchase
         </p>
-        {(shippingCost != null && shippingCost > 0) || vatAmount > 0 ? (
+        {maxQty > 1 && (
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, fontSize: 14, color: '#5A5045', marginBottom: 12 }}>
+            <span>Quantity <span style={{ color: '#8A7F70' }}>({maxQty} available)</span></span>
+            <select value={qty} onChange={e => setQty(Number(e.target.value))}
+              style={{ ...inputStyle, width: 'auto', minWidth: 72, padding: '6px 10px' }}>
+              {Array.from({ length: maxQty }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
+        {(shippingCost != null && shippingCost > 0) || vatAmount > 0 || qty > 1 ? (
           <div style={{ marginBottom: 14 }}>
             <div style={{
               display: 'flex', justifyContent: 'space-between',
               fontSize: 14, color: '#5A5045', marginBottom: 4,
             }}>
-              <span>Stone</span>
-              <span>{formatted}</span>
+              <span>{qty > 1 ? `${qty} × ${formatted}` : maxQty > 1 ? 'Item' : 'Stone'}</span>
+              <span>{money(goods)}</span>
             </div>
             {shippingCost != null && shippingCost > 0 && (
               <div style={{
@@ -111,7 +129,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
                 fontSize: 14, color: '#5A5045', marginBottom: 8,
               }}>
                 <span>{vatLabel}</span>
-                <span>{formatEur(vatAmount)}</span>
+                <span>{formatEur(vatNow)}</span>
               </div>
             )}
             <div style={{ height: 1, background: '#ECE5D8', marginBottom: 8 }} />
@@ -135,7 +153,9 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
           </p>
         )}
         <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 18, lineHeight: 1.5 }}>
-          This reserves the stone — it will no longer be available to other buyers.
+          {maxQty > 1
+            ? `This reserves ${qty === 1 ? 'one' : qty} for you while you pay.`
+            : 'This reserves the stone — it will no longer be available to other buyers.'}
         </p>
         {!isLoggedIn && (
           <div style={{ marginBottom: 16 }}>

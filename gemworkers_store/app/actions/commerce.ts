@@ -18,7 +18,8 @@ import { noteSource } from '@/lib/visitor'
 // buyer to Stripe. The order starts in 'pending_payment'; it is not confirmed
 // until the Stripe webhook fires in a later step.
 export async function buyNow(
-  itemId: string
+  itemId: string,
+  quantity = 1,
 ): Promise<{ orderId: string; checkoutUrl: string } | { error: string }> {
   const supabase = await createClient()
 
@@ -26,7 +27,13 @@ export async function buyNow(
   if (!user) {
     return { error: 'You must be logged in to buy.' }
   }
-  return startBuyNow(supabase, user, itemId)
+  return startBuyNow(supabase, user, itemId, quantity)
+}
+
+// 1–99 units (sql/quantity_listings.sql); anything else becomes 1.
+function cleanQuantity(q: unknown): number {
+  const n = Math.floor(Number(q))
+  return Number.isFinite(n) && n >= 1 && n <= 99 ? n : 1
 }
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>
@@ -40,6 +47,7 @@ export async function guestBuyNow(
   itemId: string,
   rawEmail: string,
   captchaToken: string | null,
+  quantity = 1,
 ): Promise<{ orderId: string; checkoutUrl: string } | { error: string } | { existing: true }> {
   const email = rawEmail.trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 254) {
@@ -47,7 +55,7 @@ export async function guestBuyNow(
   }
   const supabase = await createClient()
   const { data: { user: current } } = await supabase.auth.getUser()
-  if (current) return startBuyNow(supabase, current, itemId)
+  if (current) return startBuyNow(supabase, current, itemId, quantity)
 
   if (!(await verifyTurnstile(captchaToken))) {
     return { error: 'Please complete the check and try again.' }
@@ -77,13 +85,14 @@ export async function guestBuyNow(
     console.error('[guestBuyNow] login failed:', otpErr?.message)
     return { error: 'Checkout failed — please try again.' }
   }
-  return startBuyNow(supabase, session.user, itemId)
+  return startBuyNow(supabase, session.user, itemId, quantity)
 }
 
 async function startBuyNow(
   supabase: ServerSupabase,
   user: { id: string; email?: string | null },
   itemId: string,
+  quantity = 1,
 ): Promise<{ orderId: string; checkoutUrl: string } | { error: string }> {
   // Before any order exists: we must ship to the buyer's chosen country.
   const shipTo = await checkoutShipTo(supabase)
@@ -91,6 +100,7 @@ async function startBuyNow(
 
   const { data, error } = await supabase.rpc('create_platform_order', {
     p_inventory_item_id: itemId,
+    p_quantity: cleanQuantity(quantity),
   })
 
   if (error) {
@@ -483,7 +493,7 @@ export async function checkoutCart(): Promise<
   // ── 2. Read cart (same query as cart page, RLS-scoped to this buyer) ──────
   const { data: cartRows } = await supabase
     .from('storefront_cart')
-    .select('inventory_item_id, added_at')
+    .select('inventory_item_id, added_at, quantity')
     .order('added_at', { ascending: true })
 
   if (!cartRows || cartRows.length === 0) {
@@ -497,10 +507,17 @@ export async function checkoutCart(): Promise<
   const created: Created[] = []
   const skippedIds: string[] = []
 
+  const { data: stockRows } = await supabase
+    .from('public_listing_details').select('id, stock')
+    .in('id', cartRows.map(r => r.inventory_item_id))
+  const stockOf = new Map((stockRows ?? []).map(r => [r.id as string, Number(r.stock ?? 1)]))
+
   for (const row of cartRows) {
     const itemId: string = row.inventory_item_id
     const { data, error } = await supabase.rpc('create_platform_order', {
       p_inventory_item_id: itemId,
+      // Never more than still in stock (stock may have dropped since it was added).
+      p_quantity: Math.min(cleanQuantity(row.quantity), Math.max(1, Number(stockOf.get(itemId) ?? 1))),
     })
     if (error || !data) {
       // RPC raises for: sold, reserved, unlisted, inactive seller, no price.
@@ -659,6 +676,26 @@ export async function addToCart(
     return { error: error.message }
   }
 
+  return { ok: true }
+}
+
+// Changes how many of a listing are in the buyer's cart (1–99, never more
+// than in stock). RLS: buyers update only their own rows (cart_buyer_update).
+export async function setCartQuantity(
+  itemId: string,
+  quantity: number,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'You must be logged in.' }
+  const { data: item } = await supabase.from('public_listing_details').select('stock').eq('id', itemId).maybeSingle()
+  const q = Math.min(cleanQuantity(quantity), Math.max(1, Number(item?.stock ?? 1)))
+  const { error } = await supabase
+    .from('storefront_cart')
+    .update({ quantity: q })
+    .eq('buyer_id', user.id)
+    .eq('inventory_item_id', itemId)
+  if (error) return { error: error.message }
   return { ok: true }
 }
 

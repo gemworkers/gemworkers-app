@@ -49,6 +49,7 @@ type BuyerOrder = {
   payment_due_at: string | null;
   order_items: {
     inventory_item_id: string;
+    quantity?: number | null;   // sql/quantity_listings.sql
   }[];
 };
 
@@ -198,7 +199,7 @@ function SingleOrderCard({
   const itemId        = oi?.inventory_item_id ?? ''
   const stone         = listingMap.get(itemId) ?? null
   const storedTitle   = 'Stone'
-  const displayTitle  = stone?.title ?? storedTitle
+  const displayTitle  = (stone?.title ?? storedTitle) + (Number(oi?.quantity ?? 1) > 1 ? ` × ${oi!.quantity}` : '')
   const subtitle      = stone
     ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
     : null
@@ -320,7 +321,7 @@ function GroupedOrderCard({
           const itemId       = oi?.inventory_item_id ?? ''
           const stone        = listingMap.get(itemId) ?? null
           const storedTitle  = 'Stone'
-          const displayTitle = stone?.title ?? storedTitle
+          const displayTitle = (stone?.title ?? storedTitle) + (Number(oi?.quantity ?? 1) > 1 ? ` × ${oi!.quantity}` : '')
           const subtitle     = stone
             ? [stone.variety, stone.gem_type].filter(Boolean).join(' · ')
             : null
@@ -386,7 +387,7 @@ export default async function BuyerOrdersPage() {
       id, order_number, status, order_date, order_total, tax_amount, tax_scheme, shipping_cost,
       tracking_number, shipped_at, received_at, checkout_group_id,
       offer_id, payment_due_at,
-      order_items ( inventory_item_id )
+      order_items ( inventory_item_id, quantity )
     `)
     .order('created_at', { ascending: false })
 

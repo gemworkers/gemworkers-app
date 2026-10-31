@@ -174,6 +174,48 @@ BEGIN
   SELECT scheme || '/' || tax_amount INTO t FROM _tax_calc('NL', 'DE', 'loose_stone', 100, NULL);
   IF t = 'domestic/21.00' THEN pass := pass + 1; ELSE fails := fails || format('10b before OSS start NL→DE: %s, want domestic/21.00', t); END IF;
 
+  -- ── 11. Quantity listings (sql/quantity_listings.sql) ─────────────────────
+  -- 5 bracelets at €20 + €5 shipping, practice seller 12%.
+  INSERT INTO inventory_items (sku, title, seller_id, selling_price, shipping_cost, is_listed, status, sale_method, product_type, quantity)
+  VALUES ('TEST-MT-4', 'Practice bracelet', c_seller, 20, 5, true, 'available', 'both', 'jewelry', 5) RETURNING id INTO s1;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', c_buyer, 'role', 'authenticated')::text, true);
+  o1 := create_platform_order(s1, 3);
+  SELECT * INTO x FROM orders WHERE id = o1;
+  IF x.order_total = 65 AND x.commission_amount = 7.2 AND x.seller_payout = 57.8 THEN pass := pass + 1;
+  ELSE fails := fails || format('11a 3 × €20 + €5: total %s fee %s payout %s, want 65 / 7.2 / 57.8', x.order_total, x.commission_amount, x.seller_payout); END IF;
+  IF (SELECT quantity = 3 AND price_at_sale = 20 FROM order_items WHERE order_id = o1)
+     AND (SELECT quantity = 2 AND status = 'available' AND is_listed FROM inventory_items WHERE id = s1) THEN pass := pass + 1;
+  ELSE fails := fails || '11b order line / stock after buying 3 of 5 wrong'; END IF;
+  BEGIN
+    PERFORM create_platform_order(s1, 3);
+    fails := fails || '11c could buy 3 with only 2 left';
+  EXCEPTION WHEN others THEN pass := pass + 1;
+  END;
+  o2 := create_platform_order(s1, 2);
+  IF (SELECT quantity = 0 AND status = 'reserved' FROM inventory_items WHERE id = s1) THEN pass := pass + 1;
+  ELSE fails := fails || '11d last 2 bought: not reserved with 0 left'; END IF;
+  PERFORM cancel_pending_payment_order(o2);
+  IF (SELECT quantity = 2 AND status = 'available' AND is_listed FROM inventory_items WHERE id = s1) THEN pass := pass + 1;
+  ELSE fails := fails || '11e cancelled order: 2 units not back on sale'; END IF;
+  PERFORM confirm_order_paid(o1);
+  IF (SELECT quantity = 2 AND status = 'available' AND is_listed FROM inventory_items WHERE id = s1) THEN pass := pass + 1;
+  ELSE fails := fails || '11f paid 3 of 5: listing should stay on sale with 2'; END IF;
+  inv := issue_invoice(o1);
+  SELECT data INTO j FROM invoices WHERE id = inv;
+  IF (j::jsonb -> 'lines' -> 0 ->> 'quantity')::int = 3 AND (SELECT total FROM invoices WHERE id = inv) = 65 THEN pass := pass + 1;
+  ELSE fails := fails || format('11g invoice line %s', j::jsonb -> 'lines' -> 0); END IF;
+  BEGIN
+    PERFORM submit_storefront_offer(s1, 15, 'rh');
+    fails := fails || '11h offer accepted on a listing with 2 in stock';
+  EXCEPTION WHEN others THEN pass := pass + 1;
+  END;
+  -- One-of-a-kind via an older path (Sold elsewhere): stock goes to 0.
+  INSERT INTO inventory_items (sku, title, seller_id, selling_price, shipping_cost, is_listed, status, sale_method, product_type, quantity)
+  VALUES ('TEST-MT-5', 'Practice test stone 5', c_seller, 50, 0, true, 'available', 'buy_now', 'loose_stone', 1) RETURNING id INTO s3;
+  UPDATE inventory_items SET status = 'sold', is_listed = false WHERE id = s3;
+  IF (SELECT quantity FROM inventory_items WHERE id = s3) = 0 THEN pass := pass + 1;
+  ELSE fails := fails || '11i sold elsewhere: stock not 0'; END IF;
+
   RAISE EXCEPTION 'TESTRESULT passed=% failed=% %', pass, cardinality(fails),
     CASE WHEN cardinality(fails) = 0 THEN '' ELSE ':: ' || array_to_string(fails, ' || ') END;
 END

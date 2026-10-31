@@ -906,7 +906,7 @@ class _AddInventoryPageState extends State<AddInventoryPage> {
 
               const FormSection('Other'),
               FormTextField(
-                'Quantity',
+                'Quantity in stock (1 = one-of-a-kind; e.g. 10 identical bracelets)',
                 _quantity,
                 keyboardType: TextInputType.number,
               ),

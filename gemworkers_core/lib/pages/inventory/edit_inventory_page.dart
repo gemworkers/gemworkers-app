@@ -447,7 +447,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
         }
       }
 
-      await _repository.updateItem(widget.item.id!, updated);
+      await _repository.updateItem(widget.item.id!, updated, before: widget.item);
 
       // Removed an uploaded video: delete the old file (best effort).
       if (finalVideoUrl != widget.item.videoUrl) {
@@ -838,7 +838,7 @@ class _EditInventoryPageState extends State<EditInventoryPage> {
           ),
 
           const FormSection('Other'),
-          FormTextField('Quantity *', _quantity, keyboardType: TextInputType.number),
+          FormTextField('Quantity in stock * (1 = one-of-a-kind; e.g. 10 identical bracelets)', _quantity, keyboardType: TextInputType.number),
           FormTextField('Barcode / product code (optional — for repeatable items)', _barcode),
           FormDropdownField<String>(
             label: 'Status',

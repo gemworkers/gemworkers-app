@@ -17,6 +17,7 @@ import 'inventory_detail_page.dart';
 import 'listing_sheet.dart';
 import 'widgets/cascading_location_picker.dart';
 import 'widgets/reject_listing_dialog.dart';
+import 'widgets/sold_elsewhere_dialog.dart';
 
 // ── Sort options ──────────────────────────────────────────────────────────────
 
@@ -683,29 +684,18 @@ class _InventoryPageState extends State<InventoryPage>
   /// GemWorkers sale — no order, invoice or fee).
   Future<void> _soldElsewhere(InventoryItem item) async {
     if (item.id == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sold somewhere else?'),
-        content: Text('"${item.title}" is taken off GemWorkers right away and marked as sold.\n\n'
-            'This is not a GemWorkers sale: no order, invoice or fee is made.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, sold elsewhere')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    final units = await askSoldElsewhere(context, title: item.title, inStock: item.quantity);
+    if (units == null) return;
     final now = DateTime.now();
     final stamp = 'Sold elsewhere ${now.day}/${now.month}/${now.year}';
     final notes = item.notes.trim().isEmpty ? stamp : '${item.notes.trim()}\n$stamp';
     try {
-      final done = await _repository.markSoldElsewhere(item.id!, notes);
+      final done = await _repository.markSoldElsewhere(item.id!, notes, units: units, inStock: item.quantity);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(done
-            ? 'Taken off GemWorkers and marked sold.'
-            : 'Not changed: a GemWorkers buyer has reserved or bought this stone.'),
+            ? (units < item.quantity ? '${item.quantity - units} left for sale.' : 'Taken off GemWorkers and marked sold.')
+            : 'Not changed: a GemWorkers buyer has just reserved or bought it. Refresh and try again.'),
       ));
       if (done) _loadItems();
     } catch (e) {
@@ -1524,7 +1514,7 @@ class _PhoneListingCard extends StatelessWidget {
                   Row(children: [
                     const Icon(Icons.visibility_outlined, size: 14, color: AppColors.muted),
                     const SizedBox(width: 4),
-                    Text('${views30 ?? 0} views · 30 days', style: t.bodySmall?.copyWith(color: AppColors.muted)),
+                    Text('${item.quantity > 1 ? '${item.quantity} in stock · ' : ''}${views30 ?? 0} views · 30 days', style: t.bodySmall?.copyWith(color: AppColors.muted)),
                   ]),
                 ],
               ]),

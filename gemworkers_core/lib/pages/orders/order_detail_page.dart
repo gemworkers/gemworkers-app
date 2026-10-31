@@ -589,7 +589,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         if (d.netWeight != null) ('Net weight', d.netWeight!),
         if (d.originCountry != null) ('Country of origin', d.originCountry!),
       ],
-      ('Quantity', '${details.length}'),
+      // Units, not lines: 3 bracelets in one order = 3 (sql/quantity_listings.sql).
+      ('Quantity', '${_order?.items.fold<int>(0, (n, i) => n + i.quantity) ?? details.length}'),
       ('Value of goods', '€${goods.toStringAsFixed(2)} EUR'),
       if ((order.shippingCost ?? 0) > 0) ('Shipping charged', '€${order.shippingCost!.toStringAsFixed(2)} EUR'),
       ('Invoice', _invoice == null ? 'Not issued yet' : '${_invoice!['number']} (print it and put it in the parcel)'),
