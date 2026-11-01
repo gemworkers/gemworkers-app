@@ -124,18 +124,6 @@ export default async function CartPage() {
 
   const buyableCount = cartItems.filter(({ listing }) => isBuyable(listing)).length
 
-  const grandTotal = cartItems.reduce((sum, { listing, qty }) => {
-    if (!isBuyable(listing)) return sum
-    return sum + Number(listing.selling_price) * qty + Number(listing.shipping_cost ?? 0)
-  }, 0)
-
-  // Display-only split of grandTotal for the summary box
-  const shippingTotal = cartItems.reduce((sum, { listing }) => {
-    if (!isBuyable(listing)) return sum
-    return sum + Number(listing.shipping_cost ?? 0)
-  }, 0)
-  const subtotal = grandTotal - shippingTotal
-
   // ── Tax for the buyer's "Ship to" country (same calculation as checkout) ──
   const shipToCode = await currentShipToCode()
   const { data: shipToData } = await supabase
@@ -158,6 +146,17 @@ export default async function CartPage() {
   const quotes = [...quoteMap.values()]
   const pctx = shipTo?.enabled ? await priceContext() : null
   const fx = await fxContext()
+
+  // Totals as the buyer sees and pays them (lib/price-shown.ts shownPrice:
+  // VAT included in the EU, without VAT rounded up outside the EU).
+  const shipShownOf = (l: CartListing) => shownPrice(Number(l.shipping_cost ?? 0), l.seller_country, pctx, 'shipping').amount
+  const grandTotal = cartItems.reduce((sum, { listing, qty }) => {
+    if (!isBuyable(listing)) return sum
+    return sum + shownPrice(Number(listing.selling_price), listing.seller_country, pctx).amount * qty + shipShownOf(listing)
+  }, 0)
+  // Display-only split of grandTotal for the summary box
+  const shippingTotal = cartItems.reduce((sum, { listing }) => (isBuyable(listing) ? sum + shipShownOf(listing) : sum), 0)
+  const subtotal = grandTotal - shippingTotal
   // One price, VAT included (sql/vat_included_prices.sql): how much of the
   // total is VAT (the quotes are on top, so take it out at their rate).
   const vatTotal = cartItems.reduce((sum, c) => {
@@ -287,7 +286,7 @@ function AvailableItem({ itemId, listing, quote, pctx, fx, qty = 1 }: { itemId: 
             }
             {cost !== null && listing.selling_price != null && listing.sale_method !== 'accept_offers' && (
               <span className="cart-sub" style={{ display: 'block', fontWeight: 400 }}>
-                {cost === 0 ? 'Free shipping' : `+ ${priceText(shownPrice(cost, listing.seller_country, pctx).amount)} shipping`}
+                {cost === 0 ? 'Free shipping' : `+ ${priceText(shownPrice(cost, listing.seller_country, pctx, 'shipping').amount)} shipping`}
               </span>
             )}
           </div>
@@ -300,8 +299,8 @@ function AvailableItem({ itemId, listing, quote, pctx, fx, qty = 1 }: { itemId: 
               <BuyButton
                 itemId={itemId}
                 itemTitle={listing.title}
-                sellingPrice={listing.selling_price}
-                shippingCost={cost}
+                sellingPrice={listing.selling_price == null ? null : shownPrice(Number(listing.selling_price), listing.seller_country, pctx).amount}
+                shippingCost={cost == null ? null : shownPrice(cost, listing.seller_country, pctx, 'shipping').amount}
                 vatAmount={quote?.taxAmount ?? 0}
                 vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                 isLoggedIn={true}

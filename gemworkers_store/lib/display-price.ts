@@ -28,7 +28,17 @@ export async function priceContextFor(code: string, withBusiness: boolean): Prom
     .eq('country_code', code)
     .maybeSingle()
   const r = rule as { mode: string; tax_rate: string | number | null; customs_union: string | null } | null
-  if (!r || r.mode !== 'collect' || r.tax_rate == null || !r.customs_union) return null
+  if (!r || r.mode !== 'collect' || r.tax_rate == null || r.customs_union !== 'EU') {
+    // Buyer outside the EU: EU (NL) stones without their VAT, rounded up
+    // (sql/non_eu_net_prices.sql). Business status doesn't matter: no VAT anyway.
+    const [{ data: eu }, { data: nlx }] = await Promise.all([
+      supabase.from('tax_rules').select('country_code').eq('customs_union', 'EU'),
+      supabase.from('tax_rules').select('tax_rate').eq('country_code', 'NL').maybeSingle(),
+    ])
+    const rate = Number((nlx as { tax_rate: string | number | null } | null)?.tax_rate ?? 0)
+    if (!(rate > 0)) return null
+    return { rate: 0, country: '', origins: ((eu as { country_code: string }[] | null) ?? []).map(x => x.country_code), exportRate: rate }
+  }
 
   // A verified EU business in another country pays 0% (reverse charge).
   const { data: { user } } = withBusiness ? await supabase.auth.getUser() : { data: { user: null } }

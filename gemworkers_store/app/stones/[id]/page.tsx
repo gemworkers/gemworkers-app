@@ -376,7 +376,7 @@ export default async function StoneDetailPage({
   const pctx = shipToRow?.enabled ? await priceContext() : null;
   const favs = await favouriteIds();
   const shownStone = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, pctx);
-  const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx).amount;
+  const shownShip = cost === null ? null : shownPrice(cost, item.seller_country, pctx, 'shipping').amount;
 
   const shippingLine = joinParts([
     cost === null ? null : cost === 0 ? 'Free shipping' : `+ ${priceText(shownShip!)} shipping`,
@@ -523,8 +523,8 @@ export default async function StoneDetailPage({
                 <BuyButton
                   itemId={item.id}
                   itemTitle={item.title}
-                  sellingPrice={item.selling_price}
-                  shippingCost={cost}
+                  sellingPrice={shownStone?.amount ?? item.selling_price}
+                  shippingCost={shownShip ?? cost}
                   vatAmount={quote?.taxAmount ?? 0}
                   vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                   isLoggedIn={!!user}
@@ -556,8 +556,8 @@ export default async function StoneDetailPage({
                 <BuyButton
                   itemId={item.id}
                   itemTitle={item.title}
-                  sellingPrice={item.selling_price}
-                  shippingCost={cost}
+                  sellingPrice={shownStone?.amount ?? item.selling_price}
+                  shippingCost={shownShip ?? cost}
                   vatAmount={quote?.taxAmount ?? 0}
                   vatLabel={quote?.taxRate != null ? `${quote.taxName || 'VAT'} ${ratePercent(quote.taxRate)}%` : 'VAT'}
                   isLoggedIn={false}

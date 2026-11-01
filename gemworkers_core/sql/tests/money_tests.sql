@@ -231,15 +231,25 @@ BEGIN
   SELECT * INTO x FROM orders WHERE id = o1;
   IF x.order_total = 110 AND x.tax_amount = 23.10 THEN pass := pass + 1;
   ELSE fails := fails || format('12b second apply changed it: net %s VAT %s', x.order_total, x.tax_amount); END IF;
-  PERFORM apply_order_tax(ARRAY[o1], 'US');   -- changed ship-to: export, no VAT, full price
+  -- Changed ship-to: export, no VAT — price without VAT rounded up (sql/non_eu_net_prices.sql):
+  -- €121 → €100 → €100, shipping €12.10 → €10.
+  PERFORM apply_order_tax(ARRAY[o1], 'US');
   SELECT * INTO x FROM orders WHERE id = o1;
-  IF x.order_total = 133.10 AND x.tax_amount = 0 AND x.shipping_cost = 12.10 THEN pass := pass + 1;
-  ELSE fails := fails || format('12c NL stone to US: total %s VAT %s ship %s, want 133.10 / 0 / 12.10', x.order_total, x.tax_amount, x.shipping_cost); END IF;
+  IF x.order_total = 110 AND x.tax_amount = 0 AND x.shipping_cost = 10 THEN pass := pass + 1;
+  ELSE fails := fails || format('12c NL stone to US: total %s VAT %s ship %s, want 110 / 0 / 10', x.order_total, x.tax_amount, x.shipping_cost); END IF;
   PERFORM apply_order_tax(ARRAY[o1], 'NL');
   PERFORM confirm_order_paid(o1);
   inv := issue_invoice(o1);
   IF (SELECT net_amount = 110 AND tax_amount = 23.10 AND total = 133.10 FROM invoices WHERE id = inv) THEN pass := pass + 1;
   ELSE fails := fails || '12d invoice not 110 + 23.10 = 133.10'; END IF;
+  -- €395 NL stone, free shipping, 2 pieces to the US: 2 × (€326.45 → €330) = €660.
+  INSERT INTO inventory_items (sku, title, seller_id, selling_price, shipping_cost, is_listed, status, sale_method, product_type, quantity)
+  VALUES ('TEST-MT-7', 'Practice NL bracelet', 'a0000000-0000-0000-0000-000000000001', 395, 0, true, 'available', 'buy_now', 'jewelry', 3) RETURNING id INTO s1;
+  o1 := create_platform_order(s1, 2);
+  PERFORM apply_order_tax(ARRAY[o1], 'US');
+  SELECT * INTO x FROM orders WHERE id = o1;
+  IF x.order_total = 660 AND x.tax_amount = 0 THEN pass := pass + 1;
+  ELSE fails := fails || format('12e 2 × €395 to US: %s, want 660 (2 × 330)', x.order_total); END IF;
 
   RAISE EXCEPTION 'TESTRESULT passed=% failed=% %', pass, cardinality(fails),
     CASE WHEN cardinality(fails) = 0 THEN '' ELSE ':: ' || array_to_string(fails, ' || ') END;

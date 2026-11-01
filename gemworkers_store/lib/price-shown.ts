@@ -10,13 +10,29 @@ export type PriceContext = {
   // Verified EU business (reverse charge): the Dutch VAT inside the price is
   // taken off for them (sql/vat_included_prices.sql), so they see the net price.
   strip?: number
+  // Buyer outside the EU: EU stones without the VAT inside them, rounded up
+  // (sql/non_eu_net_prices.sql — same rule as _net_price_round).
+  exportRate?: number
+}
+
+/** Price without VAT, rounded up: to the next €10 (below €20: next €1). */
+export function netRound(net: number): number {
+  const cents = Math.round(net * 100)
+  return cents >= 2000 ? Math.ceil(cents / 1000) * 10 : Math.ceil(cents / 100)
 }
 
 /** The amount to show for a price (stone or shipping) of a stone shipped from
  *  [shipsFrom]. One price for everyone, VAT included (sql/vat_included_prices.sql):
  *  the amount is the entered price; inclVat says whether VAT is inside it. */
-export function shownPrice(amount: number, shipsFrom: string | null | undefined, ctx: PriceContext | null) {
+export function shownPrice(
+  amount: number, shipsFrom: string | null | undefined, ctx: PriceContext | null,
+  kind: 'price' | 'shipping' = 'price',
+) {
   const inUnion = !!ctx && !!shipsFrom && ctx.origins.includes(shipsFrom)
+  if (inUnion && ctx!.exportRate && ctx!.exportRate > 0) {
+    const net = Math.round(amount / (1 + ctx!.exportRate) * 100) / 100
+    return { amount: amount <= 0 ? 0 : kind === 'shipping' ? Math.ceil(Math.round(net * 100) / 100) : netRound(net), inclVat: false }
+  }
   if (inUnion && ctx!.strip && ctx!.strip > 0) {
     return { amount: Math.round(amount / (1 + ctx!.strip) * 100) / 100, inclVat: false }
   }

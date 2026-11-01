@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const items = rows.map(r => {
     const price = shownPrice(Number(r.selling_price), r.seller_country, ctx).amount
-    const shipCost = shownPrice(Number(r.shipping_cost ?? 0), r.seller_country, ctx).amount
+    const shipCost = shownPrice(Number(r.shipping_cost ?? 0), r.seller_country, ctx, 'shipping').amount
     const images = (r.image_urls ?? []).slice(0, 11)
     const gem = [r.variety, r.gem_type ?? r.species ?? r.jewelry_type].filter(Boolean).join(' ')
     // Handling = preparation days (3–5 working days if not set); transit = the stone's delivery estimate.

@@ -34,7 +34,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
   const cost        = item.shipping_cost == null ? null : Number(item.shipping_cost)
   // EU consumers see prices incl. VAT when the stone ships from inside the EU.
   const price       = item.selling_price == null ? null : shownPrice(Number(item.selling_price), item.seller_country, priceCtx)
-  const shipShown   = cost == null ? null : shownPrice(cost, item.seller_country, priceCtx).amount
+  const shipShown   = cost == null ? null : shownPrice(cost, item.seller_country, priceCtx, 'shipping').amount
 
   return (
     <Link
