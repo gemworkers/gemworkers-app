@@ -50,3 +50,6 @@ app.*.map.json
 # Root tools (Supabase CLI via npx) and editor settings
 /node_modules/
 .vscode/
+
+# Etsy exports (shop data, not code)
+EtsyListingsDownload*.csv
