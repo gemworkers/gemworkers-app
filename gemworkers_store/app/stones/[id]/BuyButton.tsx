@@ -8,13 +8,15 @@ import { Turnstile, TURNSTILE_ENABLED } from '@/app/components/Turnstile'
 import { formatEur } from '@/lib/money'
 import { approxPrice, type FxContext } from '@/lib/price-shown'
 import { paidTotal } from '@/lib/tax'
+import { vatInside } from '@/lib/price-shown'
 
 type Props = {
   itemId: string
   itemTitle: string
   sellingPrice: number | null
   shippingCost?: number | null
-  // VAT we collect for the buyer's ship-to country (lib/tax.ts); 0 = none.
+  // VAT for the buyer's ship-to country on one unit + shipping, as tax_quote
+  // gives it (on top); used only for its rate — the price already includes it.
   vatAmount?: number
   vatLabel?: string
   isLoggedIn: boolean
@@ -43,9 +45,11 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
   // Preview only — the server works out the real totals (one shipping per order).
   const goods = Math.round(sellingPrice * qty * 100) / 100
   const base1 = sellingPrice + (shippingCost ?? 0)
-  const vatNow = qty === 1 || base1 <= 0 ? vatAmount
-    : Math.round(vatAmount * (goods + (shippingCost ?? 0)) / base1 * 100) / 100
-  const totalEur = paidTotal(goods + (shippingCost ?? 0), vatNow)
+  // One price, VAT included (sql/vat_included_prices.sql): the total is the
+  // price + shipping; the VAT line only says how much of it is VAT.
+  const rate = base1 > 0 ? vatAmount / base1 : 0
+  const totalEur = paidTotal(goods + (shippingCost ?? 0), 0)
+  const vatNow = vatInside(totalEur, rate)
   const totalText = formatEur(totalEur)
   const totalApprox = approxPrice(totalEur, fx)
 
@@ -128,7 +132,7 @@ export function BuyButton({ itemId, itemTitle, sellingPrice, shippingCost, vatAm
                 display: 'flex', justifyContent: 'space-between',
                 fontSize: 14, color: '#5A5045', marginBottom: 8,
               }}>
-                <span>{vatLabel}</span>
+                <span>Includes {vatLabel}</span>
                 <span>{formatEur(vatNow)}</span>
               </div>
             )}

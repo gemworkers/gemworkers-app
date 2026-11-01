@@ -33,8 +33,9 @@ export default async function BusinessPage() {
       <p>
         Add your company details and they appear on your orders and invoices. Business
         buyers in the EU outside the Netherlands with a valid VAT number pay{' '}
-        <strong>0% VAT</strong> on stones shipped from the Netherlands — the VAT is
-        &ldquo;reverse charged&rdquo; and you declare it in your own VAT return.
+        <strong>0% VAT</strong> on stones shipped from the Netherlands: you pay the price
+        without the Dutch VAT it includes (shown to you as soon as your number is verified),
+        and the VAT is &ldquo;reverse charged&rdquo; — you declare it in your own VAT return.
       </p>
       <p>
         We check EU VAT numbers in the European Commission&apos;s VAT register (VIES). Until

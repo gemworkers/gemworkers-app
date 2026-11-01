@@ -216,6 +216,31 @@ BEGIN
   IF (SELECT quantity FROM inventory_items WHERE id = s3) = 0 THEN pass := pass + 1;
   ELSE fails := fails || '11i sold elsewhere: stock not 0'; END IF;
 
+  -- ── 12. One price, VAT included (sql/vat_included_prices.sql) ──────────────
+  -- My Shop (NL) stone €121 + €12.10 shipping: NL buyer pays exactly €133.10,
+  -- of which VAT 21% = €23.10; order_total (excl. VAT) €110, shipping €10.
+  INSERT INTO inventory_items (sku, title, seller_id, selling_price, shipping_cost, is_listed, status, sale_method, product_type, quantity)
+  VALUES ('TEST-MT-6', 'Practice NL stone', 'a0000000-0000-0000-0000-000000000001', 121, 12.10, true, 'available', 'buy_now', 'loose_stone', 1) RETURNING id INTO s1;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', c_buyer, 'role', 'authenticated')::text, true);
+  o1 := create_platform_order(s1);
+  PERFORM apply_order_tax(ARRAY[o1], 'NL');
+  SELECT * INTO x FROM orders WHERE id = o1;
+  IF x.order_total = 110 AND x.tax_amount = 23.10 AND x.shipping_cost = 10 AND x.order_total + x.tax_amount = 133.10 THEN pass := pass + 1;
+  ELSE fails := fails || format('12a NL €133.10 incl.: net %s VAT %s ship %s, want 110 / 23.10 / 10', x.order_total, x.tax_amount, x.shipping_cost); END IF;
+  PERFORM apply_order_tax(ARRAY[o1], 'NL');   -- buyer comes back to pay again
+  SELECT * INTO x FROM orders WHERE id = o1;
+  IF x.order_total = 110 AND x.tax_amount = 23.10 THEN pass := pass + 1;
+  ELSE fails := fails || format('12b second apply changed it: net %s VAT %s', x.order_total, x.tax_amount); END IF;
+  PERFORM apply_order_tax(ARRAY[o1], 'US');   -- changed ship-to: export, no VAT, full price
+  SELECT * INTO x FROM orders WHERE id = o1;
+  IF x.order_total = 133.10 AND x.tax_amount = 0 AND x.shipping_cost = 12.10 THEN pass := pass + 1;
+  ELSE fails := fails || format('12c NL stone to US: total %s VAT %s ship %s, want 133.10 / 0 / 12.10', x.order_total, x.tax_amount, x.shipping_cost); END IF;
+  PERFORM apply_order_tax(ARRAY[o1], 'NL');
+  PERFORM confirm_order_paid(o1);
+  inv := issue_invoice(o1);
+  IF (SELECT net_amount = 110 AND tax_amount = 23.10 AND total = 133.10 FROM invoices WHERE id = inv) THEN pass := pass + 1;
+  ELSE fails := fails || '12d invoice not 110 + 23.10 = 133.10'; END IF;
+
   RAISE EXCEPTION 'TESTRESULT passed=% failed=% %', pass, cardinality(fails),
     CASE WHEN cardinality(fails) = 0 THEN '' ELSE ':: ' || array_to_string(fails, ' || ') END;
 END

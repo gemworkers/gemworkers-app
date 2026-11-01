@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/services/seller_service.dart';
 import '../../../core/utils/commission.dart';
 
 export '../../../core/utils/commission.dart';
@@ -105,6 +106,15 @@ class _PriceFieldState extends State<PriceField> {
 
   void _onChanged() => setState(() {});
 
+  /// One price, VAT included: Dutch 21% until the OSS start (2027-01-01), then
+  /// the buyer's EU country rate (17–27%) — 21% shown as the usual case.
+  static String _vatNote(double price) {
+    final vat = (price * 0.21 / 1.21 * 100).round() / 100;
+    final keep = price - vat;
+    return 'EU buyers: price includes €${vat.toStringAsFixed(2)} VAT (21%) — you keep '
+        '€${keep.toStringAsFixed(2)}. Buyers outside the EU pay no VAT — you keep the full price.';
+  }
+
   Future<void> _load() async {
     final r = await loadSellerCommissionRate(widget.sellerId);
     if (mounted) setState(() => _rate = r);
@@ -174,6 +184,16 @@ class _PriceFieldState extends State<PriceField> {
               rate: rate.rate,
               source: rate.source,
             ),
+            // My Shop ships from NL: for EU buyers the price includes VAT
+            // (sql/vat_included_prices.sql) — show what is left after it.
+            if (widget.sellerId == kCurrentSellerId && (parsePrice(widget.controller.text) ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _vatNote(parsePrice(widget.controller.text)!),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+              ),
             if (rate.rate > 0 && widget.enabled)
               TextButton(
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),

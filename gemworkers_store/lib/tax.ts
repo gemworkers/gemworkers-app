@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatEur } from '@/lib/money'
-import { priceText } from '@/lib/price-shown'
+import { priceText, vatInside } from '@/lib/price-shown'
 
 // Tax at checkout (sql/order_tax.sql). We only collect VAT that the law
 // requires (stone ships from NL to an EU buyer); everywhere else the buyer
@@ -111,9 +111,10 @@ export function taxNote(
   }
   if ((q.scheme === 'domestic' || q.scheme === 'oss') && q.taxRate != null) {
     const name = q.taxName || 'VAT'
+    // One price, VAT included (sql/vat_included_prices.sql).
     return hasPrice
-      ? { text: `Includes ${formatEur(q.taxAmount)} ${name} (${ratePercent(q.taxRate)}%) for ${countryName} · total ${formatEur(paidTotal(q.goodsTotal, q.taxAmount))} with shipping`, warn: false }
-      : { text: `Offers are before ${name} — ${ratePercent(q.taxRate)}% ${name} for ${countryName} is added at checkout`, warn: false }
+      ? { text: `Includes ${formatEur(vatInside(q.goodsTotal, q.taxRate))} ${name} (${ratePercent(q.taxRate)}%) · ${formatEur(q.goodsTotal)} with shipping to ${countryName}`, warn: false }
+      : { text: `Offers include ${name} (${ratePercent(q.taxRate)}% for ${countryName})`, warn: false }
   }
   // Import duties the buyer pays on delivery: no note on stone page or cart
   // (Zakaria 2026-10-30, like Etsy / Gemrock) — one neutral line on Stripe's

@@ -10,7 +10,7 @@ import { pillDark, pillOutline } from '@/lib/ui'
 import { formatEur } from '@/lib/money'
 import { currentShipToCode } from '@/lib/ship-to'
 import { priceContext } from '@/lib/display-price'
-import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext } from '@/lib/price-shown'
+import { shownPrice, approxPrice, priceText, vatInside, type PriceContext, type FxContext } from '@/lib/price-shown'
 import { fxContext } from '@/lib/fx'
 import { taxQuote, taxNote, paidTotal, ratePercent, type TaxQuote } from '@/lib/tax'
 import { cardImage } from '@/lib/media'
@@ -158,9 +158,17 @@ export default async function CartPage() {
   const quotes = [...quoteMap.values()]
   const pctx = shipTo?.enabled ? await priceContext() : null
   const fx = await fxContext()
-  const vatTotal = quotes.reduce((sum, q) => paidTotal(sum, q.taxAmount), 0)
+  // One price, VAT included (sql/vat_included_prices.sql): how much of the
+  // total is VAT (the quotes are on top, so take it out at their rate).
+  const vatTotal = cartItems.reduce((sum, c) => {
+    const q = quoteMap.get(c.itemId)
+    if (!q || !isBuyable(c.listing) || !(q.taxAmount > 0)) return sum
+    // quoteMap is already scaled to this line (price × qty + shipping)
+    const line = Number(c.listing.selling_price) * c.qty + Number(c.listing.shipping_cost ?? 0)
+    return paidTotal(sum, vatInside(line, q.taxAmount / line))
+  }, 0)
   const vatRates = [...new Set(quotes.filter(q => q.taxAmount > 0 && q.taxRate != null).map(q => ratePercent(q.taxRate!)))]
-  const payTotal = paidTotal(grandTotal, vatTotal)
+  const payTotal = grandTotal
   // Under-minimum warning first (e.g. UK), else one import reminder if any stone needs it.
   const cartTaxNote =
     quotes.map(q => taxNote(q, shipTo?.name ?? shipToCode, true)).find(n => n?.warn) ??
@@ -188,7 +196,7 @@ export default async function CartPage() {
                 Summary
               </h2>
               <div className="cart-sum-row">
-                <span>Subtotal{vatTotal > 0 ? ' (excl. VAT)' : ''}</span>
+                <span>Subtotal</span>
                 <span>{formatEur(subtotal)}</span>
               </div>
               <div className="cart-sum-row">
@@ -197,7 +205,7 @@ export default async function CartPage() {
               </div>
               {vatTotal > 0 && (
                 <div className="cart-sum-row">
-                  <span>VAT{vatRates.length === 1 ? ` ${vatRates[0]}%` : ''} ({shipTo?.name})</span>
+                  <span>Includes VAT{vatRates.length === 1 ? ` ${vatRates[0]}%` : ''} ({shipTo?.name})</span>
                   <span>{formatEur(vatTotal)}</span>
                 </div>
               )}

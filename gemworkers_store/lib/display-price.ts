@@ -1,8 +1,8 @@
-// Prices shown to EU consumers must include VAT (EU Price Indication
-// Directive / Dutch price rules). We only charge VAT when the stone ships from
-// inside the EU to an EU buyer (sql/order_tax.sql), so only then is the shown
-// price "incl. VAT". Everyone else — and verified EU businesses (reverse
-// charge) — sees the price without VAT, as charged.
+// One price for everyone, VAT included (sql/vat_included_prices.sql, option B
+// 2026-11-01): the price entered is what every buyer pays. Where we must charge
+// VAT (stone ships from inside the EU to an EU consumer) it is inside that
+// price and the store says "incl. VAT". Verified EU businesses (reverse charge)
+// see — and pay — the price minus the Dutch VAT inside it.
 // The checkout calculation stays the single source of truth; this is display.
 
 import { cache } from 'react'
@@ -39,7 +39,17 @@ export async function priceContextFor(code: string, withBusiness: boolean): Prom
       .maybeSingle()
     const b = biz as { vies_valid: boolean; vat_country: string | null; vies_checked_at: string | null } | null
     const fresh = b?.vies_checked_at && Date.now() - new Date(b.vies_checked_at).getTime() < 30 * 24 * 60 * 60 * 1000
-    if (b?.vies_valid && fresh && b.vat_country === code) return { rate: 0, country: '', origins: [] }
+    if (b?.vies_valid && fresh && b.vat_country === code) {
+      const [{ data: u }, { data: nlb }] = await Promise.all([
+        supabase.from('tax_rules').select('country_code').eq('customs_union', r.customs_union),
+        supabase.from('tax_rules').select('tax_rate').eq('country_code', 'NL').maybeSingle(),
+      ])
+      return {
+        rate: 0, country: '',
+        origins: ((u as { country_code: string }[] | null) ?? []).map(x => x.country_code),
+        strip: Number((nlb as { tax_rate: string | number | null } | null)?.tax_rate ?? 0),
+      }
+    }
   }
 
   const [{ data: union }, { data: country }, { data: ossStart }, { data: nl }] = await Promise.all([

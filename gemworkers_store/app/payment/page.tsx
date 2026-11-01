@@ -66,8 +66,9 @@ export default function PaymentPage() {
 
       <h2>VAT, customs and duties</h2>
       <p>
-        <strong>Stones shipped from the Netherlands to the EU:</strong> VAT for your country
-        is added at checkout and shown as a separate line.
+        <strong>Stones shipped from the Netherlands to the EU:</strong> the price you see
+        already includes the VAT of your country — nothing is added at checkout. The VAT
+        part is shown separately on the payment page and on your invoice.
       </p>
       <p>
         <strong>All other orders</strong> (stones shipped from Thailand or Pakistan, and

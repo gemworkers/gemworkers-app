@@ -7,15 +7,25 @@ export type PriceContext = {
   rate: number          // buyer's country VAT, e.g. 0.21
   country: string       // buyer's country name, e.g. "Netherlands"
   origins: string[]     // ship-from countries that trigger VAT (same customs union)
+  // Verified EU business (reverse charge): the Dutch VAT inside the price is
+  // taken off for them (sql/vat_included_prices.sql), so they see the net price.
+  strip?: number
 }
 
-/** The amount to show for a price (stone or shipping) of a stone shipped from [shipsFrom]. */
+/** The amount to show for a price (stone or shipping) of a stone shipped from
+ *  [shipsFrom]. One price for everyone, VAT included (sql/vat_included_prices.sql):
+ *  the amount is the entered price; inclVat says whether VAT is inside it. */
 export function shownPrice(amount: number, shipsFrom: string | null | undefined, ctx: PriceContext | null) {
-  const incl = !!ctx && ctx.rate > 0 && !!shipsFrom && ctx.origins.includes(shipsFrom)
-  return {
-    amount: incl ? Math.round(amount * (1 + ctx!.rate) * 100) / 100 : amount,
-    inclVat: incl,
+  const inUnion = !!ctx && !!shipsFrom && ctx.origins.includes(shipsFrom)
+  if (inUnion && ctx!.strip && ctx!.strip > 0) {
+    return { amount: Math.round(amount / (1 + ctx!.strip) * 100) / 100, inclVat: false }
   }
+  return { amount, inclVat: inUnion && ctx!.rate > 0 }
+}
+
+/** The VAT already inside a price, e.g. €121 at 21% → €21. */
+export function vatInside(gross: number, rate: number): number {
+  return rate > 0 ? Math.round(gross * rate / (1 + rate) * 100) / 100 : 0
 }
 
 /** Buyer's currency (lib/fx.ts), display only: 1 EUR = rate. GemWorkers
