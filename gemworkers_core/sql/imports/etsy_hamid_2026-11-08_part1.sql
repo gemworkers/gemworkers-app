@@ -1,3 +1,4 @@
+-- Applied to live DB 2026-11-08 (490 drafts, 0 listed, 3275 photos).
 -- Hamid Shop Etsy import, PART 1 of 2 (245 drafts, unlisted). Run part 1, then part 2. Safe to run twice.
 BEGIN;
 INSERT INTO public.inventory_items (id, title, description, seller_id, selling_price, quantity, product_type, gem_type, variety, weight_value, weight_unit, origin_country, clarity, dimensions_mm, image_urls, notes, sale_method, shipping_cost, delivery_days_min, delivery_days_max, prep_days, status, is_listed)
