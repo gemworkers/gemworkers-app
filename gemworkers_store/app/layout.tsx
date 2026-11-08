@@ -8,6 +8,7 @@ import { StoreHeader } from '@/app/components/StoreHeader'
 import { ShipToSelect } from '@/app/components/ShipToSelect'
 import { NewsletterSignup } from '@/app/components/NewsletterSignup'
 import { ViewCounter } from '@/app/components/ViewCounter'
+import { StaleVersionReload } from '@/app/components/StaleVersionReload'
 import { socialLinks } from '@/lib/social'
 import { SOCIAL_ICONS } from '@/lib/social-icons'
 import { loadShipCountries, currentShipToCode } from '@/lib/ship-to'
@@ -196,6 +197,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </div>
         {/* Anonymous views & visits (sql/page_views.sql) */}
         <ViewCounter />
+        <StaleVersionReload />
       </body>
     </html>
   )

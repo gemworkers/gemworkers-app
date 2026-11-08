@@ -8,6 +8,8 @@ const MAX_PER_HOUR = 60
 const IGNORE = [
   /dup delivery/i, /already confirmed/i, /already refunded/i, /refunded in full/i,
   /not available yet/i, /\[views\] not counted/i, /NEXT_REDIRECT/, /NEXT_NOT_FOUND/,
+  // Page open from an older deployment; the page reloads itself (lib/stale-version.ts).
+  /Failed to find Server Action/i,
 ]
 
 let windowStart = 0

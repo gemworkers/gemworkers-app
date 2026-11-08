@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { submitContact } from '@/app/actions/contact'
 import { TOPICS, type ContactState } from './contact-shared'
 
@@ -43,6 +43,21 @@ export function ContactForm({ initialTopic }: ContactFormProps) {
   const [email,   setEmail]   = useState('')
   const [topic,   setTopic]   = useState(validInitialTopic)
   const [message, setMessage] = useState('')
+
+  // Keep a draft in this tab: if the page reloads (e.g. it was open from before
+  // an update, lib/stale-version.ts), the visitor's text is still there.
+  useEffect(() => {
+    try {
+      const d = JSON.parse(sessionStorage.getItem('gw_contact_draft') || 'null')
+      if (d) { setName(d.name || ''); setEmail(d.email || ''); if (d.topic) setTopic(d.topic); setMessage(d.message || '') }
+    } catch { /* no draft */ }
+  }, [])
+  useEffect(() => {
+    try {
+      if (state.ok) sessionStorage.removeItem('gw_contact_draft')
+      else if (name || email || message) sessionStorage.setItem('gw_contact_draft', JSON.stringify({ name, email, topic, message }))
+    } catch { /* storage blocked */ }
+  }, [name, email, topic, message, state.ok])
 
   if (state.ok) {
     return (
