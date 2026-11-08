@@ -10,6 +10,7 @@ import '../../models/location.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../repositories/item_movement_repository.dart';
 import '../../repositories/location_repository.dart';
+import '../../repositories/seller_repository.dart';
 import '../../theme/app_theme.dart';
 import 'add_item_type_picker_page.dart';
 import 'edit_inventory_page.dart';
@@ -85,6 +86,9 @@ class _InventoryPageState extends State<InventoryPage>
   String _query = '';
   _ListingTab _selectedTab = _ListingTab.all;
   String? _gemTypeFilter;
+  /// Owner only: show one seller's stones (null = all sellers).
+  String? _sellerFilter;
+  Map<String, String> _sellerNames = {};
   Location? _locationFilter;
   Set<String> _locationDescendantIds = {};
   double _maxPrice = 10000;
@@ -148,8 +152,22 @@ class _InventoryPageState extends State<InventoryPage>
     } catch (_) {}
   }
 
+  Future<void> _loadSellers() async {
+    if (!UserProfileService.instance.isOwner) return;
+    try {
+      final sellers = await SellerRepository().getSellers();
+      if (mounted) {
+        setState(() => _sellerNames = {
+              for (final s in sellers)
+                if (s.id != null) s.id!: s.name,
+            });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _loadItems() async {
     _loadViews();
+    if (_sellerNames.isEmpty) _loadSellers();
     setState(() => _loading = true);
     try {
       final svc = UserProfileService.instance;
@@ -409,8 +427,13 @@ class _InventoryPageState extends State<InventoryPage>
 
   List<InventoryItem> get _displayItems => _applySorting(_filtered);
 
+  /// Items of the chosen seller (owner's Seller picker), else all.
+  List<InventoryItem> get _bySeller => _sellerFilter == null
+      ? _all
+      : _all.where((e) => e.sellerId == _sellerFilter).toList();
+
   List<InventoryItem> get _filtered {
-    return _all.where((item) {
+    return _bySeller.where((item) {
       if (_showUnassignedOnly && item.locationId != null) return false;
       if (_selectedTab != _ListingTab.all &&
           _listingStatus(item) != _selectedTab) {
@@ -469,6 +492,7 @@ class _InventoryPageState extends State<InventoryPage>
       _all.where((e) => e.locationId == null).length;
 
   bool get _hasFilters =>
+      _sellerFilter != null ||
       (_gemTypeFilter?.isNotEmpty ?? false) ||
       _locationFilter != null ||
       _showUnassignedOnly ||
@@ -478,6 +502,7 @@ class _InventoryPageState extends State<InventoryPage>
   void _clearFilters() {
     setState(() {
       _gemTypeFilter = null;
+      _sellerFilter = null;
       _locationFilter = null;
       _locationDescendantIds = {};
       _priceRange = RangeValues(0, _maxPrice);
@@ -487,7 +512,7 @@ class _InventoryPageState extends State<InventoryPage>
 
   // ── Gem type chips ────────────────────────────────────────────────────────
 
-  List<String> get _gemTypes => _all
+  List<String> get _gemTypes => _bySeller
       .map((e) => e.gemType)
       .where((g) => g.isNotEmpty)
       .toSet()
@@ -498,7 +523,7 @@ class _InventoryPageState extends State<InventoryPage>
 
   int get _availableCount => _all.where((e) => e.status == 'available').length;
 
-  double get _listedValue => _all
+  double get _listedValue => _bySeller
       .where((e) => _listingStatus(e) == _ListingTab.active)
       .fold(0, (sum, e) => sum + (e.sellingPrice ?? 0));
 
@@ -641,10 +666,11 @@ class _InventoryPageState extends State<InventoryPage>
 
   Map<_ListingTab, int> get _tabCounts {
     final counts = {for (final t in _ListingTab.values) t: 0};
-    for (final item in _all) {
+    final items = _bySeller;
+    for (final item in items) {
       counts[_listingStatus(item)] = counts[_listingStatus(item)]! + 1;
     }
-    counts[_ListingTab.all] = _all.length;
+    counts[_ListingTab.all] = items.length;
     return counts;
   }
 
@@ -878,6 +904,7 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
               ),
             ),
+            if (_sellerNames.length > 1) _buildSellerPill(),
             if (_gemTypes.isNotEmpty) _buildGemPill(),
             _Pill(
               icon: Icons.tune,
@@ -939,6 +966,38 @@ class _InventoryPageState extends State<InventoryPage>
         borderRadius: BorderRadius.circular(22),
         borderSide: BorderSide(color: color, width: width),
       );
+
+  Widget _buildSellerPill() {
+    final names = _sellerNames.entries.toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    int count(String id) => _all.where((e) => e.sellerId == id).length;
+    return PopupMenuButton<String>(
+      tooltip: 'Seller',
+      position: PopupMenuPosition.under,
+      onSelected: (id) => setState(() => _sellerFilter = id.isEmpty ? null : id),
+      itemBuilder: (_) => [
+        CheckedPopupMenuItem(
+          value: '',
+          checked: _sellerFilter == null,
+          child: Text('All sellers (${_all.length})'),
+        ),
+        for (final e in names)
+          CheckedPopupMenuItem(
+            value: e.key,
+            checked: _sellerFilter == e.key,
+            child: Text('${e.value} (${count(e.key)})'),
+          ),
+      ],
+      child: _Pill(
+        icon: Icons.storefront_outlined,
+        label: _sellerFilter == null
+            ? 'All sellers'
+            : (_sellerNames[_sellerFilter] ?? 'Seller'),
+        active: _sellerFilter != null,
+        trailingCaret: true,
+      ),
+    );
+  }
 
   Widget _buildGemPill() {
     return PopupMenuButton<String>(
