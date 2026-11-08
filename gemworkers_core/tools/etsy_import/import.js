@@ -18,6 +18,15 @@ const crypto = require('crypto')
 const [csvFile, sellerId, outDir, ...flags] = process.argv.slice(2)
 const DRY = flags.includes('--dry')
 const LIMIT = flags.includes('--limit') ? Number(flags[flags.indexOf('--limit') + 1]) : Infinity
+// Seller's own shipping (copy from their listed stones): --shipping 25 --days 4-8 --prep 3. Default = Atal's (free, 10–20 days).
+const flag = (n, d) => flags.includes(n) ? flags[flags.indexOf(n) + 1] : d
+const SHIP = Number(flag('--shipping', '0'))
+const [DMIN, DMAX] = flag('--days', '10-20').split('-').map(Number)
+const PREP = flag('--prep', null)
+// --usd-rate 1.1165 = ECB euro reference rate (1 EUR = x USD): USD prices → whole euros (GemWorkers is EUR-only).
+const USD_RATE = Number(flag('--usd-rate', '0'))
+// --max-qty 90: Etsy 'keep active' stock numbers (≥ this) become 1; the seller enters the real stock.
+const MAX_QTY = Number(flag('--max-qty', '1000'))
 if (!csvFile || !sellerId || !outDir) { console.error('usage: import.js <csv> <seller_id> <out_dir> [--dry] [--limit N]'); process.exit(1) }
 fs.mkdirSync(outDir, { recursive: true })
 
@@ -39,6 +48,7 @@ function parseCsv(t) {
 
 // ── Recognise fields from title + description ───────────────────────────────
 const GEMS = [  // [word in title, gem_type, variety]
+  ['ametrine', 'Quartz', 'Ametrine'], ['hauyne', 'Hauyne', null], ['moonstone', 'Moonstone', null], ['aqumarine', 'Aquamarine', null], ['imperial topa', 'Topaz', 'Imperial'],
   ['rubellite', 'Tourmaline', 'Rubellite'], ['indicolite', 'Tourmaline', 'Indicolite'], ['paraiba', 'Tourmaline', 'Paraiba'],
   ['tourmaline', 'Tourmaline', null], ['kunzite', 'Kunzite', null], ['hiddenite', 'Hiddenite', null], ['spodumene', 'Spodumene', null],
   ['aquamarine', 'Aquamarine', null], ['morganite', 'Morganite', null], ['heliodor', 'Beryl', 'Heliodor'], ['emerald', 'Emerald', null],
@@ -70,7 +80,9 @@ function recognise(row) {
     [/\bmadagascar\b/i, 'Madagascar'], [/\bburm(a|ese)\b|\bmyanmar\b/i, 'Myanmar'], [/\btanzania/i, 'Tanzania'], [/\bkenya/i, 'Kenya'],
     [/\bnamibia/i, 'Namibia'], [/\bcolombia/i, 'Colombia'], [/\bzambia/i, 'Zambia'], [/\bvietnam/i, 'Vietnam']]
   const originLine = (desc.match(/origin\s*:\s*([A-Za-z][A-Za-z .'-]{1,40})/i) || [])[1]
-  const origin = originLine ?? (COUNTRY.find(([re]) => re.test(title + ' ' + desc)) || [])[1]
+  // The "Origin:" line only counts when it names a known place (not "Ethically sourced").
+  const fromLine = originLine && (COUNTRY.find(([re]) => re.test(originLine)) || [])[1]
+  const origin = fromLine ?? (COUNTRY.find(([re]) => re.test(title + ' ' + desc)) || [])[1]
   const size = (desc.match(/size\s*:\s*([\d.,]+\s*x\s*[\d.,]+(?:\s*x\s*[\d.,]+)?)\s*mm/i) || [])[1]
   const clarity = (desc.match(/clarity\s*:\s*([^\n\r]{1,60})/i) || [])[1]
   const images = Array.from({ length: 10 }, (_, i) => row[`IMAGE${i + 1}`]).filter(u => /^https:\/\/i\.etsystatic\.com\//.test(u || ''))
@@ -113,6 +125,13 @@ const q = s => (s == null ? 'NULL' : `'${String(s).replace(/'/g, "''")}'`)
 ;(async () => {
   const rows = parseCsv(fs.readFileSync(csvFile, 'utf8')).slice(0, LIMIT)
   const items = rows.map(recognise)
+  for (const it of items) {
+    if (it.currency === 'USD') {
+      if (!USD_RATE) { console.error('Prices are in USD: pass --usd-rate (ECB rate, 1 EUR = x USD)'); process.exit(1) }
+      it.etsy_price = `${it.price} USD`; it.price = Math.round(it.price / USD_RATE); it.currency = 'EUR'
+    } else if (it.currency !== 'EUR') { console.error(`Unknown currency ${it.currency}`); process.exit(1) }
+    if (it.quantity >= MAX_QTY) { it.etsy_qty = it.quantity; it.quantity = 1 }
+  }
   const idsFile = path.join(outDir, 'ids.json')
   const ids = fs.existsSync(idsFile) ? JSON.parse(fs.readFileSync(idsFile, 'utf8')) : {}
   items.forEach((it, i) => { const k = `${i}|${it.title}`; ids[k] ??= crypto.randomUUID(); it.id = ids[k] })
@@ -162,11 +181,11 @@ const q = s => (s == null ? 'NULL' : `'${String(s).replace(/'/g, "''")}'`)
     'BEGIN;',
   ]
   for (const it of items) {
-    const notes = [`Imported from Etsy (${stamp}).`, it.etsy_sku && `Etsy SKU: ${it.etsy_sku}.`,
+    const notes = [`Imported from Etsy (${stamp}).`, it.etsy_sku && `Etsy SKU: ${it.etsy_sku}.`, it.etsy_price && `Etsy price ${it.etsy_price}, converted at ECB rate.`, it.etsy_qty && `Etsy quantity was ${it.etsy_qty} — set the real stock.`,
       it.tags && `Etsy tags: ${it.tags.replace(/_/g, ' ')}.`, it.variations && 'Had variations on Etsy — check size/options.']
       .filter(Boolean).join(' ')
-    sql.push(`INSERT INTO public.inventory_items (id, title, description, seller_id, selling_price, quantity, product_type, gem_type, variety, weight_value, weight_unit, origin_country, clarity, dimensions_mm, image_urls, notes, sale_method, shipping_cost, delivery_days_min, delivery_days_max, status, is_listed)
-VALUES (${q(it.id)}, ${q(it.title)}, ${q(it.description)}, ${q(sellerId)}, ${Number.isFinite(it.price) ? it.price : 'NULL'}, ${it.quantity}, ${q(it.product_type)}, ${q(it.gem_type)}, ${q(it.variety)}, ${it.weight_value ?? 'NULL'}, ${q(it.weight_unit)}, ${q(it.origin_country)}, ${q(it.clarity)}, ${q(it.dimensions_mm)}, ${q(JSON.stringify(it.image_urls))}::jsonb, ${q(notes)}, ${q(it.quantity > 1 ? 'buy_now' : 'both')}, 0, 10, 20, 'available', false)
+    sql.push(`INSERT INTO public.inventory_items (id, title, description, seller_id, selling_price, quantity, product_type, gem_type, variety, weight_value, weight_unit, origin_country, clarity, dimensions_mm, image_urls, notes, sale_method, shipping_cost, delivery_days_min, delivery_days_max, prep_days, status, is_listed)
+VALUES (${q(it.id)}, ${q(it.title)}, ${q(it.description)}, ${q(sellerId)}, ${Number.isFinite(it.price) ? it.price : 'NULL'}, ${it.quantity}, ${q(it.product_type)}, ${q(it.gem_type)}, ${q(it.variety)}, ${it.weight_value ?? 'NULL'}, ${q(it.weight_unit)}, ${q(it.origin_country)}, ${q(it.clarity)}, ${q(it.dimensions_mm)}, ${q(JSON.stringify(it.image_urls))}::jsonb, ${q(notes)}, ${q(it.quantity > 1 ? 'buy_now' : 'both')}, ${SHIP}, ${DMIN}, ${DMAX}, ${PREP == null ? 'NULL' : Number(PREP)}, 'available', false)
 ON CONFLICT (id) DO NOTHING;`)
   }
   sql.push(`-- Check: drafts for this seller, all unlisted`,
