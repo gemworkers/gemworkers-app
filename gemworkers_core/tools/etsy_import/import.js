@@ -27,6 +27,10 @@ const PREP = flag('--prep', null)
 const USD_RATE = Number(flag('--usd-rate', '0'))
 // --max-qty 90: Etsy 'keep active' stock numbers (≥ this) become 1; the seller enters the real stock.
 const MAX_QTY = Number(flag('--max-qty', '1000'))
+// --vat-markup 1.21: own NL stock whose Etsy price had VAT inside by accident → GemWorkers price incl. VAT (whole euros).
+const MARKUP = Number(flag('--vat-markup', '1'))
+// --skip 1,5,16: CSV rows (1 = first listing) already on GemWorkers — not imported.
+const SKIP = new Set(String(flag('--skip', '')).split(',').filter(Boolean).map(Number))
 if (!csvFile || !sellerId || !outDir) { console.error('usage: import.js <csv> <seller_id> <out_dir> [--dry] [--limit N]'); process.exit(1) }
 fs.mkdirSync(outDir, { recursive: true })
 
@@ -48,7 +52,7 @@ function parseCsv(t) {
 
 // ── Recognise fields from title + description ───────────────────────────────
 const GEMS = [  // [word in title, gem_type, variety]
-  ['ametrine', 'Quartz', 'Ametrine'], ['hauyne', 'Hauyne', null], ['moonstone', 'Moonstone', null], ['aqumarine', 'Aquamarine', null], ['imperial topa', 'Topaz', 'Imperial'],
+  ['herkimer', 'Quartz', 'Herkimer'], ["tiger's eye", "Tiger's Eye", null], ['tiger eye', "Tiger's Eye", null], ['ametrine', 'Quartz', 'Ametrine'], ['hauyne', 'Hauyne', null], ['moonstone', 'Moonstone', null], ['aqumarine', 'Aquamarine', null], ['imperial topa', 'Topaz', 'Imperial'],
   ['rubellite', 'Tourmaline', 'Rubellite'], ['indicolite', 'Tourmaline', 'Indicolite'], ['paraiba', 'Tourmaline', 'Paraiba'],
   ['tourmaline', 'Tourmaline', null], ['kunzite', 'Kunzite', null], ['hiddenite', 'Hiddenite', null], ['spodumene', 'Spodumene', null],
   ['aquamarine', 'Aquamarine', null], ['morganite', 'Morganite', null], ['heliodor', 'Beryl', 'Heliodor'], ['emerald', 'Emerald', null],
@@ -67,7 +71,9 @@ function recognise(row) {
   const title = row.TITLE.trim()
   const desc = row.DESCRIPTION || ''
   const lower = title.toLowerCase()
-  const gem = GEMS.find(([w]) => lower.includes(w))
+  // The gem named FIRST in the title wins ("Aquamarine with black tourmaline" = aquamarine).
+  const gem = GEMS.map(g => [g, lower.indexOf(g[0])]).filter(([, i]) => i >= 0)
+    .sort((a, b) => a[1] - b[1])[0]?.[0]
   const productType = JEWELRY.test(title) ? 'jewelry' : SPECIMEN.test(title) ? 'specimen' : 'loose_stone'
   let weight = null, unit = null
   const wt = title.match(/(\d+(?:\.\d+)?)\s*(cts?|carats?)\b/i)
@@ -124,12 +130,13 @@ const q = s => (s == null ? 'NULL' : `'${String(s).replace(/'/g, "''")}'`)
 
 ;(async () => {
   const rows = parseCsv(fs.readFileSync(csvFile, 'utf8')).slice(0, LIMIT)
-  const items = rows.map(recognise)
+  const items = rows.map(recognise).filter((_, i) => !SKIP.has(i + 1))
   for (const it of items) {
     if (it.currency === 'USD') {
       if (!USD_RATE) { console.error('Prices are in USD: pass --usd-rate (ECB rate, 1 EUR = x USD)'); process.exit(1) }
       it.etsy_price = `${it.price} USD`; it.price = Math.round(it.price / USD_RATE); it.currency = 'EUR'
     } else if (it.currency !== 'EUR') { console.error(`Unknown currency ${it.currency}`); process.exit(1) }
+    if (MARKUP !== 1) { it.etsy_price = it.etsy_price || `${it.price} EUR`; it.price = Math.round(it.price * MARKUP) }
     if (it.quantity >= MAX_QTY) { it.etsy_qty = it.quantity; it.quantity = 1 }
   }
   const idsFile = path.join(outDir, 'ids.json')
@@ -181,7 +188,7 @@ const q = s => (s == null ? 'NULL' : `'${String(s).replace(/'/g, "''")}'`)
     'BEGIN;',
   ]
   for (const it of items) {
-    const notes = [`Imported from Etsy (${stamp}).`, it.etsy_sku && `Etsy SKU: ${it.etsy_sku}.`, it.etsy_price && `Etsy price ${it.etsy_price}, converted at ECB rate.`, it.etsy_qty && `Etsy quantity was ${it.etsy_qty} — set the real stock.`,
+    const notes = [`Imported from Etsy (${stamp}).`, it.etsy_sku && `Etsy SKU: ${it.etsy_sku}.`, it.etsy_price && `Etsy price ${it.etsy_price}${MARKUP !== 1 ? ` × ${MARKUP} (VAT)` : ', converted at ECB rate'}.`, it.etsy_qty && `Etsy quantity was ${it.etsy_qty} — set the real stock.`,
       it.tags && `Etsy tags: ${it.tags.replace(/_/g, ' ')}.`, it.variations && 'Had variations on Etsy — check size/options.']
       .filter(Boolean).join(' ')
     sql.push(`INSERT INTO public.inventory_items (id, title, description, seller_id, selling_price, quantity, product_type, gem_type, variety, weight_value, weight_unit, origin_country, clarity, dimensions_mm, image_urls, notes, sale_method, shipping_cost, delivery_days_min, delivery_days_max, prep_days, status, is_listed)
