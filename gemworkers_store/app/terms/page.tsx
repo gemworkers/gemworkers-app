@@ -12,16 +12,19 @@ export default async function TermsPage() {
 
       <h2>Who we are</h2>
       <p>
-        GemWorkers is the trading name of {c.name}, registered in the Netherlands.
+        GemWorkers is the trading name of Zakaria Khan, a sole proprietorship
+        (eenmanszaak) registered in the Netherlands.
       </p>
       <ul>
+        <li>Legal name: Z. Khan, trading as GemWorkers</li>
+        <li>Legal form: sole proprietorship (eenmanszaak)</li>
         {c.address && <li style={{ whiteSpace: 'pre-line' }}>Address: {c.address}</li>}
         {c.kvk && <li>Chamber of Commerce (KvK): {c.kvk}</li>}
         {c.vat && <li>VAT number: {c.vat}</li>}
         <li>Email: <a href={`mailto:${c.email}`}>{c.email}</a></li>
       </ul>
       <p>
-        When you buy from GemWorkers, your contract is with {c.name}. GemWorkers sells
+        When you buy from GemWorkers, your contract is with Zakaria Khan, trading as GemWorkers. GemWorkers sells
         every piece in its own name, including pieces it sells on behalf of partners. Some
         pieces are shipped directly from our partners in Thailand and Pakistan; the product
         page shows where each piece ships from.
