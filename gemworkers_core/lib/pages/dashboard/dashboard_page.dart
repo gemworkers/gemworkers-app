@@ -237,6 +237,8 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     return _viewsFuture!;
   }
+  /// Visitors by country: top 10, or all after "Show all".
+  bool _allCountries = false;
   double? _rating;
   int _ratingCount = 0;
 
@@ -541,13 +543,19 @@ class _DashboardPageState extends State<DashboardPage> {
                           const SizedBox(height: 4),
                           Text(isOwner ? 'Visits' : 'Visits to your stones', style: t.bodySmall?.copyWith(color: AppColors.muted)),
                           const SizedBox(height: 6),
-                          for (final c in countries)
+                          for (final c in _allCountries ? countries : countries.take(10))
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 3),
                               child: Row(children: [
                                 Expanded(child: Text(countryName(c['country']?.toString()))),
                                 Text('${c['visits']}', style: AppTheme.numeric(t.bodyMedium)),
                               ]),
+                            ),
+                          if (countries.length > 10)
+                            TextButton(
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                              onPressed: () => setState(() => _allCountries = !_allCountries),
+                              child: Text(_allCountries ? 'Show top 10' : 'Show all ${countries.length} countries'),
                             ),
                         ],
                       ]),
