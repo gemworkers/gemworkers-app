@@ -1,3 +1,4 @@
+-- Applied to live DB 2026-11-09 (748 drafts, 0 listed, 7008 photos).
 -- Abdal Shop Etsy import, PART 1 of 3 (250 drafts, unlisted; USD→EUR at ECB 1.1193). Run parts in order. Safe to run twice.
 BEGIN;
 INSERT INTO public.inventory_items (id, title, description, seller_id, selling_price, quantity, product_type, gem_type, variety, weight_value, weight_unit, origin_country, clarity, dimensions_mm, image_urls, notes, sale_method, shipping_cost, delivery_days_min, delivery_days_max, prep_days, status, is_listed)
