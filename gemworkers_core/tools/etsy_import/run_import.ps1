@@ -38,4 +38,4 @@ try {
   Set-Location $root
 }
 Write-Host ''
-Write-Host 'Done. Tell Claude: "Hamid upload finished".'
+Write-Host 'Done. Tell Claude: "upload finished".'
