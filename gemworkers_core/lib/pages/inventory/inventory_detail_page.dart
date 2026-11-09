@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/utils/download/download_file.dart';
 import '../../core/utils/share/share.dart';
 
 import '../../core/services/user_profile_service.dart';
@@ -64,6 +65,22 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
 
   // A video still encoding at Bunny: ask whether it is ready (the store shows
   // it as soon as it is; the Bunny webhook usually gets there first).
+  bool _downloadingVideo = false;
+
+  Future<void> _downloadVideo() async {
+    setState(() => _downloadingVideo = true);
+    try {
+      final name = _item.title.replaceAll(RegExp(r'[^A-Za-z0-9 ]'), '').trim().replaceAll(RegExp(r's+'), '-');
+      await downloadUrlFile(_item.videoUrl!, '${name.isEmpty ? 'stone' : name}.mp4');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _downloadingVideo = false);
+    }
+  }
+
   Future<void> _checkVideo() async {
     if (_item.id == null) return;
     try {
@@ -797,6 +814,19 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
               title: const Text('Video processing'),
               subtitle: const Text('Usually a few minutes. It appears on the store by itself when ready.'),
               trailing: TextButton(onPressed: _checkVideo, child: const Text('Check')),
+            ),
+          // Download the stone's video (owner, or the seller of this stone —
+          // sellers only ever open their own stones). For Instagram etc.
+          if (_item.videoPending == null && (_item.videoUrl ?? '').contains('b-cdn.net'))
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _downloadingVideo ? null : _downloadVideo,
+                icon: _downloadingVideo
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.download),
+                label: Text(_downloadingVideo ? 'Downloading…' : 'Download video'),
+              ),
             ),
           if (UserProfileService.instance.isOwner && _item.isListed)
             SwitchListTile(
