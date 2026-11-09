@@ -67,11 +67,23 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
   // it as soon as it is; the Bunny webhook usually gets there first).
   bool _downloadingVideo = false;
 
+  /// Phones: the fetched video, ready for the share menu (second tap).
+  Object? _videoFile;
+
   Future<void> _downloadVideo() async {
+    final name = _item.title.replaceAll(RegExp(r'[^A-Za-z0-9 ]'), '').trim().replaceAll(RegExp(r's+'), '-');
+    final filename = '${name.isEmpty ? 'stone' : name}.mp4';
+    if (canShareFiles && _videoFile != null) {
+      if (!await shareFile(_videoFile!)) saveFile(_videoFile!);
+      return;
+    }
     setState(() => _downloadingVideo = true);
     try {
-      final name = _item.title.replaceAll(RegExp(r'[^A-Za-z0-9 ]'), '').trim().replaceAll(RegExp(r's+'), '-');
-      await downloadUrlFile(_item.videoUrl!, '${name.isEmpty ? 'stone' : name}.mp4');
+      if (canShareFiles) {
+        _videoFile = await fetchFileForShare(_item.videoUrl!, filename);
+      } else {
+        await downloadUrlFile(_item.videoUrl!, filename);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
@@ -824,8 +836,14 @@ class _InventoryDetailPageState extends State<InventoryDetailPage> {
                 onPressed: _downloadingVideo ? null : _downloadVideo,
                 icon: _downloadingVideo
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.download),
-                label: Text(_downloadingVideo ? 'Downloading…' : 'Download video'),
+                    : Icon(canShareFiles ? Icons.ios_share : Icons.download),
+                label: Text(_downloadingVideo
+                    ? 'Getting video…'
+                    : !canShareFiles
+                        ? 'Download video'
+                        : _videoFile == null
+                            ? 'Get video to share'
+                            : 'Share video (Instagram, TikTok…)'),
               ),
             ),
           if (UserProfileService.instance.isOwner && _item.isListed)
