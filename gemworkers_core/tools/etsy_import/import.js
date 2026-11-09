@@ -52,7 +52,8 @@ function parseCsv(t) {
 
 // ── Recognise fields from title + description ───────────────────────────────
 const GEMS = [  // [word in title, gem_type, variety]
-  ['herkimer', 'Quartz', 'Herkimer'], ["tiger's eye", "Tiger's Eye", null], ['tiger eye', "Tiger's Eye", null], ['ametrine', 'Quartz', 'Ametrine'], ['hauyne', 'Hauyne', null], ['moonstone', 'Moonstone', null], ['aqumarine', 'Aquamarine', null], ['imperial topa', 'Topaz', 'Imperial'],
+  ['rubilite', 'Tourmaline', 'Rubellite'], ['rubelite', 'Tourmaline', 'Rubellite'], ['watermelon', 'Tourmaline', 'Watermelon'],
+  ['flourite', 'Fluorite', null], ['herkimer', 'Quartz', 'Herkimer'], ["tiger's eye", "Tiger's Eye", null], ['tiger eye', "Tiger's Eye", null], ['ametrine', 'Quartz', 'Ametrine'], ['hauyne', 'Hauyne', null], ['moonstone', 'Moonstone', null], ['aqumarine', 'Aquamarine', null], ['imperial topa', 'Topaz', 'Imperial'],
   ['rubellite', 'Tourmaline', 'Rubellite'], ['indicolite', 'Tourmaline', 'Indicolite'], ['paraiba', 'Tourmaline', 'Paraiba'],
   ['tourmaline', 'Tourmaline', null], ['kunzite', 'Kunzite', null], ['hiddenite', 'Hiddenite', null], ['spodumene', 'Spodumene', null],
   ['aquamarine', 'Aquamarine', null], ['morganite', 'Morganite', null], ['heliodor', 'Beryl', 'Heliodor'], ['emerald', 'Emerald', null],
@@ -72,8 +73,11 @@ function recognise(row) {
   const desc = row.DESCRIPTION || ''
   const lower = title.toLowerCase()
   // The gem named FIRST in the title wins ("Aquamarine with black tourmaline" = aquamarine).
+  // Else Etsy's own "Gemstone" attribute (one value, e.g. "Tourmaline").
+  const attr = /^gemstone/i.test(row['VARIATION 1 NAME'] || '') && !/,/.test(row['VARIATION 1 VALUES'] || '')
+    ? (row['VARIATION 1 VALUES'] || '').toLowerCase().trim() : ''
   const gem = GEMS.map(g => [g, lower.indexOf(g[0])]).filter(([, i]) => i >= 0)
-    .sort((a, b) => a[1] - b[1])[0]?.[0]
+    .sort((a, b) => a[1] - b[1])[0]?.[0] ?? GEMS.find(([w]) => attr.includes(w))
   const productType = JEWELRY.test(title) ? 'jewelry' : SPECIMEN.test(title) ? 'specimen' : 'loose_stone'
   let weight = null, unit = null
   const wt = title.match(/(\d+(?:\.\d+)?)\s*(cts?|carats?)\b/i)
@@ -101,7 +105,8 @@ function recognise(row) {
     clarity: clarity ? clarity.trim() : null,
     dimensions_mm: size ? size.replace(/s+/g, ' ').trim() : null,
     images, etsy_sku: row.SKU || null, tags: row.TAGS || '', materials: row.MATERIALS || '',
-    variations: !!(row['VARIATION 1 TYPE'] || '').trim(),
+    // Only real choices count (several values); a single Etsy attribute is not one.
+    variations: [1, 2, 3].some(n => (row[`VARIATION ${n} VALUES`] || '').includes(',')),
   }
 }
 
