@@ -1,5 +1,6 @@
 import { ContentPage } from '@/app/components/ContentPage'
 import { ContactForm } from './ContactForm'
+import { WHATSAPP_DISPLAY, WHATSAPP_LINK } from '@/lib/whatsapp'
 
 type Props = { searchParams: Promise<{ topic?: string }> }
 
@@ -26,6 +27,10 @@ export default async function ContactPage({ searchParams }: Props) {
             style={{ color: '#7A5A22', textDecoration: 'none' }}
           >
             hello@gemworkers.com
+          </a>
+          {' '}· or WhatsApp us at{' '}
+          <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" style={{ color: '#7A5A22', textDecoration: 'none' }}>
+            {WHATSAPP_DISPLAY}
           </a>
         </p>
       </div>

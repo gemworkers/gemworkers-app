@@ -26,6 +26,7 @@ import { favouriteIds } from '@/lib/favourites';
 import { FavouriteButton } from '@/app/components/FavouriteButton';
 import { ShareButton } from '@/app/components/ShareButton';
 import { isUploadedVideo } from '@/lib/media'
+import { tidyTitle } from '@/lib/tidy'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -396,7 +397,7 @@ export default async function StoneDetailPage({
         <span aria-hidden="true">/</span>
         <Link href={category.href}>{category.label}</Link>
         <span aria-hidden="true">/</span>
-        <span aria-current="page" className="pd-crumb-current">{item.title}</span>
+        <span aria-current="page" className="pd-crumb-current">{tidyTitle(item.title)}</span>
       </nav>
 
       {/* Cancel-return notice */}
@@ -431,7 +432,7 @@ export default async function StoneDetailPage({
         <div className="pd-info">
           {eyebrow && <p className="pd-eyebrow">{eyebrow}</p>}
 
-          <h1 className="font-serif pd-title">{item.title}</h1>
+          <h1 className="font-serif pd-title">{tidyTitle(item.title)}</h1>
 
           {metaLine && <p className="pd-meta">{metaLine}</p>}
 

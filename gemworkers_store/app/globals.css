@@ -362,6 +362,20 @@
 .home-h2 { font-size: 42px; line-height: 1.1; font-weight: 500; color: #1F1B16; }
 .home-lead { font-size: 18px; line-height: 1.6; color: #5A5045; max-width: 520px; }
 .home-cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 36px; }
+/* Trust line under the hero buttons */
+.home-trustline { list-style: none; padding: 0; margin: 22px 0 0; display: flex; flex-wrap: wrap; gap: 8px 18px;
+  font-size: 13px; color: #5A5045; letter-spacing: 0.02em; }
+.home-trustline li { display: inline-flex; align-items: center; gap: 7px; }
+.home-trustline li::before { content: '✓'; color: #7A5A22; font-weight: 700; }
+/* How buying works */
+.home-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.home-steps li { background: #FFFFFF; border: 1px solid #ECE5D8; border-radius: 12px; padding: 22px 22px 24px;
+  display: flex; flex-direction: column; gap: 8px; }
+.home-step-num { width: 30px; height: 30px; border-radius: 50%; background: #1F1B16; color: #FBF8F3;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+.home-step-title { font-size: 21px; color: #1F1B16; }
+.home-step-body { font-size: 14px; line-height: 1.6; color: #5A5045; }
+@media (max-width: 760px) { .home-steps { grid-template-columns: 1fr; } }
 .home-btn {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 14px 28px; border-radius: 28px;

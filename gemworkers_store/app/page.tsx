@@ -11,6 +11,7 @@ import { countryName } from "@/lib/countries";
 import type { StoneCardItem } from "@/app/components/StoneCard";
 import { HeroCollage } from '@/app/components/HeroCollage'
 import { StoneCarousel } from '@/app/components/StoneCarousel'
+import { WHATSAPP_DISPLAY } from '@/lib/whatsapp'
 
 type ListedItem = {
   id: string;
@@ -105,7 +106,8 @@ export default async function HomePage() {
     shipping_cost:  item.shipping_cost,
     image_url:      item.image_url,
   })
-  const newArrivals = items.slice(0, 12).map(toCard)
+  // New arrivals skip the ⭐ featured stones, so no stone shows twice.
+  const newArrivals = items.filter(i => !i.is_featured).slice(0, 12).map(toCard)
   const featured = items.filter(i => i.is_featured).map(toCard)
   const withPhoto = items.filter(i => !!i.image_url)
 
@@ -118,12 +120,12 @@ export default async function HomePage() {
     ...c,
     count: items.filter(i => i.product_type === c.type).length,
     photo: withPhoto.find(i => i.product_type === c.type)?.image_url ?? null,
-  }))
+  })).filter(c => c.count >= 3)   // a tile with 1 piece looks empty
 
   // Gems actually in stock, most stones first.
   const gemCounts = new Map<string, number>()
   for (const i of items) if (i.gem_type?.trim()) gemCounts.set(i.gem_type.trim(), (gemCounts.get(i.gem_type.trim()) ?? 0) + 1)
-  const gems = [...gemCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+  const gems = [...gemCounts.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8)
 
   const [pctx, favs, fx] = await Promise.all([priceContext(), favouriteIds(), fxContext()])
 
@@ -142,6 +144,12 @@ export default async function HomePage() {
             <Link href={SHOP_HREF} className="home-btn home-btn-solid">Shop the collection</Link>
             <Link href="/contact?topic=Request%20a%20stone" className="home-btn home-btn-outline">Request a stone</Link>
           </div>
+          <ul className="home-trustline" aria-label="Why buy from GemWorkers">
+            <li>Since 2018</li>
+            <li>4,000+ stones sold worldwide</li>
+            <li>30-day returns</li>
+            <li>Secure payment by Stripe</li>
+          </ul>
           <ReviewSummary style={{ marginTop: 20 }} />
         </div>
         {hasHero ? (
@@ -172,7 +180,30 @@ export default async function HomePage() {
         )}
       </section>
 
+      {/* ── How buying works: what happens after paying ── */}
+      <section className="home-wrap home-section-tight">
+        <SectionHeader title="How buying works" />
+        <ol className="home-steps">
+          <li>
+            <span className="home-step-num">1</span>
+            <span className="font-serif home-step-title">Choose your stone</span>
+            <span className="home-step-body">Every stone is photographed as it is, with treatments disclosed. Questions? Message us or WhatsApp {WHATSAPP_DISPLAY}.</span>
+          </li>
+          <li>
+            <span className="home-step-num">2</span>
+            <span className="font-serif home-step-title">Pay securely</span>
+            <span className="home-step-body">Card, PayPal, Apple Pay, Google Pay or iDEAL, through Stripe. You pay in your own currency.</span>
+          </li>
+          <li>
+            <span className="home-step-num">3</span>
+            <span className="font-serif home-step-title">Tracked delivery</span>
+            <span className="home-step-body">Shipped with tracking. Not what you hoped for? Return it within 30 days.</span>
+          </li>
+        </ol>
+      </section>
+
       {/* ── 4. Shop by category ── */}
+      {categories.length > 0 && (
       <section className="home-band">
         <div className="home-wrap home-section-tight">
           <SectionHeader title="Shop by category" linkLabel="All stones →" href={SHOP_HREF} />
@@ -194,6 +225,7 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ── 5. Shop by gemstone (gems in stock) ── */}
       {gems.length > 0 && (

@@ -3,6 +3,7 @@ import { countryName } from '@/lib/countries'
 import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext } from '@/lib/price-shown'
 import { FavouriteButton } from './FavouriteButton'
 import { cardImage } from '@/lib/media'
+import { tidyTitle, tidyPlace } from '@/lib/tidy'
 
 export type StoneCardItem = {
   id: string
@@ -25,7 +26,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
   favouriteIds?: string[] | null
 }) {
   const gemLabel    = item.variety?.trim() || item.gem_type?.trim() || null
-  const originLabel = item.origin_country?.trim() || null
+  const originLabel = tidyPlace(item.origin_country)
   const hasWeight   = item.weight_value != null && Number(item.weight_value) > 0
   const weightLabel = hasWeight ? `${item.weight_value} ${item.weight_unit ?? ''}`.trim() : null
   const meta        = [weightLabel, originLabel].filter(Boolean).join(' · ') || gemLabel
@@ -57,7 +58,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={cardImage(item.image_url)}
-            alt={item.title}
+            alt={tidyTitle(item.title)}
             className="stone-img"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
@@ -86,7 +87,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
         )}
 
         <p style={{ fontSize: 17, fontWeight: 600, color: '#1F1B16', lineHeight: 1.3, marginBottom: 4 }}>
-          {item.title}
+          {tidyTitle(item.title)}
         </p>
 
         {shipsFrom && (

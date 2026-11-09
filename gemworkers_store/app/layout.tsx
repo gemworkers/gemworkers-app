@@ -12,6 +12,7 @@ import { StaleVersionReload } from '@/app/components/StaleVersionReload'
 import { socialLinks } from '@/lib/social'
 import { SOCIAL_ICONS } from '@/lib/social-icons'
 import { loadShipCountries, currentShipToCode } from '@/lib/ship-to'
+import { WHATSAPP_DISPLAY, WHATSAPP_LINK } from '@/lib/whatsapp'
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -101,6 +102,13 @@ async function Footer() {
         {/* Email sign-up (sql/newsletter.sql) + GemWorkers' social accounts */}
         <div>
           <NewsletterSignup />
+          <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer"
+             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 18, fontSize: 13, color: '#5A5045', textDecoration: 'none' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.6-5.2A8.5 8.5 0 1 1 21 11.5z" strokeLinejoin="round" />
+            </svg>
+            WhatsApp {WHATSAPP_DISPLAY}
+          </a>
           {accounts.length > 0 && (
             <div style={{ display: 'flex', gap: 14, marginTop: 22, flexWrap: 'wrap' }} aria-label="GemWorkers on social media">
               {accounts.map(k => (
