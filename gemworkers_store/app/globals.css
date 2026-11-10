@@ -367,6 +367,18 @@
   font-size: 13px; color: #5A5045; letter-spacing: 0.02em; }
 .home-trustline li { display: inline-flex; align-items: center; gap: 7px; }
 .home-trustline li::before { content: '✓'; color: #7A5A22; font-weight: 700; }
+/* Buyer protection box (under the hero) */
+.home-protect { background: #FFFFFF; border: 1px solid #E3D6BC; border-radius: 16px; padding: 28px 30px; }
+.home-protect-title { font-size: 28px; color: #1F1B16; margin: 0 0 18px; }
+.home-protect-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+.home-protect-list li { display: flex; flex-direction: column; gap: 6px; padding-left: 28px; position: relative; }
+.home-protect-list li::before { content: '✓'; position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%;
+  background: #1F1B16; color: #FBF8F3; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.home-protect-list strong { font-size: 15px; color: #1F1B16; }
+.home-protect-list span { font-size: 13.5px; line-height: 1.55; color: #5A5045; }
+.home-protect-company { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid #ECE5D8; font-size: 13px; color: #6B6052; }
+@media (max-width: 960px) { .home-protect-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .home-protect { padding: 22px 18px; } .home-protect-list { grid-template-columns: 1fr; gap: 16px; } }
 /* How buying works */
 .home-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .home-steps li { background: #FFFFFF; border: 1px solid #ECE5D8; border-radius: 12px; padding: 22px 22px 24px;

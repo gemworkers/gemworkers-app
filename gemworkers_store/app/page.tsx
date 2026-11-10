@@ -13,6 +13,7 @@ import { HeroCollage } from '@/app/components/HeroCollage'
 import { StoneCarousel } from '@/app/components/StoneCarousel'
 import { WHATSAPP_DISPLAY } from '@/lib/whatsapp'
 import { COLOURS, COLLECTIONS, colourKeys } from '@/lib/browse'
+import { companyInfo } from '@/lib/company'
 
 type ListedItem = {
   id: string;
@@ -146,7 +147,7 @@ export default async function HomePage() {
 
   const gems = [...gemCounts.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8)
 
-  const [pctx, favs, fx] = await Promise.all([priceContext(), favouriteIds(), fxContext()])
+  const [pctx, favs, fx, company] = await Promise.all([priceContext(), favouriteIds(), fxContext(), companyInfo()])
 
   return (
     <main>
@@ -179,6 +180,35 @@ export default async function HomePage() {
         ) : (
           <div className="home-hero-media home-panel" aria-hidden="true" />
         )}
+      </section>
+
+      {/* ── Buyer protection: why it is safe to buy (wording matches /guarantee) ── */}
+      <section className="home-wrap home-section-tight">
+        <div className="home-protect">
+          <h2 className="font-serif home-protect-title">Your purchase is protected</h2>
+          <ul className="home-protect-list">
+            <li>
+              <strong>Lab-check guarantee</strong>
+              <span>If an independent gem lab finds a stone is not what we described, you get a full refund, lab fee included.</span>
+            </li>
+            <li>
+              <strong>30-day returns</strong>
+              <span>Changed your mind? Send it back within 30 days for a refund.</span>
+            </li>
+            <li>
+              <strong>Protected payment</strong>
+              <span>Pay with PayPal (PayPal Buyer Protection) or card (your card&apos;s chargeback rights), securely through Stripe.</span>
+            </li>
+            <li>
+              <strong>EU consumer law</strong>
+              <span>You buy from a registered Dutch company, under European consumer rules.</span>
+            </li>
+          </ul>
+          <p className="home-protect-company">
+            GemWorkers · registered in the Netherlands{company.kvk ? <> · KvK {company.kvk}</> : null}{company.vat ? <> · VAT {company.vat}</> : null}
+            {' · '}<Link href="/guarantee" className="home-text-link">Our guarantee →</Link>
+          </p>
+        </div>
       </section>
 
       {/* ── 2. Featured (owner's ⭐ picks) ── */}
