@@ -17,15 +17,23 @@ class InventoryRepository {
 
   // ── Inventory CRUD ────────────────────────────────────────────────────────
 
+  /// All stones, newest first. The database hands out at most 1,000 rows per
+  /// request, so this reads page after page (with 1,500+ imported drafts the
+  /// oldest — e.g. a whole seller — were silently missing).
   Future<List<InventoryItem>> getItems() async {
-    final response = await supabase
-        .from('inventory_items')
-        .select('*, suppliers(name)')
-        .order('created_at', ascending: false);
-
-    return response
-        .map<InventoryItem>((row) => InventoryItem.fromMap(row))
-        .toList();
+    const page = 1000;
+    final all = <InventoryItem>[];
+    for (var from = 0;; from += page) {
+      final rows = await supabase
+          .from('inventory_items')
+          .select('*, suppliers(name)')
+          .order('created_at', ascending: false)
+          .order('id')
+          .range(from, from + page - 1);
+      all.addAll(rows.map<InventoryItem>((row) => InventoryItem.fromMap(row)));
+      if (rows.length < page) break;
+    }
+    return all;
   }
 
   Future<List<InventoryItem>> getItemsBySupplier(String supplierId) async {
