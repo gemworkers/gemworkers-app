@@ -1,7 +1,16 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { oldShopifyTarget } from '@/lib/old-links'
 
 export async function middleware(request: NextRequest) {
+  // Old Shopify links → closest GemWorkers page (lib/old-links.ts), keeping utm_*.
+  const old = oldShopifyTarget(request.nextUrl.pathname)
+  if (old) {
+    const url = new URL(old, request.nextUrl.origin)
+    for (const [k, v] of request.nextUrl.searchParams) if (k.startsWith('utm_')) url.searchParams.set(k, v)
+    return NextResponse.redirect(url, 301)
+  }
+
   // ?ship_to=NL (links from the Google Shopping feed): show the page for that
   // country, so the price matches the feed. Saved like the header chooser.
   const shipTo = request.nextUrl.searchParams.get('ship_to')?.toUpperCase()
