@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
     const path = typeof body?.p === 'string' ? body.p.split('?')[0].slice(0, 300) : ''
     if (!path.startsWith('/') || path.startsWith('/api')) return new NextResponse(null, { status: 204 })
 
+    // A device marked with gemworkers.com/dont-count-me (owner, sellers, family) doesn't count.
+    if (req.cookies.get('gw_nocount')?.value === '1') return new NextResponse(null, { status: 204 })
+
     // Staff browsing their own shop don't count.
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
