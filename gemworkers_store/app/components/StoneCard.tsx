@@ -4,6 +4,7 @@ import { shownPrice, approxPrice, priceText, type PriceContext, type FxContext }
 import { FavouriteButton } from './FavouriteButton'
 import { cardImage } from '@/lib/media'
 import { tidyTitle, tidyPlace } from '@/lib/tidy'
+import { shipsIn } from '@/lib/browse'
 
 export type StoneCardItem = {
   id: string
@@ -18,6 +19,8 @@ export type StoneCardItem = {
   sale_method: string | null
   shipping_cost: number | null
   image_url: string | null
+  /** Seller's preparation days; when given, the card says "ships in N days". */
+  prep_days?: number | null
 }
 
 export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx = null }: {
@@ -93,6 +96,7 @@ export function StoneCard({ item, index = 0, priceCtx = null, favouriteIds, fx =
         {shipsFrom && (
           <p style={{ fontSize: 13, color: '#6B6052', marginBottom: 8 }}>
             Ships from {shipsFrom}
+            {item.prep_days !== undefined && <> · {shipsIn(item.prep_days).replace('Ships', 'ships')}</>}
           </p>
         )}
 

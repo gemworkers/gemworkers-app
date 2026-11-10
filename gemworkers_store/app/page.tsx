@@ -12,6 +12,7 @@ import type { StoneCardItem } from "@/app/components/StoneCard";
 import { HeroCollage } from '@/app/components/HeroCollage'
 import { StoneCarousel } from '@/app/components/StoneCarousel'
 import { WHATSAPP_DISPLAY } from '@/lib/whatsapp'
+import { COLOURS, COLLECTIONS, colourKeys } from '@/lib/browse'
 
 type ListedItem = {
   id: string;
@@ -29,6 +30,11 @@ type ListedItem = {
   product_type?: string | null;
   listed_at?: string | null;    // sql/public_views_listed_at.sql
   is_featured?: boolean | null; // set by the owner in the admin
+  status?: string | null;
+  prep_days?: number | null;
+  treatment?: string | null;
+  description?: string | null;
+  certification_lab?: string | null;
 };
 
 // The whole collection (all types), newest first
@@ -76,11 +82,14 @@ export default async function HomePage() {
   const hasHero = existsSync(join(process.cwd(), 'public', 'hero.jpg'))
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("public_listings").select("*");
+  // Detail view: also has prep days, treatment and lab (ship time, colour and
+  // collection rows). Reserved stones (accepted offer) stay off the homepage.
+  const { data, error } = await supabase.from("public_listing_details").select("*");
   if (error) console.error("[GemWorkers Store] Supabase error:", error.message);
 
   // Newest listed first — banner, carousels and everything below follow it.
   const items = ((data ?? []) as ListedItem[])
+    .filter(i => (i.status ?? 'available') === 'available')
     .sort((a, b) => (b.listed_at ?? '').localeCompare(a.listed_at ?? ''));
 
   // Newest three approved reviews that have text — not hand-picked.
@@ -105,6 +114,7 @@ export default async function HomePage() {
     sale_method:    item.sale_method,
     shipping_cost:  item.shipping_cost,
     image_url:      item.image_url,
+    prep_days:      item.prep_days != null ? Number(item.prep_days) : null,
   })
   // New arrivals skip the ⭐ featured stones, so no stone shows twice.
   const newArrivals = items.filter(i => !i.is_featured).slice(0, 12).map(toCard)
@@ -125,6 +135,12 @@ export default async function HomePage() {
   // Gems actually in stock, most stones first.
   const gemCounts = new Map<string, number>()
   for (const i of items) if (i.gem_type?.trim()) gemCounts.set(i.gem_type.trim(), (gemCounts.get(i.gem_type.trim()) ?? 0) + 1)
+  // Colours and collections with enough stones to be worth a tile.
+  const colours = COLOURS.map(c => ({ ...c, count: items.filter(i => colourKeys(i).includes(c.key)).length }))
+    .filter(c => c.count >= 3)
+  const collections = COLLECTIONS.map(c => ({ ...c, count: items.filter(i => c.test(i)).length }))
+    .filter(c => c.count >= 2)
+
   const gems = [...gemCounts.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8)
 
   const [pctx, favs, fx] = await Promise.all([priceContext(), favouriteIds(), fxContext()])
@@ -225,6 +241,39 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+      )}
+
+      {/* ── Shop by colour (from the words in titles) ── */}
+      {colours.length > 0 && (
+        <section className="home-wrap home-section-tight">
+          <SectionHeader title="Shop by colour" linkLabel="All stones →" href={SHOP_HREF} />
+          <div className="home-gem-grid">
+            {colours.map(c => (
+              <Link key={c.key} href={`${SHOP_HREF}?colour=${c.key}`} className="home-gem-tile">
+                <span className="home-gem-stone" aria-hidden="true" style={{ '--gem': c.swatch } as React.CSSProperties} />
+                <span>{c.label}</span>
+                <span className="home-gem-count">{c.count} {c.count === 1 ? 'piece' : 'pieces'}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Collections: pairs, lots, untreated, certified ── */}
+      {collections.length > 0 && (
+        <section className="home-band">
+          <div className="home-wrap home-section-tight">
+            <SectionHeader title="Collections" />
+            <div className="home-gem-grid">
+              {collections.map(c => (
+                <Link key={c.key} href={`${SHOP_HREF}?col=${c.key}`} className="home-gem-tile home-col-tile">
+                  <span className="font-serif home-col-label">{c.label}</span>
+                  <span className="home-gem-count">{c.blurb} · {c.count}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* ── 5. Shop by gemstone (gems in stock) ── */}

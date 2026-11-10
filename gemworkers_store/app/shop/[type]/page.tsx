@@ -7,6 +7,7 @@ import { shownPrice } from '@/lib/price-shown'
 import { countryName } from '@/lib/countries'
 import { favouriteIds } from '@/lib/favourites'
 import { fxContext } from '@/lib/fx'
+import { COLOURS, COLLECTIONS, colourKeys, inCollection } from '@/lib/browse'
 
 const TYPE_LABELS: Record<string, string> = {
   all:         'All stones',
@@ -30,7 +31,7 @@ const CATEGORY_TABS = [['all', 'All'], ['loose_stone', 'Loose gemstones'], ['spe
 type PageProps = {
   params:       Promise<{ type: string }>
   // Filters live in the URL so a filtered page can be bookmarked or shared.
-  searchParams: Promise<{ gem?: string; min?: string; max?: string; from?: string; cert?: string; sort?: string }>
+  searchParams: Promise<{ gem?: string; min?: string; max?: string; from?: string; cert?: string; sort?: string; colour?: string; col?: string }>
 }
 
 type CategoryRow = {
@@ -47,6 +48,9 @@ type CategoryRow = {
   shipping_cost:  number | null
   image_urls:     unknown
   certification_lab?: string | null
+  treatment?: string | null
+  description?: string | null
+  prep_days?: number | null
   // Present once public_views_available_only.sql is applied; absent before.
   status?:        string | null
   listed_at?:     string | null   // sql/public_views_listed_at.sql
@@ -83,7 +87,7 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
 
 export default async function ShopCategoryPage({ params, searchParams }: PageProps) {
   const { type } = await params
-  const { gem, min, max, from, cert, sort } = await searchParams
+  const { gem, min, max, from, cert, sort, colour, col } = await searchParams
 
   if (!VALID_TYPES.has(type)) {
     return (
@@ -125,6 +129,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
     selling_price:  row.selling_price  != null ? Number(row.selling_price) : null,
     sale_method:    row.sale_method,
     shipping_cost:  row.shipping_cost  != null ? Number(row.shipping_cost) : null,
+    prep_days:      row.prep_days != null ? Number(row.prep_days) : null,
     image_url:      Array.isArray(row.image_urls)
       ? ((row.image_urls as string[])[0] ?? null)
       : null,
@@ -151,8 +156,13 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
     i.selling_price == null || i.sale_method === 'accept_offers'
       ? null : shownPrice(i.selling_price, i.seller_country, pctx).amount
 
+  // Colour / collection (homepage rows) — worked out from the full row.
+  const byId = new Map(rows.map(r => [r.id, r]))
   let items = allItems.filter(i => {
     if (gem && i.gem_type !== gem) return false
+    const row = byId.get(i.id)
+    if (colour && !(row && colourKeys(row).includes(colour))) return false
+    if (col && !(row && inCollection(row, col))) return false
     if (from && i.seller_country !== from) return false
     if (cert === '1' && !certified.has(i.id)) return false
     if (minN != null || maxN != null) {
@@ -172,12 +182,13 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       return (pa - pb) * dir
     })
   }
-  const filtered = !!(min || max || from || cert || (sort && sort !== 'default'))
+  const filtered = !!(min || max || from || cert || colour || col || (sort && sort !== 'default'))
+  const groupLabel = COLOURS.find(c => c.key === colour)?.label ?? COLLECTIONS.find(c => c.key === col)?.label
 
   // Chip links keep the other filters.
   const href = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams()
-    const all = { gem, min, max, from, cert, sort, ...over }
+    const all = { gem, min, max, from, cert, sort, colour, col, ...over }
     for (const [k, v] of Object.entries(all)) if (v) p.set(k, v)
     const q = p.toString()
     return `/shop/${type}${q ? `?${q}` : ''}`
@@ -191,7 +202,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       {/* ── Heading ── */}
       <h1 className="font-serif browse-title">{label}</h1>
       <p className="browse-count">
-        {items.length} {items.length === 1 ? one : many}{gem ? ` · ${gem}` : ''}{filtered ? ' · filtered' : ''}
+        {items.length} {items.length === 1 ? one : many}{groupLabel ? ` · ${groupLabel}` : ''}{gem ? ` · ${gem}` : ''}{filtered ? ' · filtered' : ''}
       </p>
 
       {/* ── Category tabs: the whole collection or one product type ── */}
@@ -222,6 +233,8 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
       {/* ── More filters (plain form: works without JavaScript) ── */}
       <form method="get" action={`/shop/${type}`} className="browse-filters">
         {gem && <input type="hidden" name="gem" value={gem} />}
+        {colour && <input type="hidden" name="colour" value={colour} />}
+        {col && <input type="hidden" name="col" value={col} />}
         <label className="browse-filter">
           <span>Price from €</span>
           <input name="min" inputMode="decimal" defaultValue={min ?? ''} placeholder="0" />
@@ -252,7 +265,7 @@ export default async function ShopCategoryPage({ params, searchParams }: PagePro
           <span>Certified only</span>
         </label>
         <button type="submit" className="browse-chip is-active">Apply</button>
-        {filtered && <Link href={href({ min: undefined, max: undefined, from: undefined, cert: undefined, sort: undefined })} className="pd-link" style={{ fontSize: 14 }}>Clear filters</Link>}
+        {filtered && <Link href={href({ min: undefined, max: undefined, from: undefined, cert: undefined, sort: undefined, colour: undefined, col: undefined })} className="pd-link" style={{ fontSize: 14 }}>Clear filters</Link>}
       </form>
 
       {/* ── Grid or empty state ── */}

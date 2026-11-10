@@ -46,7 +46,6 @@ const TRUST_POINTS = [
   '100% natural gemstones',
   'Tracked shipping worldwide',
   '30-day returns',
-  'Certificates on request',
 ]
 
 const SHOP_LINKS = [
@@ -197,6 +196,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div className="trust-strip">
             {TRUST_POINTS.map(t => <span key={t}>{t}</span>)}
+            <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', fontWeight: 600 }}>
+              Questions? WhatsApp {WHATSAPP_DISPLAY}
+            </a>
             <ShipToSelect countries={shipCountries} current={shipTo} />
           </div>
           <StoreHeader user={navUser} />
