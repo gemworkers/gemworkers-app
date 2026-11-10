@@ -35,6 +35,7 @@ type ListedItem = {
   treatment?: string | null;
   description?: string | null;
   certification_lab?: string | null;
+  image_urls?: unknown;           // detail view: the photo list (first = cover)
 };
 
 // The whole collection (all types), newest first
@@ -90,6 +91,8 @@ export default async function HomePage() {
   // Newest listed first — banner, carousels and everything below follow it.
   const items = ((data ?? []) as ListedItem[])
     .filter(i => (i.status ?? 'available') === 'available')
+    // The detail view has the photo list, not image_url: take the first photo.
+    .map(i => ({ ...i, image_url: i.image_url ?? (Array.isArray(i.image_urls) ? ((i.image_urls as string[])[0] ?? null) : null) }))
     .sort((a, b) => (b.listed_at ?? '').localeCompare(a.listed_at ?? ''));
 
   // Newest three approved reviews that have text — not hand-picked.
